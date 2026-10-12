@@ -1,0 +1,55 @@
+import asyncio, subprocess, sys, time, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from playwright.async_api import async_playwright
+ROOT = pathlib.Path(__file__).parent
+PORT = 8767
+SHIM = open(ROOT/'run.py').read().split('SHIM = """')[1].split('"""')[0]
+async def main():
+    srv = subprocess.Popen([sys.executable, str(ROOT / 'server.py'), str(PORT)]); time.sleep(0.8)
+    try:
+        async with async_playwright() as p:
+            b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
+            page = await b.new_page(viewport={'width': 1600, 'height': 950})
+            errs=[]; page.on('pageerror', lambda e: errs.append(str(e)))
+            async def route(r):
+                u = r.request.url
+                if 'react-dom' in u: await r.fulfill(body='', content_type='text/javascript')
+                elif 'react' in u: await r.fulfill(path=str(ROOT / 'react-bundle.js'), content_type='text/javascript')
+                elif 'babel' in u: await r.fulfill(body=SHIM, content_type='text/javascript')
+                elif 'fonts.g' in u: await r.fulfill(body='', content_type='text/css')
+                else: await r.continue_()
+            await page.route('**/*', route)
+            await page.goto(f'http://127.0.0.1:{PORT}/'); await page.wait_for_timeout(600)
+            await page.evaluate('Workspace.open("m7")'); await page.wait_for_timeout(1000)
+            await page.click('[data-ptab="design"]'); await page.wait_for_timeout(1800)
+            await page.click('[data-dmode="interact"]')
+            h = page.locator('#designHost')
+            await h.locator('.hashtag-btn').click(); await page.wait_for_timeout(100)
+            print('loading:', await h.locator('.modal-message').inner_text())
+            await page.wait_for_timeout(1600)
+            print('rows:', await h.locator('.tag-row').count(), '|', (await h.locator('.tag-row').first.inner_text()).replace(chr(10),' '))
+            await h.locator('.post-input').evaluate("e => e")
+            await h.locator('.tag-row', has_text='#react').click(); await page.wait_for_timeout(150)
+            print('text:', repr(await h.locator('.post-input').input_value()), '| modal:', await h.locator('.modal').count(), '|', await h.locator('.char-count').inner_text())
+            await h.locator('.post-input').fill('hello world')
+            await h.locator('.hashtag-btn').click(); await page.wait_for_timeout(1600)
+            await h.locator('.tag-row', has_text='#ai').first.click(); await page.wait_for_timeout(150)
+            print('text2:', repr(await h.locator('.post-input').input_value()))
+            await h.locator('.hashtag-btn').click(); await page.wait_for_timeout(1600)
+            print('ai disabled:', await h.locator('.tag-row', has_text='#ai ').count(), await h.locator('.tag-row.is-used').count())
+            await h.locator('.modal-search').fill('#TYPE'); await page.wait_for_timeout(100)
+            print('search:', await h.locator('.tag-row').all_inner_texts())
+            await h.locator('.modal-search').fill('zzz'); await page.wait_for_timeout(100)
+            print('none:', await h.locator('.modal-message').inner_text())
+            await page.screenshot(path=str(ROOT/'shots'/'m7-int.png'))
+            await h.locator('.modal-head').click(); await page.wait_for_timeout(100)
+            print('inside keeps:', await h.locator('.modal').count())
+            await page.keyboard.press('Escape'); await page.wait_for_timeout(150)
+            print('esc:', await h.locator('.modal').count())
+            await h.locator('.hashtag-btn').click(); await page.wait_for_timeout(200)
+            await h.locator('.backdrop').click(position={'x':5,'y':5}); await page.wait_for_timeout(150)
+            print('backdrop:', await h.locator('.modal').count())
+            print('errs', errs)
+            await b.close()
+    finally: srv.terminate()
+asyncio.run(main())

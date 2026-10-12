@@ -1,0 +1,620 @@
+@@@ shared src/utils/date.ts
+// "Today" is fixed so the calendar is the same every time you open it.
+// Never use new Date() / Date.now() for "today" in this app: use TODAY.
+export const TODAY = new Date(2026, 2, 3); // Tue, Mar 3 2026 (months are 0-based)
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Local date -> "2026-03-04". ISO strings compare correctly as plain strings: "2026-03-04" < "2026-03-10".
+export function toISO(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
+// "2026-03-04" -> local Date (midnight)
+export function fromISO(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function addDays(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+// Always returns the 1st of the resulting month.
+export function addMonths(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + n, 1);
+}
+
+export function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+// "March 2026"
+export function monthLabel(d: Date): string {
+  return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+// "2026-03-04" -> "Mar 4"
+export function formatShort(iso: string): string {
+  const d = fromISO(iso);
+  return MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+}
+
+// nightsBetween("2026-03-04", "2026-03-09") -> 5
+export function nightsBetween(startIso: string, endIso: string): number {
+  return Math.round((fromISO(endIso).getTime() - fromISO(startIso).getTime()) / 86400000);
+}
+
+// The cells of a month view, weeks starting on Sunday.
+// Leading blanks are null: e.g. March 2026 starts on a Sunday, April 2026 -> [null, null, null, Apr 1, ...]
+export function getMonthGrid(month: Date): (Date | null)[] {
+  const first = startOfMonth(month);
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < first.getDay(); i++) {
+    cells.push(null);
+  }
+  const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    cells.push(new Date(first.getFullYear(), first.getMonth(), d));
+  }
+  return cells;
+}
+@@@ shared src/utils/money.ts
+// formatPrice(925) -> "$925"
+export function formatPrice(n: number): string {
+  return '$' + n.toLocaleString('en-US');
+}
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Availability = {
+  cabinId: string;
+  pricePerNight: number;
+  unavailable: string[]; // ISO dates (nights) already booked
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /cabins/:id/availability
+export async function getAvailability(cabinId: string): Promise<Availability> {
+  await randomDelay(400, 1000);
+  return {
+    cabinId,
+    pricePerNight: 185,
+    unavailable: ['2026-03-12', '2026-03-13', '2026-03-20', '2026-03-21', '2026-03-22', '2026-04-03', '2026-04-04', '2026-04-17', '2026-05-08', '2026-05-09'],
+  };
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getAvailability } from './api';
+import type { Availability } from './api';
+import { TODAY, toISO, getMonthGrid, monthLabel } from './utils/date';
+import { formatPrice } from './utils/money';
+
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+// Display only for now. TODO: selection (see the task)
+function MonthView({ month }: { month: Date }) {
+  const todayIso = toISO(TODAY);
+  return (
+    <div className="month">
+      <h3 className="month-title">{monthLabel(month)}</h3>
+      <div className="weekdays">
+        {WEEKDAYS.map((w) => {
+          return <span key={w}>{w}</span>;
+        })}
+      </div>
+      <div className="days">
+        {getMonthGrid(month).map((d, i) => {
+          if (!d) {
+            return <span key={'blank-' + i} />;
+          }
+          const iso = toISO(d);
+          return (
+            <button key={iso} type="button" className="day" disabled={iso < todayIso}>
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CabinHero() {
+  return (
+    <div className="hero">
+      <div className="hero-art" aria-hidden="true" />
+      <div className="hero-text">
+        <p className="kicker">Fernhill Cabins · Hood River, OR</p>
+        <h1>The Alder Cabin</h1>
+        <p className="hero-meta">2 guests · 1 bedroom · wood stove · creek view</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [availability, setAvailability] = useState<Availability | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAvailability('alder').then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setAvailability(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let calendar;
+  if (!availability) {
+    calendar = <p className="loading">Checking availability…</p>;
+  } else {
+    calendar = <MonthView month={TODAY} />;
+  }
+
+  let price = null;
+  if (availability) {
+    price = <span className="price"><b>{formatPrice(availability.pricePerNight)}</b> / night</span>;
+  }
+
+  return (
+    <div className="page">
+      <CabinHero />
+      <section className="booking">
+        <div className="booking-head">
+          <h2>Select dates</h2>
+          {price}
+        </div>
+        {calendar}
+        <div className="summary-bar">
+          <span className="summary">Add your check-in date</span>
+          <button type="button" className="reserve-btn" disabled>Reserve</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F5F3EC;
+  --surface: #FFFFFF;
+  --border: #E2DED1;
+  --text: #1F2A22;
+  --muted: #74796F;
+  --forest: #2F5D46;
+  --forest-dark: #234635;
+  --forest-soft: #E3EDE6;
+  --moss: #A7C4A0;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.page { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
+
+.hero { display: flex; gap: 18px; align-items: center; margin-bottom: 22px; }
+.hero-art { width: 120px; height: 90px; flex-shrink: 0; border-radius: 12px; background: linear-gradient(160deg, #CFE0C8 0%, #8DB08A 45%, #2F5D46 46%, #234635 100%); box-shadow: inset 0 -18px 0 rgba(0, 0, 0, 0.08); }
+.kicker { margin: 0; font-size: 12px; color: var(--forest); font-weight: 600; }
+.hero h1 { margin: 2px 0; font: 600 28px/1.15 Georgia, 'Times New Roman', serif; }
+.hero-meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.booking { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: 0 6px 24px rgba(31, 42, 34, 0.06); }
+.booking-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+.booking-head h2 { margin: 0; font-size: 18px; }
+.price { color: var(--muted); }
+.price b { color: var(--text); font-size: 17px; }
+.loading { padding: 50px 0; text-align: center; color: var(--muted); }
+
+.month { flex: 1; min-width: 0; }
+.month-title { margin: 0 0 10px; text-align: center; font-size: 14px; font-weight: 600; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); }
+.weekdays span { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 6px; }
+.day { height: 38px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); border-radius: 999px; cursor: pointer; }
+.day:hover:not(:disabled) { background: var(--forest-soft); }
+.day:disabled { color: #C3C1B8; cursor: default; }
+
+.summary-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.summary { font-weight: 600; }
+.reserve-btn { height: 40px; padding: 0 22px; border: 0; border-radius: 10px; background: var(--forest); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.reserve-btn:hover:not(:disabled) { background: var(--forest-dark); }
+.reserve-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getAvailability } from './api';
+import type { Availability } from './api';
+import { TODAY, toISO, fromISO, addDays, addMonths, startOfMonth, getMonthGrid, monthLabel, formatShort, nightsBetween } from './utils/date';
+import { formatPrice } from './utils/money';
+
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const TODAY_ISO = toISO(TODAY);
+
+type DayInfo = {
+  disabled: boolean;
+  unavailable: boolean;
+  isStart: boolean;
+  isEnd: boolean;
+  inRange: boolean;
+  isPreviewEnd: boolean;
+};
+
+type MonthViewProps = {
+  month: Date;
+  focusedIso: string;
+  getInfo: (iso: string) => DayInfo;
+  onDayClick: (iso: string) => void;
+  onDayHover: (iso: string | null) => void;
+  onDayFocus: (iso: string) => void;
+};
+
+function MonthView({ month, focusedIso, getInfo, onDayClick, onDayHover, onDayFocus }: MonthViewProps) {
+  return (
+    <div className="month">
+      <h3 className="month-title">{monthLabel(month)}</h3>
+      <div className="weekdays">
+        {WEEKDAYS.map((w) => {
+          return <span key={w}>{w}</span>;
+        })}
+      </div>
+      <div className="days">
+        {getMonthGrid(month).map((d, i) => {
+          if (!d) {
+            return <span key={'blank-' + i} />;
+          }
+          const iso = toISO(d);
+          const info = getInfo(iso);
+          let cls = 'day';
+          if (info.disabled) {
+            cls += ' is-disabled';
+          }
+          if (info.unavailable) {
+            cls += ' is-unavailable';
+          }
+          if (info.inRange) {
+            cls += ' in-range';
+          }
+          if (info.isStart) {
+            cls += ' is-start';
+          }
+          if (info.isEnd || info.isPreviewEnd) {
+            cls += ' is-end';
+          }
+          if (iso === TODAY_ISO) {
+            cls += ' is-today';
+          }
+          // Roving tabindex: only one day is in the Tab order.
+          let tabIndex = -1;
+          if (iso === focusedIso) {
+            tabIndex = 0;
+          }
+          return (
+            <button
+              key={iso}
+              type="button"
+              className={cls}
+              data-date={iso}
+              tabIndex={tabIndex}
+              aria-disabled={info.disabled}
+              aria-pressed={info.isStart || info.isEnd}
+              aria-label={d.toDateString()}
+              onClick={() => { onDayClick(iso); }}
+              onMouseEnter={() => { onDayHover(iso); }}
+              onFocus={() => { onDayFocus(iso); }}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CabinHero() {
+  return (
+    <div className="hero">
+      <div className="hero-art" aria-hidden="true" />
+      <div className="hero-text">
+        <p className="kicker">Fernhill Cabins · Hood River, OR</p>
+        <h1>The Alder Cabin</h1>
+        <p className="hero-meta">2 guests · 1 bedroom · wood stove · creek view</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(TODAY));
+  const [start, setStart] = useState<string | null>(null);
+  const [end, setEnd] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const [focusedIso, setFocusedIso] = useState(TODAY_ISO);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const keyboardMoved = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAvailability('alder').then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setAvailability(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Change: after an arrow key, move real DOM focus to the new day (it may be in a new month).
+  useEffect(() => {
+    if (!keyboardMoved.current || !calendarRef.current) {
+      return;
+    }
+    keyboardMoved.current = false;
+    const el = calendarRef.current.querySelector<HTMLElement>('[data-date="' + focusedIso + '"]');
+    if (el) {
+      el.focus();
+    }
+  }, [focusedIso, viewMonth]);
+
+  // derived
+  const unavailable = new Set<string>();
+  if (availability) {
+    availability.unavailable.forEach((u) => {
+      unavailable.add(u);
+    });
+  }
+  const pickingEnd = start !== null && end === null;
+  // While picking checkout, nothing on or after the next booked night can be chosen.
+  let limit: string | null = null;
+  if (pickingEnd && start) {
+    const s = start;
+    const later = Array.from(unavailable).filter((u) => {
+      return u > s;
+    }).sort();
+    if (later.length > 0) {
+      limit = later[0];
+    }
+  }
+
+  // Roving tabindex target: the focused day, or the first selectable visible day
+  // if the month buttons scrolled it out of view.
+  const viewStartIso = toISO(viewMonth);
+  const viewEndIso = toISO(addDays(addMonths(viewMonth, 2), -1));
+  let tabbableIso = focusedIso;
+  if (focusedIso < viewStartIso || focusedIso > viewEndIso) {
+    tabbableIso = viewStartIso;
+    if (tabbableIso < TODAY_ISO) {
+      tabbableIso = TODAY_ISO;
+    }
+  }
+
+  function isDisabled(iso: string): boolean {
+    if (iso < TODAY_ISO || unavailable.has(iso)) {
+      return true;
+    }
+    return limit !== null && iso >= limit;
+  }
+
+  // The range end to draw: the real end, or the hovered day while picking.
+  let rangeEnd = end;
+  let previewing = false;
+  if (pickingEnd && hover && start && hover > start && !isDisabled(hover)) {
+    rangeEnd = hover;
+    previewing = true;
+  }
+
+  function getInfo(iso: string): DayInfo {
+    return {
+      disabled: isDisabled(iso),
+      unavailable: unavailable.has(iso),
+      isStart: iso === start,
+      isEnd: iso === end,
+      inRange: start !== null && rangeEnd !== null && iso > start && iso < rangeEnd,
+      isPreviewEnd: previewing && iso === rangeEnd,
+    };
+  }
+
+  function handleDayClick(iso: string) {
+    setFocusedIso(iso);
+    if (isDisabled(iso)) {
+      return;
+    }
+    if (!start || end) {
+      setStart(iso); // first click, or starting over
+      setEnd(null);
+    } else if (iso <= start) {
+      setStart(iso); // earlier day: move the check-in instead
+    } else {
+      setEnd(iso);
+    }
+  }
+
+  function handleClear() {
+    setStart(null);
+    setEnd(null);
+    setHover(null);
+  }
+
+  // ---- change: arrow keys across days ----
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    const step = steps[e.key];
+    if (step === undefined) {
+      return;
+    }
+    e.preventDefault();
+    let next = toISO(addDays(fromISO(tabbableIso), step));
+    if (next < TODAY_ISO) {
+      next = TODAY_ISO;
+    }
+    // Keep the focused day inside the two visible months.
+    const nextDate = fromISO(next);
+    if (nextDate < viewMonth) {
+      setViewMonth(startOfMonth(nextDate));
+    } else if (nextDate >= addMonths(viewMonth, 2)) {
+      setViewMonth(addMonths(startOfMonth(nextDate), -1));
+    }
+    keyboardMoved.current = true;
+    setFocusedIso(next);
+    setHover(next); // keyboard users get the same range preview
+  }
+
+  // derived: summary
+  let summary = 'Add your check-in date';
+  let total = null;
+  if (start && end && availability) {
+    const nights = nightsBetween(start, end);
+    let noun = 'nights';
+    if (nights === 1) {
+      noun = 'night';
+    }
+    summary = formatShort(start) + ' → ' + formatShort(end) + ' · ' + nights + ' ' + noun;
+    total = <span className="total">{formatPrice(nights * availability.pricePerNight)} total</span>;
+  } else if (start) {
+    summary = formatShort(start) + ' → Add checkout';
+  }
+
+  let clearBtn = null;
+  if (start) {
+    clearBtn = <button type="button" className="clear-btn" onClick={() => { handleClear(); }}>Clear dates</button>;
+  }
+
+  const canGoBack = viewMonth > startOfMonth(TODAY);
+
+  let calendar;
+  if (!availability) {
+    calendar = <p className="loading">Checking availability…</p>;
+  } else {
+    calendar = (
+      <div className="calendar" ref={calendarRef} onKeyDown={handleKeyDown} onMouseLeave={() => { setHover(null); }}>
+        <button type="button" className="nav-btn nav-prev" aria-label="Previous month" disabled={!canGoBack} onClick={() => { setViewMonth((m) => { return addMonths(m, -1); }); }}>‹</button>
+        <button type="button" className="nav-btn nav-next" aria-label="Next month" onClick={() => { setViewMonth((m) => { return addMonths(m, 1); }); }}>›</button>
+        <MonthView month={viewMonth} focusedIso={tabbableIso} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} onDayFocus={setFocusedIso} />
+        <MonthView month={addMonths(viewMonth, 1)} focusedIso={tabbableIso} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} onDayFocus={setFocusedIso} />
+      </div>
+    );
+  }
+
+  let price = null;
+  if (availability) {
+    price = <span className="price"><b>{formatPrice(availability.pricePerNight)}</b> / night</span>;
+  }
+
+  return (
+    <div className="page">
+      <CabinHero />
+      <section className="booking">
+        <div className="booking-head">
+          <h2>Select dates</h2>
+          {price}
+        </div>
+        {calendar}
+        <div className="legend">
+          <span className="legend-item"><span className="swatch swatch-booked" />Booked</span>
+          <span className="legend-item"><span className="swatch swatch-range" />Your stay</span>
+        </div>
+        <div className="summary-bar">
+          <div className="summary-text">
+            <span className="summary" aria-live="polite">{summary}</span>
+            {total}
+          </div>
+          {clearBtn}
+          <button type="button" className="reserve-btn" disabled={!end}>Reserve</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F5F3EC;
+  --surface: #FFFFFF;
+  --border: #E2DED1;
+  --text: #1F2A22;
+  --muted: #74796F;
+  --forest: #2F5D46;
+  --forest-dark: #234635;
+  --forest-soft: #E3EDE6;
+  --moss: #A7C4A0;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.page { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
+
+.hero { display: flex; gap: 18px; align-items: center; margin-bottom: 22px; }
+.hero-art { width: 120px; height: 90px; flex-shrink: 0; border-radius: 12px; background: linear-gradient(160deg, #CFE0C8 0%, #8DB08A 45%, #2F5D46 46%, #234635 100%); box-shadow: inset 0 -18px 0 rgba(0, 0, 0, 0.08); }
+.kicker { margin: 0; font-size: 12px; color: var(--forest); font-weight: 600; }
+.hero h1 { margin: 2px 0; font: 600 28px/1.15 Georgia, 'Times New Roman', serif; }
+.hero-meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.booking { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: 0 6px 24px rgba(31, 42, 34, 0.06); }
+.booking-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+.booking-head h2 { margin: 0; font-size: 18px; }
+.price { color: var(--muted); }
+.price b { color: var(--text); font-size: 17px; }
+.loading { padding: 50px 0; text-align: center; color: var(--muted); }
+
+.month { flex: 1; min-width: 0; }
+.month-title { margin: 0 0 10px; text-align: center; font-size: 14px; font-weight: 600; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); }
+.weekdays span { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 6px; }
+.day { height: 38px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); border-radius: 999px; cursor: pointer; }
+.day:hover:not(:disabled) { background: var(--forest-soft); }
+.day:disabled { color: #C3C1B8; cursor: default; }
+
+.summary-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.summary { font-weight: 600; }
+.reserve-btn { height: 40px; padding: 0 22px; border: 0; border-radius: 10px; background: var(--forest); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.reserve-btn:hover:not(:disabled) { background: var(--forest-dark); }
+.reserve-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Added: two-month range picker ---- */
+.calendar { position: relative; display: flex; gap: 32px; }
+.nav-btn { position: absolute; top: -6px; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%; background: #fff; color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.nav-btn:hover:not(:disabled) { background: var(--forest-soft); }
+.nav-btn:disabled { opacity: 0.35; cursor: default; }
+.nav-prev { left: 0; }
+.nav-next { right: 0; }
+
+.days { row-gap: 2px; }
+.day { position: relative; }
+.day:focus-visible { outline: 2px solid var(--forest); outline-offset: -2px; }
+.day.is-today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.day.is-disabled { color: #C3C1B8; cursor: default; }
+.day.is-disabled:hover { background: none; }
+.day.is-unavailable { text-decoration: line-through; }
+.day.in-range { background: var(--forest-soft); border-radius: 0; }
+.day.in-range:hover { background: #D3E3D8; }
+.day.is-start, .day.is-end { background: var(--forest); color: #fff; font-weight: 600; }
+.day.is-start:hover, .day.is-end:hover { background: var(--forest-dark); }
+
+.legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; }
+.swatch-booked { background: repeating-linear-gradient(135deg, #D9D6CC 0 2px, #fff 2px 4px); border: 1px solid var(--border); }
+.swatch-range { background: var(--forest-soft); border: 1px solid var(--moss); }
+
+.summary-text { display: flex; flex-direction: column; margin-right: auto; }
+.total { font-size: 13px; color: var(--muted); }
+.clear-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+
+@media (max-width: 640px) {
+  .calendar { flex-direction: column; gap: 20px; }
+}

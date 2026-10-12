@@ -1,0 +1,365 @@
+@@@ shared src/utils/tags.ts
+export const MAX_TAGS = 5;
+
+// cleanTag("  #React  ") -> "React", cleanTag("design,") -> "design", cleanTag("   ") -> ""
+// Trims, drops commas and a leading "#", and collapses inner spaces.
+export function cleanTag(raw: string): string {
+  return raw
+    .replace(/,/g, '')
+    .replace(/^#/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+@@@ shared src/components/Chip.tsx
+import React from 'react';
+
+type ChipProps = {
+  label: string;
+  onRemove?: () => void; // when given, the chip shows a small × button
+};
+
+export default function Chip({ label, onRemove }: ChipProps) {
+  let removeBtn = null;
+  if (onRemove) {
+    removeBtn = (
+      <button type="button" className="chip-x" aria-label={'Remove ' + label} onClick={() => { onRemove(); }}>
+        ×
+      </button>
+    );
+  }
+  return (
+    <span className="chip">
+      {label}
+      {removeBtn}
+    </span>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import Chip from './components/Chip';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">Inkwell</span>
+      <span className="draft-state">Draft · Saved</span>
+      <button type="button" className="publish-btn">Publish</button>
+    </header>
+  );
+}
+
+type EditorProps = {
+  title: string;
+  body: string;
+  onTitleChange: (value: string) => void;
+  onBodyChange: (value: string) => void;
+};
+
+function Editor({ title, body, onTitleChange, onBodyChange }: EditorProps) {
+  return (
+    <article className="editor">
+      <input
+        className="title-input"
+        placeholder="Title"
+        value={title}
+        onChange={(e) => { onTitleChange(e.target.value); }}
+      />
+      <textarea
+        className="body-input"
+        placeholder="Tell your story…"
+        value={body}
+        onChange={(e) => { onBodyChange(e.target.value); }}
+      />
+    </article>
+  );
+}
+
+// TODO: turn this into a tag input. Enter or comma adds a chip,
+// Backspace on an empty input removes the last one.
+function TagField() {
+  const [draft, setDraft] = useState('');
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor="tags">Tags</label>
+      <div className="tag-box">
+        <input
+          id="tags"
+          className="tag-input"
+          placeholder="Add a tag…"
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); }}
+        />
+      </div>
+      <p className="field-help">Tags help readers find your post.</p>
+    </div>
+  );
+}
+
+function PostSettings() {
+  return (
+    <aside className="settings">
+      <h2>Post settings</h2>
+      <div className="field">
+        <span className="field-label">Publication</span>
+        <div><Chip label="Engineering Notes" /></div>
+      </div>
+      <TagField />
+      <div className="field">
+        <span className="field-label">Visibility</span>
+        <p className="field-value">Public · appears on your profile</p>
+      </div>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [title, setTitle] = useState('What I learned shipping a design system');
+  const [body, setBody] = useState('Six months ago our product had four different button styles and no shared tokens. This is the story of how we fixed it without stopping feature work.');
+
+  return (
+    <div className="app">
+      <TopBar />
+      <div className="workspace">
+        <Editor title={title} body={body} onTitleChange={setTitle} onBodyChange={setBody} />
+        <PostSettings />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FBF8F3;
+  --surface: #FFFFFF;
+  --border: #E8E1D6;
+  --text: #2B2622;
+  --muted: #8A7F73;
+  --accent: #B5532C;
+  --accent-soft: #F7E7DE;
+  --serif: Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 14px; padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.logo { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.draft-state { font-size: 13px; color: var(--muted); margin-right: auto; }
+.publish-btn { height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+.workspace { display: flex; flex-wrap: wrap; gap: 32px; padding: 32px 28px; max-width: 1040px; margin: 0 auto; }
+.editor { flex: 1 1 380px; display: flex; flex-direction: column; gap: 14px; }
+.title-input { border: 0; background: none; font-family: var(--serif); font-size: 34px; font-weight: 700; color: var(--text); padding: 0; outline: none; }
+.body-input { border: 0; background: none; min-height: 220px; resize: vertical; font-family: var(--serif); font-size: 19px; line-height: 1.65; color: var(--text); padding: 0; outline: none; }
+
+.settings { flex: 0 1 300px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 18px; align-self: flex-start; }
+.settings h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field-label { font-size: 14px; font-weight: 600; }
+.field-help, .field-value { margin: 0; font-size: 13px; color: var(--muted); }
+
+.tag-box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.tag-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tag-input { flex: 1; min-width: 90px; height: 28px; border: 0; outline: none; font: inherit; font-size: 14px; background: none; color: var(--text); }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
+.chip-x { width: 18px; height: 18px; margin-right: -4px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.chip-x:hover { background: rgba(181, 83, 44, 0.15); }
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import Chip from './components/Chip';
+import { cleanTag, MAX_TAGS } from './utils/tags';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">Inkwell</span>
+      <span className="draft-state">Draft · Saved</span>
+      <button type="button" className="publish-btn">Publish</button>
+    </header>
+  );
+}
+
+type EditorProps = {
+  title: string;
+  body: string;
+  onTitleChange: (value: string) => void;
+  onBodyChange: (value: string) => void;
+};
+
+function Editor({ title, body, onTitleChange, onBodyChange }: EditorProps) {
+  return (
+    <article className="editor">
+      <input
+        className="title-input"
+        placeholder="Title"
+        value={title}
+        onChange={(e) => { onTitleChange(e.target.value); }}
+      />
+      <textarea
+        className="body-input"
+        placeholder="Tell your story…"
+        value={body}
+        onChange={(e) => { onBodyChange(e.target.value); }}
+      />
+    </article>
+  );
+}
+
+type TagFieldProps = {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+};
+
+// The tags belong to the post (App). Only the half-typed text is local.
+function TagField({ tags, onChange }: TagFieldProps) {
+  const [draft, setDraft] = useState('');
+  const [message, setMessage] = useState('');
+
+  function addTag() {
+    const tag = cleanTag(draft);
+    if (tag === '') {
+      setDraft('');
+      return;
+    }
+    if (tags.length >= MAX_TAGS) {
+      setMessage('You can add up to ' + MAX_TAGS + ' tags.');
+      return;
+    }
+    const exists = tags.some((t) => {
+      return t.toLowerCase() === tag.toLowerCase();
+    });
+    if (exists) {
+      setMessage('"' + tag + '" is already added.');
+      setDraft('');
+      return;
+    }
+    onChange([...tags, tag]);
+    setDraft('');
+    setMessage('');
+  }
+
+  function removeTag(tag: string) {
+    onChange(tags.filter((t) => {
+      return t !== tag;
+    }));
+    setMessage('');
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault(); // stop the comma from being typed
+      addTag();
+      return;
+    }
+    if (e.key === 'Backspace' && draft === '' && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+      setMessage('');
+    }
+  }
+
+  // decisions
+  let help = <p className="field-help">Press Enter or comma to add · {tags.length} / {MAX_TAGS}</p>;
+  if (message !== '') {
+    help = <p className="field-help is-error" role="alert">{message}</p>;
+  }
+
+  let placeholder = 'Add a tag…';
+  if (tags.length > 0) {
+    placeholder = '';
+  }
+
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor="tags">Tags</label>
+      <div className="tag-box">
+        {tags.map((tag) => {
+          // tags are unique (case-insensitive), so the text is a stable key
+          return <Chip key={tag} label={tag} onRemove={() => { removeTag(tag); }} />;
+        })}
+        <input
+          id="tags"
+          className="tag-input"
+          placeholder={placeholder}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); }}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
+      {help}
+    </div>
+  );
+}
+
+function PostSettings({ tags, onTagsChange }: { tags: string[]; onTagsChange: (tags: string[]) => void }) {
+  return (
+    <aside className="settings">
+      <h2>Post settings</h2>
+      <div className="field">
+        <span className="field-label">Publication</span>
+        <div><Chip label="Engineering Notes" /></div>
+      </div>
+      <TagField tags={tags} onChange={onTagsChange} />
+      <div className="field">
+        <span className="field-label">Visibility</span>
+        <p className="field-value">Public · appears on your profile</p>
+      </div>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [title, setTitle] = useState('What I learned shipping a design system');
+  const [body, setBody] = useState('Six months ago our product had four different button styles and no shared tokens. This is the story of how we fixed it without stopping feature work.');
+  const [tags, setTags] = useState<string[]>([]);
+
+  return (
+    <div className="app">
+      <TopBar />
+      <div className="workspace">
+        <Editor title={title} body={body} onTitleChange={setTitle} onBodyChange={setBody} />
+        <PostSettings tags={tags} onTagsChange={setTags} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FBF8F3;
+  --surface: #FFFFFF;
+  --border: #E8E1D6;
+  --text: #2B2622;
+  --muted: #8A7F73;
+  --accent: #B5532C;
+  --accent-soft: #F7E7DE;
+  --serif: Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 14px; padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.logo { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.draft-state { font-size: 13px; color: var(--muted); margin-right: auto; }
+.publish-btn { height: 34px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+.workspace { display: flex; flex-wrap: wrap; gap: 32px; padding: 32px 28px; max-width: 1040px; margin: 0 auto; }
+.editor { flex: 1 1 380px; display: flex; flex-direction: column; gap: 14px; }
+.title-input { border: 0; background: none; font-family: var(--serif); font-size: 34px; font-weight: 700; color: var(--text); padding: 0; outline: none; }
+.body-input { border: 0; background: none; min-height: 220px; resize: vertical; font-family: var(--serif); font-size: 19px; line-height: 1.65; color: var(--text); padding: 0; outline: none; }
+
+.settings { flex: 0 1 300px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 18px; align-self: flex-start; }
+.settings h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field-label { font-size: 14px; font-weight: 600; }
+.field-help, .field-value { margin: 0; font-size: 13px; color: var(--muted); }
+
+.tag-box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.tag-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tag-input { flex: 1; min-width: 90px; height: 28px; border: 0; outline: none; font: inherit; font-size: 14px; background: none; color: var(--text); }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
+.chip-x { width: 18px; height: 18px; margin-right: -4px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.chip-x:hover { background: rgba(181, 83, 44, 0.15); }
+
+/* ---- Added: tag input ---- */
+.field-help.is-error { color: #B42318; font-weight: 500; }

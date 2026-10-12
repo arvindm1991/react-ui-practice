@@ -1,0 +1,354 @@
+@@@ shared src/components/Icons.tsx
+// Small SVG icon set used across the app.
+type HeartIconProps = {
+  filled?: boolean;
+};
+
+// <HeartIcon /> is an outline. <HeartIcon filled /> is solid (it uses currentColor).
+export function HeartIcon({ filled }: HeartIconProps) {
+  let fill = 'none';
+  if (filled) {
+    fill = 'currentColor';
+  }
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8 3.6 4.5 7.1 4.5c2 0 3.6 1.1 4.9 2.9 1.3-1.8 2.9-2.9 4.9-2.9 3.5 0 5.6 3.5 4.4 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"
+        fill={fill}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CommentIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-4.4A8.5 8.5 0 1 1 20.5 11.5z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ShareIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 3 10 14M21 3l-7 18-4-7-7-4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+@@@ shared src/utils/format.ts
+// pluralize(1, 'like') -> "1 like", pluralize(1240, 'like') -> "1,240 likes"
+export function pluralize(n: number, word: string): string {
+  let label = word + 's';
+  if (n === 1) {
+    label = word;
+  }
+  return n.toLocaleString('en-US') + ' ' + label;
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { HeartIcon, CommentIcon, ShareIcon } from './components/Icons';
+import { pluralize } from './utils/format';
+
+type Post = {
+  id: string;
+  author: string;
+  initials: string;
+  location: string;
+  caption: string;
+  likes: number; // likes from OTHER people (the server count before you)
+  comments: number;
+  postedAgo: string;
+};
+
+const POST: Post = {
+  id: 'p1',
+  author: 'mira.lens',
+  initials: 'ML',
+  location: 'Big Sur, California',
+  caption: 'Fog rolled in ten minutes after this. Worth the 5am alarm.',
+  likes: 241,
+  comments: 18,
+  postedAgo: '2 hours ago',
+};
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="brand">lumen</span>
+    </header>
+  );
+}
+
+function PostHeader({ post }: { post: Post }) {
+  return (
+    <div className="post-head">
+      <div className="avatar">{post.initials}</div>
+      <div>
+        <p className="author">{post.author}</p>
+        <p className="location">{post.location}</p>
+      </div>
+    </div>
+  );
+}
+
+function PostPhoto() {
+  return (
+    <div className="photo" role="img" aria-label="Coastline at sunrise">
+      <div className="sun" />
+    </div>
+  );
+}
+
+function LikeButton() {
+  // TODO: make this toggle
+  return (
+    <button type="button" className="icon-btn like-btn" aria-label="Like">
+      <HeartIcon />
+    </button>
+  );
+}
+
+function PostCard({ post }: { post: Post }) {
+  return (
+    <article className="card">
+      <PostHeader post={post} />
+      <PostPhoto />
+      <div className="actions">
+        <LikeButton />
+        <button type="button" className="icon-btn" aria-label="Comment"><CommentIcon /></button>
+        <button type="button" className="icon-btn" aria-label="Share"><ShareIcon /></button>
+      </div>
+      <div className="post-body">
+        <p className="likes">{pluralize(post.likes, 'like')}</p>
+        <p className="caption"><b>{post.author}</b> {post.caption}</p>
+        <p className="meta">View all {post.comments} comments · {post.postedAgo}</p>
+      </div>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <main className="feed">
+        <PostCard post={POST} />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FAF7F2;
+  --surface: #FFFFFF;
+  --border: #ECE6DC;
+  --text: #262220;
+  --muted: #8A817A;
+  --like: #E8445A;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.topbar { height: 56px; display: flex; align-items: center; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 24px; letter-spacing: -0.5px; }
+
+.feed { max-width: 470px; margin: 0 auto; padding: 24px 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 2px rgba(38, 34, 32, 0.04); }
+
+.post-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.post-head p { margin: 0; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #F59E6B, #D9467A); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #F0B27A; }
+.author { font-size: 14px; font-weight: 600; }
+.location { font-size: 12px; color: var(--muted); }
+
+.photo { position: relative; aspect-ratio: 4 / 3; background: linear-gradient(180deg, #F6C9A3 0%, #F2A587 38%, #9BB5C9 62%, #4F7187 100%); overflow: hidden; user-select: none; }
+.sun { position: absolute; left: 58%; top: 34%; width: 72px; height: 72px; border-radius: 50%; background: #FFF1D6; box-shadow: 0 0 60px 20px rgba(255, 236, 200, 0.7); }
+
+.actions { display: flex; gap: 4px; padding: 6px 8px 0; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: none; border-radius: 50%; color: var(--text); cursor: pointer; }
+.icon-btn:hover { background: #F4EFE8; }
+.icon-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+
+.post-body { padding: 4px 16px 16px; font-size: 14px; }
+.post-body p { margin: 0 0 6px; }
+.likes { font-weight: 700; }
+.meta { color: var(--muted); font-size: 13px; }
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { HeartIcon, CommentIcon, ShareIcon } from './components/Icons';
+import { pluralize } from './utils/format';
+
+type Post = {
+  id: string;
+  author: string;
+  initials: string;
+  location: string;
+  caption: string;
+  likes: number; // likes from OTHER people (the server count before you)
+  comments: number;
+  postedAgo: string;
+};
+
+const POST: Post = {
+  id: 'p1',
+  author: 'mira.lens',
+  initials: 'ML',
+  location: 'Big Sur, California',
+  caption: 'Fog rolled in ten minutes after this. Worth the 5am alarm.',
+  likes: 241,
+  comments: 18,
+  postedAgo: '2 hours ago',
+};
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="brand">lumen</span>
+    </header>
+  );
+}
+
+function PostHeader({ post }: { post: Post }) {
+  return (
+    <div className="post-head">
+      <div className="avatar">{post.initials}</div>
+      <div>
+        <p className="author">{post.author}</p>
+        <p className="location">{post.location}</p>
+      </div>
+    </div>
+  );
+}
+
+// Change: the photo reports a double-click up. It doesn't know about "liked".
+function PostPhoto({ onDoubleClick }: { onDoubleClick: () => void }) {
+  return (
+    <div className="photo" role="img" aria-label="Coastline at sunrise" onDoubleClick={() => { onDoubleClick(); }}>
+      <div className="sun" />
+    </div>
+  );
+}
+
+type LikeButtonProps = {
+  liked: boolean;
+  onToggle: () => void;
+};
+
+// The button is "dumb": it shows liked and reports clicks. PostCard owns the state.
+function LikeButton({ liked, onToggle }: LikeButtonProps) {
+  let cls = 'icon-btn like-btn';
+  let label = 'Like';
+  if (liked) {
+    cls = 'icon-btn like-btn is-liked';
+    label = 'Unlike';
+  }
+  return (
+    <button type="button" className={cls} aria-label={label} aria-pressed={liked} onClick={() => { onToggle(); }}>
+      <HeartIcon filled={liked} />
+    </button>
+  );
+}
+
+function PostCard({ post }: { post: Post }) {
+  // liked lives here because the button, the count and the photo all need it.
+  const [liked, setLiked] = useState(false);
+
+  function handleToggle() {
+    setLiked((prev) => {
+      return !prev;
+    });
+  }
+
+  // Double-click only ever likes. It never unlikes.
+  function handlePhotoDoubleClick() {
+    setLiked(true);
+  }
+
+  // derived: never stored in state
+  let likeCount = post.likes;
+  if (liked) {
+    likeCount = post.likes + 1;
+  }
+
+  return (
+    <article className="card">
+      <PostHeader post={post} />
+      <PostPhoto onDoubleClick={handlePhotoDoubleClick} />
+      <div className="actions">
+        <LikeButton liked={liked} onToggle={handleToggle} />
+        <button type="button" className="icon-btn" aria-label="Comment"><CommentIcon /></button>
+        <button type="button" className="icon-btn" aria-label="Share"><ShareIcon /></button>
+      </div>
+      <div className="post-body">
+        <p className="likes">{pluralize(likeCount, 'like')}</p>
+        <p className="caption"><b>{post.author}</b> {post.caption}</p>
+        <p className="meta">View all {post.comments} comments · {post.postedAgo}</p>
+      </div>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <main className="feed">
+        <PostCard post={POST} />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FAF7F2;
+  --surface: #FFFFFF;
+  --border: #ECE6DC;
+  --text: #262220;
+  --muted: #8A817A;
+  --like: #E8445A;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.topbar { height: 56px; display: flex; align-items: center; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 24px; letter-spacing: -0.5px; }
+
+.feed { max-width: 470px; margin: 0 auto; padding: 24px 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 2px rgba(38, 34, 32, 0.04); }
+
+.post-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.post-head p { margin: 0; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #F59E6B, #D9467A); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #F0B27A; }
+.author { font-size: 14px; font-weight: 600; }
+.location { font-size: 12px; color: var(--muted); }
+
+.photo { position: relative; aspect-ratio: 4 / 3; background: linear-gradient(180deg, #F6C9A3 0%, #F2A587 38%, #9BB5C9 62%, #4F7187 100%); overflow: hidden; user-select: none; }
+.sun { position: absolute; left: 58%; top: 34%; width: 72px; height: 72px; border-radius: 50%; background: #FFF1D6; box-shadow: 0 0 60px 20px rgba(255, 236, 200, 0.7); }
+
+.actions { display: flex; gap: 4px; padding: 6px 8px 0; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: none; border-radius: 50%; color: var(--text); cursor: pointer; }
+.icon-btn:hover { background: #F4EFE8; }
+.icon-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+
+.post-body { padding: 4px 16px 16px; font-size: 14px; }
+.post-body p { margin: 0 0 6px; }
+.likes { font-weight: 700; }
+.meta { color: var(--muted); font-size: 13px; }
+
+/* ---- Added: like button ---- */
+.like-btn.is-liked { color: var(--like); }
+.like-btn.is-liked svg { animation: like-pop 0.25s ease-out; }
+@keyframes like-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}

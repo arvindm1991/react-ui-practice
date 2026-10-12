@@ -1,0 +1,285 @@
+@@@ shared src/utils/money.ts
+// formatPrice(4800) -> "$48.00", formatPrice(105000) -> "$1,050.00". Prices are always in cents.
+export function formatPrice(cents: number): string {
+  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+@@@ shared src/data/event.ts
+export type GigEvent = {
+  id: string;
+  artist: string;
+  tour: string;
+  venue: string;
+  date: string;
+  tier: string;
+  priceCents: number;
+  feeCents: number; // service fee per ticket
+};
+
+export const EVENT: GigEvent = {
+  id: 'ev_204',
+  artist: 'Neon Harbor',
+  tour: 'Low Tide Tour',
+  venue: 'The Fillmore, San Francisco',
+  date: 'Sat, Nov 14 · Doors 7:30 PM',
+  tier: 'General admission',
+  priceCents: 4800,
+  feeCents: 450,
+};
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { EVENT } from './data/event';
+import type { GigEvent } from './data/event';
+import { formatPrice } from './utils/money';
+
+function EventHero({ event }: { event: GigEvent }) {
+  return (
+    <header className="hero">
+      <p className="tour">{event.tour}</p>
+      <h1>{event.artist}</h1>
+      <p className="when">{event.date}</p>
+      <p className="where">{event.venue}</p>
+    </header>
+  );
+}
+
+function TicketPanel({ event }: { event: GigEvent }) {
+  // TODO: quantity stepper
+  return (
+    <section className="ticket-panel">
+      <div className="tier-row">
+        <div>
+          <p className="tier">{event.tier}</p>
+          <p className="tier-price">{formatPrice(event.priceCents)} each</p>
+        </div>
+        <div className="stepper">
+          <button type="button" className="step-btn">−</button>
+          <span className="qty">1</span>
+          <button type="button" className="step-btn">+</button>
+        </div>
+      </div>
+
+      <div className="summary-row">
+        <span>Subtotal</span>
+        <span>{formatPrice(event.priceCents)}</span>
+      </div>
+
+      <button type="button" className="checkout">Checkout</button>
+      <p className="fine">Tickets are delivered to your phone. All sales final.</p>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <div className="logo">gigbox</div>
+      <div className="layout">
+        <EventHero event={EVENT} />
+        <TicketPanel event={EVENT} />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFF4EC;
+  --surface: #FFFFFF;
+  --ink: #1E1330;
+  --muted: #7A6E86;
+  --line: #F1E3DA;
+  --hot: #FF3D7F;
+  --orange: #FF8A3D;
+  --warn: #C26A00;
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Futura', 'Century Gothic', 'Avenir Next', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+
+.page { max-width: 860px; margin: 0 auto; padding: 24px 20px 48px; }
+.logo { font-weight: 900; font-size: 22px; letter-spacing: -1px; margin-bottom: 20px; color: var(--hot); }
+
+.layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
+
+.hero { min-height: 300px; padding: 28px; border-radius: var(--radius); color: #fff; display: flex; flex-direction: column; justify-content: flex-end; background: radial-gradient(circle at 80% 15%, #FFD25A 0 60px, transparent 61px), linear-gradient(150deg, var(--orange), var(--hot) 55%, #6A2BD9); box-shadow: 0 20px 40px rgba(255, 61, 127, 0.25); }
+.hero p { margin: 0; }
+.tour { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.85; }
+.hero h1 { margin: 6px 0 12px; font-size: 44px; line-height: 1; letter-spacing: -1.5px; text-transform: uppercase; }
+.when { font-weight: 700; }
+.where { opacity: 0.85; font-size: 14px; }
+
+.ticket-panel { background: var(--surface); border-radius: var(--radius); padding: 22px; border: 1px solid var(--line); }
+.tier-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.tier-row p { margin: 0; }
+.tier { font-weight: 700; font-size: 16px; }
+.tier-price { font-size: 14px; color: var(--muted); }
+
+.stepper { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; background: #F7EFEA; }
+.step-btn { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--surface); color: var(--ink); font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(30, 19, 48, 0.12); }
+.step-btn:hover { color: var(--hot); }
+.qty { min-width: 28px; text-align: center; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+
+.summary-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; }
+.summary-row span:last-child { font-variant-numeric: tabular-nums; }
+
+.checkout { width: 100%; height: 50px; margin-top: 12px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
+.checkout:hover { background: var(--hot); }
+.fine { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+@media (max-width: 680px) {
+  .layout { grid-template-columns: 1fr; }
+  .hero { min-height: 220px; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { EVENT } from './data/event';
+import type { GigEvent } from './data/event';
+import { formatPrice } from './utils/money';
+
+const MIN_QTY = 1;
+const MAX_QTY = 8;
+
+function EventHero({ event }: { event: GigEvent }) {
+  return (
+    <header className="hero">
+      <p className="tour">{event.tour}</p>
+      <h1>{event.artist}</h1>
+      <p className="when">{event.date}</p>
+      <p className="where">{event.venue}</p>
+    </header>
+  );
+}
+
+function TicketPanel({ event }: { event: GigEvent }) {
+  const [qty, setQty] = useState(MIN_QTY);
+
+  // Clamp inside the updater so fast clicks can never go out of range.
+  function handleDecrease() {
+    setQty((prev) => {
+      return Math.max(MIN_QTY, prev - 1);
+    });
+  }
+
+  function handleIncrease() {
+    setQty((prev) => {
+      return Math.min(MAX_QTY, prev + 1);
+    });
+  }
+
+  // derived: never stored in state
+  const atMin = qty === MIN_QTY;
+  const atMax = qty === MAX_QTY;
+  const subtotal = event.priceCents * qty;
+  const fees = event.feeCents * qty;
+  const total = subtotal + fees;
+  const subtotalLabel = 'Subtotal (' + qty + ' × ' + formatPrice(event.priceCents) + ')';
+  const checkoutLabel = 'Checkout · ' + formatPrice(total);
+
+  let maxNote = null;
+  if (atMax) {
+    maxNote = <p className="max-note">Max {MAX_QTY} tickets per order</p>;
+  }
+
+  return (
+    <section className="ticket-panel">
+      <div className="tier-row">
+        <div>
+          <p className="tier">{event.tier}</p>
+          <p className="tier-price">{formatPrice(event.priceCents)} each</p>
+        </div>
+        <div className="stepper">
+          <button type="button" className="step-btn" aria-label="Decrease quantity" disabled={atMin} onClick={() => { handleDecrease(); }}>−</button>
+          <span className="qty" aria-live="polite">{qty}</span>
+          <button type="button" className="step-btn" aria-label="Increase quantity" disabled={atMax} onClick={() => { handleIncrease(); }}>+</button>
+        </div>
+      </div>
+      {maxNote}
+
+      <div className="summary-row">
+        <span>{subtotalLabel}</span>
+        <span className="subtotal">{formatPrice(subtotal)}</span>
+      </div>
+      <div className="summary-row is-muted">
+        <span>Service fees</span>
+        <span className="fees">{formatPrice(fees)}</span>
+      </div>
+      <div className="summary-row is-total">
+        <span>Total</span>
+        <span className="total">{formatPrice(total)}</span>
+      </div>
+
+      <button type="button" className="checkout">{checkoutLabel}</button>
+      <p className="fine">Tickets are delivered to your phone. All sales final.</p>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <div className="logo">gigbox</div>
+      <div className="layout">
+        <EventHero event={EVENT} />
+        <TicketPanel event={EVENT} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFF4EC;
+  --surface: #FFFFFF;
+  --ink: #1E1330;
+  --muted: #7A6E86;
+  --line: #F1E3DA;
+  --hot: #FF3D7F;
+  --orange: #FF8A3D;
+  --warn: #C26A00;
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Futura', 'Century Gothic', 'Avenir Next', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+
+.page { max-width: 860px; margin: 0 auto; padding: 24px 20px 48px; }
+.logo { font-weight: 900; font-size: 22px; letter-spacing: -1px; margin-bottom: 20px; color: var(--hot); }
+
+.layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
+
+.hero { min-height: 300px; padding: 28px; border-radius: var(--radius); color: #fff; display: flex; flex-direction: column; justify-content: flex-end; background: radial-gradient(circle at 80% 15%, #FFD25A 0 60px, transparent 61px), linear-gradient(150deg, var(--orange), var(--hot) 55%, #6A2BD9); box-shadow: 0 20px 40px rgba(255, 61, 127, 0.25); }
+.hero p { margin: 0; }
+.tour { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.85; }
+.hero h1 { margin: 6px 0 12px; font-size: 44px; line-height: 1; letter-spacing: -1.5px; text-transform: uppercase; }
+.when { font-weight: 700; }
+.where { opacity: 0.85; font-size: 14px; }
+
+.ticket-panel { background: var(--surface); border-radius: var(--radius); padding: 22px; border: 1px solid var(--line); }
+.tier-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.tier-row p { margin: 0; }
+.tier { font-weight: 700; font-size: 16px; }
+.tier-price { font-size: 14px; color: var(--muted); }
+
+.stepper { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; background: #F7EFEA; }
+.step-btn { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--surface); color: var(--ink); font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(30, 19, 48, 0.12); }
+.step-btn:hover { color: var(--hot); }
+.qty { min-width: 28px; text-align: center; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+
+.summary-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; }
+.summary-row span:last-child { font-variant-numeric: tabular-nums; }
+
+.checkout { width: 100%; height: 50px; margin-top: 12px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
+.checkout:hover { background: var(--hot); }
+.fine { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+@media (max-width: 680px) {
+  .layout { grid-template-columns: 1fr; }
+  .hero { min-height: 220px; }
+}
+
+/* ---- Added: stepper states + totals ---- */
+.step-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.step-btn:disabled:hover { color: var(--ink); }
+.max-note { margin: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--warn); text-align: right; }
+.summary-row:first-of-type { margin-top: 8px; }
+.summary-row.is-muted { color: var(--muted); font-size: 14px; padding-top: 0; }
+.summary-row.is-total { border-top: 1px solid var(--line); font-weight: 800; font-size: 17px; }

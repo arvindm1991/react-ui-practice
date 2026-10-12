@@ -1,0 +1,581 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+import type { OnboardingData } from './types';
+
+export type Account = {
+  id: string;
+  name: string;
+  planName: string;
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+const PLAN_NAMES = { lose: 'Lean & Light', strength: 'Iron Foundations', run: 'Road to 10K' };
+
+// POST /accounts -> Account
+export async function createAccount(data: OnboardingData): Promise<Account> {
+  await randomDelay(700, 1300);
+  let planName = 'Starter plan';
+  if (data.goal !== '') {
+    planName = PLAN_NAMES[data.goal];
+  }
+  return { id: 'acc_' + Math.floor(Math.random() * 100000), name: data.name.trim(), planName };
+}
+@@@ shared src/types.ts
+export type Goal = 'lose' | 'strength' | 'run';
+export type Units = 'metric' | 'imperial';
+
+// Everything the wizard collects. Inputs keep strings (age too) so they stay controlled.
+export type OnboardingData = {
+  name: string;
+  email: string;
+  age: string;
+  goal: Goal | '';
+  daysPerWeek: string;
+  units: Units;
+};
+
+export const EMPTY_FORM: OnboardingData = {
+  name: '',
+  email: '',
+  age: '',
+  goal: '',
+  daysPerWeek: '3',
+  units: 'metric',
+};
+
+export const GOALS: { id: Goal; label: string; blurb: string }[] = [
+  { id: 'lose', label: 'Lose weight', blurb: 'Cardio-led plans with a calorie target' },
+  { id: 'strength', label: 'Build strength', blurb: 'Progressive overload, 3 lifts a week' },
+  { id: 'run', label: 'Run further', blurb: 'Build up to your first 10K' },
+];
+@@@ shared src/components/Field.tsx
+import React from 'react';
+
+type FieldProps = {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+};
+
+// Label + control + error message. Pass error to show it in red under the control.
+export function Field({ label, error, children }: FieldProps) {
+  let cls = 'field';
+  let message = null;
+  if (error) {
+    cls = 'field has-error';
+    message = <p className="field-error">{error}</p>;
+  }
+  return (
+    <div className={cls}>
+      <span className="field-label">{label}</span>
+      {children}
+      {message}
+    </div>
+  );
+}
+@@@ shared src/components/Steps.tsx
+import React from 'react';
+import { Field } from './Field';
+import { GOALS } from '../types';
+import type { OnboardingData } from '../types';
+
+export type StepErrors = Partial<Record<keyof OnboardingData, string>>;
+
+type StepProps = {
+  values: OnboardingData;
+  errors: StepErrors;
+  onChange: (field: keyof OnboardingData, value: string) => void;
+};
+
+export function ProfileStep({ values, errors, onChange }: StepProps) {
+  return (
+    <div className="step-body">
+      <Field label="Full name" error={errors.name}>
+        <input className="input" value={values.name} onChange={(e) => { onChange('name', e.target.value); }} placeholder="Jordan Rivera" />
+      </Field>
+      <Field label="Email" error={errors.email}>
+        <input className="input" value={values.email} onChange={(e) => { onChange('email', e.target.value); }} placeholder="you@example.com" />
+      </Field>
+      <Field label="Age" error={errors.age}>
+        <input className="input input-short" value={values.age} onChange={(e) => { onChange('age', e.target.value); }} inputMode="numeric" placeholder="30" />
+      </Field>
+    </div>
+  );
+}
+
+export function PreferencesStep({ values, errors, onChange }: StepProps) {
+  return (
+    <div className="step-body">
+      <Field label="Main goal" error={errors.goal}>
+        <div className="choices">
+          {GOALS.map((g) => {
+            let cls = 'choice';
+            if (values.goal === g.id) {
+              cls = 'choice is-selected';
+            }
+            return (
+              <label key={g.id} className={cls}>
+                <input type="radio" name="goal" checked={values.goal === g.id} onChange={() => { onChange('goal', g.id); }} />
+                <span className="choice-label">{g.label}</span>
+                <span className="choice-blurb">{g.blurb}</span>
+              </label>
+            );
+          })}
+        </div>
+      </Field>
+      <div className="row">
+        <Field label="Workouts per week">
+          <select className="input" value={values.daysPerWeek} onChange={(e) => { onChange('daysPerWeek', e.target.value); }}>
+            <option value="2">2 days</option>
+            <option value="3">3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+          </select>
+        </Field>
+        <Field label="Units">
+          <select className="input" value={values.units} onChange={(e) => { onChange('units', e.target.value); }}>
+            <option value="metric">Metric (kg, km)</option>
+            <option value="imperial">Imperial (lb, mi)</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  );
+}
+@@@ shared src/utils/validate.ts
+// isValidEmail('a@b.co') -> true, isValidEmail('a@b') -> false
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+// isIntInRange('34', 13, 99) -> true, isIntInRange('12', 13, 99) -> false, isIntInRange('abc', 13, 99) -> false
+export function isIntInRange(value: string, min: number, max: number): boolean {
+  const n = Number(value);
+  return value.trim() !== '' && Number.isInteger(n) && n >= min && n <= max;
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { EMPTY_FORM } from './types';
+import type { OnboardingData } from './types';
+import { ProfileStep } from './components/Steps';
+
+function SidePanel() {
+  return (
+    <aside className="side">
+      <div className="logo">
+        <span className="logo-mark">S</span>
+        Stride
+      </div>
+      <h2 className="side-title">A plan that fits your week.</h2>
+      <p className="side-copy">Answer three quick questions and we'll build your first four weeks of training.</p>
+      <ul className="side-points">
+        <li>Coach-designed workouts</li>
+        <li>Adjusts as you get stronger</li>
+        <li>Cancel any time</li>
+      </ul>
+    </aside>
+  );
+}
+
+// TODO: turn this into a 3-step wizard (Profile → Preferences → Review)
+function OnboardingWizard() {
+  const [form, setForm] = useState<OnboardingData>(EMPTY_FORM);
+
+  function handleChange(field: keyof OnboardingData, value: string) {
+    setForm((prev) => {
+      return { ...prev, [field]: value };
+    });
+  }
+
+  return (
+    <section className="wizard">
+      <p className="eyebrow">Get started</p>
+      <h1 className="wizard-title">Tell us about you</h1>
+      <ProfileStep values={form} errors={{}} onChange={handleChange} />
+      <div className="wizard-foot">
+        <span />
+        <button type="button" className="btn btn-primary">Continue</button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <div className="shell">
+        <SidePanel />
+        <OnboardingWizard />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFF6EF;
+  --surface: #FFFFFF;
+  --border: #F0E2D8;
+  --text: #2A1A14;
+  --muted: #8A7468;
+  --primary: #FF5A36;
+  --primary-dark: #E2431F;
+  --primary-soft: #FFEDE6;
+  --danger: #D92D20;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: var(--text); background: var(--bg); }
+
+.app { min-height: 100vh; display: grid; place-items: center; padding: 32px 16px; }
+.shell { width: 100%; max-width: 860px; display: grid; grid-template-columns: 280px 1fr; background: var(--surface); border-radius: 22px; overflow: hidden; box-shadow: 0 20px 50px rgba(42, 26, 20, 0.10); }
+
+.side { padding: 28px; color: #fff; background: linear-gradient(160deg, #FF7A45 0%, #FF5A36 45%, #C2331A 100%); }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; }
+.logo-mark { width: 28px; height: 28px; border-radius: 9px; background: #fff; color: var(--primary); display: grid; place-items: center; }
+.side-title { margin: 48px 0 10px; font-size: 26px; line-height: 1.15; }
+.side-copy { margin: 0 0 20px; opacity: 0.9; line-height: 1.5; }
+.side-points { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.side-points li::before { content: '✓'; margin-right: 8px; font-weight: 700; }
+
+.wizard { padding: 32px 36px; display: flex; flex-direction: column; min-height: 520px; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.wizard-title { margin: 6px 0 22px; font-size: 24px; }
+.step-body { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 13px; font-weight: 600; }
+.input { height: 44px; padding: 0 14px; border: 1.5px solid var(--border); border-radius: 12px; font: inherit; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.input-short { width: 120px; }
+.field.has-error .input { border-color: var(--danger); }
+.field-error { margin: 0; font-size: 13px; color: var(--danger); }
+
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.choice { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; }
+.choice input { position: absolute; opacity: 0; }
+.choice:hover { border-color: #FFC3B0; }
+.choice.is-selected { border-color: var(--primary); background: var(--primary-soft); }
+.choice-label { font-weight: 700; }
+.choice-blurb { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+.wizard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn { height: 44px; padding: 0 22px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; border: 1.5px solid transparent; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.6; cursor: wait; }
+.btn-ghost { background: none; border-color: var(--border); color: var(--text); }
+.btn-ghost:hover { background: var(--bg); }
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { EMPTY_FORM, GOALS } from './types';
+import type { OnboardingData } from './types';
+import { ProfileStep, PreferencesStep } from './components/Steps';
+import type { StepErrors } from './components/Steps';
+import { isIntInRange, isValidEmail } from './utils/validate';
+import { createAccount } from './api';
+import type { Account } from './api';
+
+const STEPS = ['Profile', 'Preferences', 'Review'];
+const TITLES = ['Tell us about you', 'What are you training for?', 'Check your details'];
+
+// Pure function: which fields on this step are invalid?
+function validateStep(step: number, form: OnboardingData): StepErrors {
+  const errors: StepErrors = {};
+  if (step === 0) {
+    if (form.name.trim() === '') {
+      errors.name = 'Enter your name';
+    }
+    if (!isValidEmail(form.email)) {
+      errors.email = 'Enter a valid email';
+    }
+    if (!isIntInRange(form.age, 13, 99)) {
+      errors.age = 'Age must be between 13 and 99';
+    }
+  }
+  if (step === 1) {
+    if (form.goal === '') {
+      errors.goal = 'Pick a goal';
+    }
+  }
+  return errors;
+}
+
+function SidePanel() {
+  return (
+    <aside className="side">
+      <div className="logo">
+        <span className="logo-mark">S</span>
+        Stride
+      </div>
+      <h2 className="side-title">A plan that fits your week.</h2>
+      <p className="side-copy">Answer three quick questions and we'll build your first four weeks of training.</p>
+      <ul className="side-points">
+        <li>Coach-designed workouts</li>
+        <li>Adjusts as you get stronger</li>
+        <li>Cancel any time</li>
+      </ul>
+    </aside>
+  );
+}
+
+type IndicatorProps = {
+  current: number;
+  onJump: (index: number) => void;
+};
+
+// Change: completed steps are buttons you can jump back to. Current and future steps are disabled.
+function StepIndicator({ current, onJump }: IndicatorProps) {
+  return (
+    <ol className="stepper">
+      {STEPS.map((label, i) => {
+        let cls = 'step';
+        let mark = String(i + 1);
+        if (i < current) {
+          cls = 'step is-done';
+          mark = '✓';
+        } else if (i === current) {
+          cls = 'step is-current';
+        }
+        return (
+          <li key={label} className="stepper-item">
+            <button type="button" className={cls} disabled={i >= current} onClick={() => { onJump(i); }}>
+              <span className="step-dot">{mark}</span>
+              <span className="step-label">{label}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ReviewStep({ values }: { values: OnboardingData }) {
+  const goal = GOALS.find((g) => {
+    return g.id === values.goal;
+  });
+  let goalLabel = '—';
+  if (goal) {
+    goalLabel = goal.label;
+  }
+  let unitsLabel = 'Metric';
+  if (values.units === 'imperial') {
+    unitsLabel = 'Imperial';
+  }
+  const rows = [
+    ['Name', values.name.trim()],
+    ['Email', values.email.trim()],
+    ['Age', values.age],
+    ['Goal', goalLabel],
+    ['Workouts', values.daysPerWeek + ' days a week'],
+    ['Units', unitsLabel],
+  ];
+  return (
+    <dl className="review">
+      {rows.map((row) => {
+        return (
+          <div key={row[0]} className="review-row">
+            <dt>{row[0]}</dt>
+            <dd>{row[1]}</dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+function OnboardingWizard() {
+  const [form, setForm] = useState<OnboardingData>(EMPTY_FORM);
+  const [step, setStep] = useState(0);
+  const [errors, setErrors] = useState<StepErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [account, setAccount] = useState<Account | null>(null);
+
+  function handleChange(field: keyof OnboardingData, value: string) {
+    setForm((prev) => {
+      return { ...prev, [field]: value };
+    });
+    // Clear that field's error as soon as they fix it.
+    setErrors((prev) => {
+      return { ...prev, [field]: undefined };
+    });
+  }
+
+  function handleNext() {
+    const found = validateStep(step, form);
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      return;
+    }
+    setErrors({});
+    setStep((prev) => {
+      return prev + 1;
+    });
+  }
+
+  function handleBack() {
+    setErrors({});
+    setStep((prev) => {
+      return prev - 1;
+    });
+  }
+
+  function handleJump(index: number) {
+    if (index < step) {
+      setErrors({});
+      setStep(index);
+    }
+  }
+
+  function handleSubmit() {
+    setSubmitting(true);
+    createAccount(form).then((result) => {
+      setSubmitting(false);
+      setAccount(result);
+    });
+  }
+
+  if (account) {
+    return (
+      <section className="wizard wizard-done">
+        <div className="done-badge">✓</div>
+        <h1 className="wizard-title">You're all set, {account.name}!</h1>
+        <p className="done-copy">Your plan <b>{account.planName}</b> starts tomorrow.</p>
+      </section>
+    );
+  }
+
+  let body;
+  if (step === 0) {
+    body = <ProfileStep values={form} errors={errors} onChange={handleChange} />;
+  } else if (step === 1) {
+    body = <PreferencesStep values={form} errors={errors} onChange={handleChange} />;
+  } else {
+    body = <ReviewStep values={form} />;
+  }
+
+  let backBtn = <span />;
+  if (step > 0) {
+    backBtn = <button type="button" className="btn btn-ghost" disabled={submitting} onClick={() => { handleBack(); }}>Back</button>;
+  }
+
+  let nextBtn = <button type="button" className="btn btn-primary" onClick={() => { handleNext(); }}>Continue</button>;
+  if (step === STEPS.length - 1) {
+    let label = 'Create my plan';
+    if (submitting) {
+      label = 'Creating…';
+    }
+    nextBtn = <button type="button" className="btn btn-primary" disabled={submitting} onClick={() => { handleSubmit(); }}>{label}</button>;
+  }
+
+  return (
+    <section className="wizard">
+      <StepIndicator current={step} onJump={handleJump} />
+      <p className="eyebrow">Step {step + 1} of {STEPS.length}</p>
+      <h1 className="wizard-title">{TITLES[step]}</h1>
+      {body}
+      <div className="wizard-foot">
+        {backBtn}
+        {nextBtn}
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <div className="shell">
+        <SidePanel />
+        <OnboardingWizard />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFF6EF;
+  --surface: #FFFFFF;
+  --border: #F0E2D8;
+  --text: #2A1A14;
+  --muted: #8A7468;
+  --primary: #FF5A36;
+  --primary-dark: #E2431F;
+  --primary-soft: #FFEDE6;
+  --danger: #D92D20;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: var(--text); background: var(--bg); }
+
+.app { min-height: 100vh; display: grid; place-items: center; padding: 32px 16px; }
+.shell { width: 100%; max-width: 860px; display: grid; grid-template-columns: 280px 1fr; background: var(--surface); border-radius: 22px; overflow: hidden; box-shadow: 0 20px 50px rgba(42, 26, 20, 0.10); }
+
+.side { padding: 28px; color: #fff; background: linear-gradient(160deg, #FF7A45 0%, #FF5A36 45%, #C2331A 100%); }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; }
+.logo-mark { width: 28px; height: 28px; border-radius: 9px; background: #fff; color: var(--primary); display: grid; place-items: center; }
+.side-title { margin: 48px 0 10px; font-size: 26px; line-height: 1.15; }
+.side-copy { margin: 0 0 20px; opacity: 0.9; line-height: 1.5; }
+.side-points { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.side-points li::before { content: '✓'; margin-right: 8px; font-weight: 700; }
+
+.wizard { padding: 32px 36px; display: flex; flex-direction: column; min-height: 520px; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.wizard-title { margin: 6px 0 22px; font-size: 24px; }
+.step-body { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 13px; font-weight: 600; }
+.input { height: 44px; padding: 0 14px; border: 1.5px solid var(--border); border-radius: 12px; font: inherit; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.input-short { width: 120px; }
+.field.has-error .input { border-color: var(--danger); }
+.field-error { margin: 0; font-size: 13px; color: var(--danger); }
+
+.choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.choice { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; }
+.choice input { position: absolute; opacity: 0; }
+.choice:hover { border-color: #FFC3B0; }
+.choice.is-selected { border-color: var(--primary); background: var(--primary-soft); }
+.choice-label { font-weight: 700; }
+.choice-blurb { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+.wizard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn { height: 44px; padding: 0 22px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; border: 1.5px solid transparent; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.6; cursor: wait; }
+.btn-ghost { background: none; border-color: var(--border); color: var(--text); }
+.btn-ghost:hover { background: var(--bg); }
+
+/* ---- Added: wizard steps ---- */
+.stepper { display: flex; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
+.stepper-item { flex: 1; }
+.step { width: 100%; display: flex; align-items: center; gap: 8px; padding: 0 0 10px; border: 0; border-bottom: 3px solid var(--border); background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; }
+.step:disabled { cursor: default; }
+.step-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--bg); color: var(--muted); }
+.step.is-current { border-bottom-color: var(--primary); color: var(--text); }
+.step.is-current .step-dot { background: var(--primary); color: #fff; }
+.step.is-done { border-bottom-color: #FFB59E; color: var(--text); cursor: pointer; }
+.step.is-done .step-dot { background: var(--primary-soft); color: var(--primary); }
+.step.is-done:hover .step-label { text-decoration: underline; }
+
+.review { margin: 0; flex: 1; border: 1.5px solid var(--border); border-radius: 12px; padding: 4px 16px; align-self: stretch; }
+.review-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.review-row:last-child { border-bottom: 0; }
+.review dt { color: var(--muted); }
+.review dd { margin: 0; font-weight: 600; text-align: right; }
+
+.wizard-done { align-items: center; justify-content: center; text-align: center; }
+.done-badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; color: #fff; background: var(--primary); margin-bottom: 16px; }
+.done-copy { margin: 0; color: var(--muted); }

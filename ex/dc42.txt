@@ -1,0 +1,391 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Photo = {
+  id: string;
+  title: string;
+  author: string;
+  likes: number;
+  location: string;
+  colors: [string, string]; // gradient stand-in for the image
+};
+
+export type PhotoPage = {
+  photos: Photo[];
+  nextCursor: number | null; // null = no more pages
+};
+
+const TITLES = ['Morning fog', 'Neon alley', 'Salt flats', 'Quiet harbor', 'Dune lines', 'Glass tower', 'Late tram', 'First snow', 'Copper hour', 'Tide pools'];
+const AUTHORS = ['mira.k', 'jonas', 'aiko_lens', 'dev.shoots', 'lena.v', 'oskar'];
+const PLACES = ['Lisbon', 'Kyoto', 'Reykjavik', 'Oaxaca', 'Cape Town', 'Oslo', 'Hanoi', 'Marfa'];
+const PALETTE: [string, string][] = [
+  ['#FF9A8B', '#6A5ACD'], ['#1D976C', '#93F9B9'], ['#F7971E', '#FFD200'], ['#2C3E50', '#4CA1AF'],
+  ['#ee0979', '#ff6a00'], ['#4776E6', '#8E54E9'], ['#11998e', '#38ef7d'], ['#C33764', '#1D2671'],
+];
+
+const TOTAL = 40;
+const ALL: Photo[] = [];
+for (let i = 0; i < TOTAL; i++) {
+  ALL.push({
+    id: 'p' + (i + 1),
+    title: TITLES[i % TITLES.length] + ' #' + (i + 1),
+    author: AUTHORS[i % AUTHORS.length],
+    likes: 120 + ((i * 937) % 4800),
+    location: PLACES[i % PLACES.length],
+    colors: PALETTE[i % PALETTE.length],
+  });
+}
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /photos?cursor=0&limit=8 -> PhotoPage
+// Pass the nextCursor from the previous page to get the next one.
+export async function getPhotos(cursor: number, limit: number = 8): Promise<PhotoPage> {
+  console.log('GET /photos?cursor=' + cursor);
+  await randomDelay(500, 1100);
+  const slice = ALL.slice(cursor, cursor + limit).map((p) => ({ ...p }));
+  const next = cursor + limit;
+  let nextCursor: number | null = next;
+  if (next >= TOTAL) {
+    nextCursor = null;
+  }
+  return { photos: slice, nextCursor: nextCursor };
+}
+@@@ shared src/utils/format.ts
+// formatCount(1840) -> "1.8K", formatCount(950) -> "950"
+export function formatCount(n: number): string {
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + 'K';
+  }
+  return String(n);
+}
+@@@ shared src/components/PhotoCard.tsx
+import React from 'react';
+import type { Photo } from '../api';
+import { formatCount } from '../utils/format';
+
+export default function PhotoCard({ photo }: { photo: Photo }) {
+  const imageStyle = { backgroundImage: 'linear-gradient(135deg, ' + photo.colors[0] + ', ' + photo.colors[1] + ')' };
+  return (
+    <article className="photo-card" aria-label={photo.title}>
+      <div className="photo-head">
+        <span className="photo-avatar">{photo.author.charAt(0).toUpperCase()}</span>
+        <div>
+          <p className="photo-author">{photo.author}</p>
+          <p className="photo-location">{photo.location}</p>
+        </div>
+      </div>
+      <div className="photo-image" style={imageStyle} role="img" aria-label={photo.title} />
+      <div className="photo-foot">
+        <span className="photo-title">{photo.title}</span>
+        <span className="photo-likes">♥ {formatCount(photo.likes)}</span>
+      </div>
+    </article>
+  );
+}
+@@@ shared src/components/Spinner.tsx
+import React from 'react';
+
+// Inline spinner + label. Reuse it for any loading row.
+export default function Spinner({ label }: { label: string }) {
+  return (
+    <div className="spinner-row" role="status">
+      <span className="spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPhotos } from './api';
+import type { Photo } from './api';
+import PhotoCard from './components/PhotoCard';
+import Spinner from './components/Spinner';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">◉ aperture</span>
+      <nav className="tabs">
+        <button type="button" className="tab is-active">For you</button>
+        <button type="button" className="tab">Following</button>
+      </nav>
+    </header>
+  );
+}
+
+function Feed() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Only loads the first page. TODO: infinite scroll.
+  useEffect(() => {
+    let cancelled = false;
+    getPhotos(0).then((page) => {
+      if (cancelled) {
+        return;
+      }
+      setPhotos(page.photos);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let status = null;
+  if (loading) {
+    status = <Spinner label="Loading photos…" />;
+  }
+
+  return (
+    <div className="feed-scroll">
+      <div className="feed">
+        {photos.map((p) => {
+          return <PhotoCard key={p.id} photo={p} />;
+        })}
+        {status}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <Feed />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0D0D10;
+  --surface: #17171C;
+  --surface-2: #222229;
+  --line: #2A2A33;
+  --text: #F2F2F5;
+  --muted: #8B8B99;
+  --accent: #FF5C7A;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+/* The app is exactly one screen tall; the feed scrolls inside its own container. */
+.app { height: 100vh; display: flex; flex-direction: column; }
+
+.topbar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; height: 56px; border-bottom: 1px solid var(--line); background: rgba(13, 13, 16, 0.92); }
+.logo { font-weight: 800; letter-spacing: 0.04em; font-size: 17px; }
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--surface); border-radius: 999px; }
+.tab { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab.is-active { background: var(--surface-2); color: var(--text); }
+
+.feed-scroll { flex: 1; overflow-y: auto; }
+.feed { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+
+.photo-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.photo-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.photo-head p { margin: 0; }
+.photo-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 13px; }
+.photo-author { font-size: 14px; font-weight: 600; }
+.photo-location { font-size: 12px; color: var(--muted); }
+.photo-image { aspect-ratio: 4 / 3; background-size: cover; }
+.photo-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; font-size: 14px; }
+.photo-title { font-weight: 600; }
+.photo-likes { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.spinner-row { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px; color: var(--muted); font-size: 14px; }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getPhotos } from './api';
+import type { Photo } from './api';
+import PhotoCard from './components/PhotoCard';
+import Spinner from './components/Spinner';
+
+const SHOW_TOP_AFTER = 800; // px scrolled before "Back to top" appears
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">◉ aperture</span>
+      <nav className="tabs">
+        <button type="button" className="tab is-active">For you</button>
+        <button type="button" className="tab">Following</button>
+      </nav>
+    </header>
+  );
+}
+
+function Feed() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [nextCursor, setNextCursor] = useState<number | null>(0); // null = reached the end
+  const [loading, setLoading] = useState(false);
+  const [showTop, setShowTop] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // A ref, not state: the observer callback must see the latest value immediately.
+  const inFlight = useRef(false);
+
+  // A new observer per cursor. When a page arrives, nextCursor changes, the observer is
+  // recreated, and if the sentinel is still visible it fires again (fills tall screens).
+  useEffect(() => {
+    if (nextCursor === null) {
+      return; // end of feed: stop observing
+    }
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) {
+      return;
+    }
+    let cancelled = false;
+    const cursor = nextCursor;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting || inFlight.current) {
+        return;
+      }
+      inFlight.current = true;
+      setLoading(true);
+      getPhotos(cursor).then((page) => {
+        inFlight.current = false;
+        if (cancelled) {
+          return;
+        }
+        setPhotos((prev) => {
+          return [...prev, ...page.photos];
+        });
+        setNextCursor(page.nextCursor);
+        setLoading(false);
+      });
+    }, { root: root, rootMargin: '0px 0px 300px 0px' });
+    observer.observe(sentinel);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [nextCursor]);
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const scrolled = e.currentTarget.scrollTop > SHOW_TOP_AFTER;
+    setShowTop(scrolled); // React skips the re-render when the value didn't change
+  }
+
+  function handleBackToTop() {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // decisions
+  let status = null;
+  if (loading) {
+    status = <Spinner label="Loading more photos…" />;
+  } else if (nextCursor === null) {
+    status = <p className="feed-end">You're all caught up · {photos.length} photos</p>;
+  }
+
+  let topButton = null;
+  if (showTop) {
+    topButton = (
+      <button type="button" className="back-to-top" onClick={() => { handleBackToTop(); }}>
+        ↑ Back to top
+      </button>
+    );
+  }
+
+  return (
+    <div className="feed-wrap">
+      <div className="feed-scroll" ref={scrollRef} onScroll={handleScroll}>
+        <div className="feed">
+          {photos.map((p) => {
+            return <PhotoCard key={p.id} photo={p} />;
+          })}
+          <div ref={sentinelRef} className="sentinel" aria-hidden="true" />
+          {status}
+        </div>
+      </div>
+      {topButton}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <Feed />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0D0D10;
+  --surface: #17171C;
+  --surface-2: #222229;
+  --line: #2A2A33;
+  --text: #F2F2F5;
+  --muted: #8B8B99;
+  --accent: #FF5C7A;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+/* The app is exactly one screen tall; the feed scrolls inside its own container. */
+.app { height: 100vh; display: flex; flex-direction: column; }
+
+.topbar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; height: 56px; border-bottom: 1px solid var(--line); background: rgba(13, 13, 16, 0.92); }
+.logo { font-weight: 800; letter-spacing: 0.04em; font-size: 17px; }
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--surface); border-radius: 999px; }
+.tab { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab.is-active { background: var(--surface-2); color: var(--text); }
+
+.feed-scroll { flex: 1; overflow-y: auto; }
+.feed { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+
+.photo-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.photo-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.photo-head p { margin: 0; }
+.photo-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 13px; }
+.photo-author { font-size: 14px; font-weight: 600; }
+.photo-location { font-size: 12px; color: var(--muted); }
+.photo-image { aspect-ratio: 4 / 3; background-size: cover; }
+.photo-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; font-size: 14px; }
+.photo-title { font-weight: 600; }
+.photo-likes { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.spinner-row { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px; color: var(--muted); font-size: 14px; }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Added: infinite scroll + back to top ---- */
+.feed-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.sentinel { height: 1px; margin-top: -20px; }
+.feed-end { margin: 0; padding: 18px; text-align: center; color: var(--muted); font-size: 14px; }
+.back-to-top {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.back-to-top:hover { background: #fff; }

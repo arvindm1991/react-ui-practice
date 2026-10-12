@@ -1,0 +1,174 @@
+@@@ shared src/data.js
+export const projects = [
+  {
+    id: 1,
+    name: 'Evaluation harness for long-context retrieval tasks',
+    description: 'Builds and scores benchmark suites that test recall across very long documents, with a per-section breakdown of where answers were found.',
+    status: 'active',
+    updated: '2h ago',
+    members: 4,
+  },
+  {
+    id: 2,
+    name: 'Prompt library',
+    description: 'Shared, versioned prompts for the support team.',
+    status: 'paused',
+    updated: '1d ago',
+    members: 2,
+  },
+  {
+    id: 3,
+    name: 'Billing dashboard redesign',
+    description: 'New layout for invoices, usage limits and payment methods. Includes the mobile breakpoint and empty states for new organizations that have not been billed yet.',
+    status: 'active',
+    updated: '3d ago',
+    members: 6,
+  },
+  {
+    id: 4,
+    name: 'Docs search',
+    description: 'Typeahead search across API reference pages.',
+    status: 'done',
+    updated: '1w ago',
+    members: 3,
+  },
+  {
+    id: 5,
+    name: 'Onboarding checklist',
+    description: 'Step-by-step setup for new workspace admins.',
+    status: 'active',
+    updated: '2w ago',
+    members: 1,
+  },
+];
+@@@ starter src/App.jsx
+import React from 'react';
+import { projects } from './data';
+
+export default function App() {
+  return (
+    <main className="page">
+      <h1 className="title">Projects</h1>
+      {/* TODO: render one card per project (see Design tab) */}
+    </main>
+  );
+}
+@@@ starter src/styles.css
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@@@ solution src/App.jsx
+import React from 'react';
+import { projects } from './data';
+
+const STATUS_LABEL = { active: 'Active', paused: 'Paused', done: 'Done' };
+
+function ProjectCard({ project }) {
+  return (
+    <article className="card">
+      <span className={`badge badge-${project.status}`}>
+        {STATUS_LABEL[project.status]}
+      </span>
+      {/* title attribute shows the full name on hover when truncated */}
+      <h3 className="card-title" title={project.name}>{project.name}</h3>
+      <p className="card-desc">{project.description}</p>
+      <footer className="card-meta">
+        <span>
+          {project.members} {project.members === 1 ? 'member' : 'members'}
+        </span>
+        <span>Updated {project.updated}</span>
+      </footer>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <main className="page">
+      <h1 className="title">Projects</h1>
+      <div className="grid">
+        {projects.map((p) => (
+          <ProjectCard key={p.id} project={p} />
+        ))}
+      </div>
+    </main>
+  );
+}
+@@@ solution src/styles.css
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+
+.page { padding: 24px; }
+
+.title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
+
+/* As many 220px+ columns as fit, stretched to fill the row */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  position: relative;          /* anchor for the absolute badge */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 44px 16px 16px;     /* top padding leaves room for the badge */
+  background: #FFFFFF;
+  border: 1px solid #E2E5EA;
+  border-radius: 10px;
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-active { background: #E3F5EA; color: #1C7A43; }
+.badge-paused { background: #FFF3DC; color: #93600B; }
+.badge-done   { background: #ECEEF2; color: #545C6B; }
+
+/* One line, then ellipsis */
+.card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Two lines, then ellipsis */
+.card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #5A6273;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* margin-top: auto pins the footer to the bottom of equal-height cards */
+.card-meta {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #7A8292;
+}

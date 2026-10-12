@@ -1,0 +1,487 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Comment = {
+  id: string;
+  author: string;
+  text: string;
+  score: number;
+  minutesAgo: number;
+  replies: Comment[];   // nested to any depth
+};
+
+export type Thread = {
+  title: string;
+  author: string;
+  points: number;
+  comments: Comment[];
+};
+
+const THREAD: Thread = {
+  title: 'Ask: How do you keep a design system from drifting?',
+  author: 'kaya',
+  points: 312,
+  comments: [
+    {
+      id: 'c1', author: 'mtorres', score: 48, minutesAgo: 190,
+      text: 'We lint for raw hex values in CI. If it is not a token, the build fails. Drift dropped a lot.',
+      replies: [
+        {
+          id: 'c2', author: 'priya_dev', score: 41, minutesAgo: 150,
+          text: 'Did people just start adding tokens for everything?',
+          replies: [
+            {
+              id: 'c3', author: 'mtorres', score: 17, minutesAgo: 120,
+              text: 'A bit. New tokens need a design review, which slows that down.',
+              replies: [
+                { id: 'c4', author: 'jun', score: 3, minutesAgo: 40, text: 'Same here. The review is the real control, the lint just routes people to it.', replies: [] },
+              ],
+            },
+          ],
+        },
+        { id: 'c5', author: 'oli', score: 30, minutesAgo: 25, text: 'Stylelint with a custom rule works well for this.', replies: [] },
+      ],
+    },
+    {
+      id: 'c6', author: 'rhea', score: 12, minutesAgo: 15,
+      text: 'Honestly: a weekly 20-minute "UI debt" review with one designer and one engineer.',
+      replies: [
+        { id: 'c7', author: 'kaya', score: 6, minutesAgo: 8, text: 'Love this. Do you track the debt anywhere?', replies: [] },
+      ],
+    },
+    {
+      id: 'c8', author: 'sam_k', score: 64, minutesAgo: 300,
+      text: 'Make the right thing the easy thing. If the component is easier than a div, people use it.',
+      replies: [
+        { id: 'c9', author: 'lee', score: 9, minutesAgo: 210, text: 'This is the answer. Docs with copy-paste examples matter more than rules.', replies: [] },
+        { id: 'c10', author: 'nadia', score: 14, minutesAgo: 60, text: 'And delete the old components, or they live forever.', replies: [] },
+      ],
+    },
+  ],
+};
+
+function copyComment(c: Comment): Comment {
+  return { ...c, replies: c.replies.map(copyComment) };
+}
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /threads/812 -> Thread
+export async function getThread(): Promise<Thread> {
+  await randomDelay(400, 1000);
+  return { ...THREAD, comments: THREAD.comments.map(copyComment) };
+}
+
+// POST /comments/:id/upvote -> { ok: true }
+// shouldFail = true simulates being offline: the request rejects.
+export async function upvoteComment(id: string, shouldFail: boolean): Promise<{ ok: true }> {
+  console.log('POST /comments/' + id + '/upvote');
+  await randomDelay(400, 900);
+  if (shouldFail) {
+    throw new Error('Network error');
+  }
+  return { ok: true };
+}
+@@@ shared src/utils/time.ts
+// timeAgo(8) -> "8m ago", timeAgo(190) -> "3h ago", timeAgo(3000) -> "2d ago"
+export function timeAgo(minutes: number): string {
+  if (minutes < 60) {
+    return minutes + 'm ago';
+  }
+  if (minutes < 60 * 24) {
+    return Math.floor(minutes / 60) + 'h ago';
+  }
+  return Math.floor(minutes / (60 * 24)) + 'd ago';
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#F97316', '#0EA5E9', '#22C55E', '#A855F7', '#EF4444', '#14B8A6'];
+
+// Colored initial. The color is stable per name.
+export default function Avatar({ name }: { name: string }) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = hash + name.charCodeAt(i);
+  }
+  const style = { background: COLORS[hash % COLORS.length] };
+  return <span className="avatar" style={style} aria-hidden="true">{name.charAt(0).toUpperCase()}</span>;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getThread } from './api';
+import type { Comment, Thread } from './api';
+import { timeAgo } from './utils/time';
+import Avatar from './components/Avatar';
+
+function PostHeader({ thread }: { thread: Thread }) {
+  return (
+    <header className="post">
+      <div className="post-votes"><span className="post-arrow">▲</span><b>{thread.points}</b></div>
+      <div>
+        <h1>{thread.title}</h1>
+        <p className="post-meta">posted by {thread.author} · {thread.comments.length} threads</p>
+      </div>
+    </header>
+  );
+}
+
+// TODO: render replies (any depth), collapse, upvote.
+function CommentItem({ comment }: { comment: Comment }) {
+  return (
+    <div className="comment">
+      <div className="comment-head">
+        <Avatar name={comment.author} />
+        <span className="comment-author">{comment.author}</span>
+        <span className="comment-time">{timeAgo(comment.minutesAgo)}</span>
+      </div>
+      <p className="comment-text">{comment.text}</p>
+      <div className="comment-actions">
+        <button type="button" className="vote-btn" aria-label={'Upvote ' + comment.author}>▲</button>
+        <span className="score">{comment.score}</span>
+        <span className="reply-count">{comment.replies.length} replies</span>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [thread, setThread] = useState<Thread | null>(null);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getThread().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setThread(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!thread) {
+    return <div className="app"><p className="loading">Loading discussion…</p></div>;
+  }
+
+  return (
+    <div className="app">
+      <nav className="topnav">
+        <span className="brand">threadline</span>
+        <label className="offline-toggle">
+          <input type="checkbox" checked={offline} onChange={(e) => { setOffline(e.target.checked); }} />
+          Simulate offline (votes fail)
+        </label>
+      </nav>
+      <PostHeader thread={thread} />
+      <section className="comments">
+        {thread.comments.map((c) => {
+          return <CommentItem key={c.id} comment={c} />;
+        })}
+      </section>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F2EF;
+  --surface: #FFFFFF;
+  --line: #E4E1DA;
+  --thread: #D9D5CC;
+  --text: #1C1B19;
+  --muted: #7A766D;
+  --accent: #FF5722;
+  --accent-soft: #FFEDE6;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 760px; margin: 0 auto; padding: 0 16px 40px; }
+.loading { color: var(--muted); text-align: center; margin-top: 80px; }
+
+.topnav { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 54px; }
+.brand { font-weight: 800; font-size: 18px; color: var(--accent); letter-spacing: -0.02em; }
+.offline-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+.post { display: flex; gap: 16px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.post h1 { margin: 0 0 6px; font-size: 20px; line-height: 1.3; }
+.post-meta { margin: 0; font-size: 13px; color: var(--muted); }
+.post-votes { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; }
+.post-arrow { color: var(--accent); }
+
+.comments { margin-top: 16px; padding: 8px 20px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.comment { padding-top: 14px; }
+.comment-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.avatar { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.comment-author { font-weight: 600; }
+.comment-time { color: var(--muted); }
+.comment-text { margin: 6px 0 6px 30px; font-size: 15px; line-height: 1.5; }
+.comment-actions { display: flex; align-items: center; gap: 6px; margin-left: 30px; font-size: 13px; color: var(--muted); }
+.vote-btn { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.vote-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.score { min-width: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.reply-count { margin-left: 8px; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getThread, upvoteComment } from './api';
+import type { Comment, Thread } from './api';
+import { timeAgo } from './utils/time';
+import Avatar from './components/Avatar';
+
+type SortMode = 'top' | 'new';
+type Votes = Record<string, boolean>; // comment id -> I upvoted it
+
+// Every reply below this comment, at any depth.
+function countDescendants(c: Comment): number {
+  return c.replies.reduce((sum, r) => {
+    return sum + 1 + countDescendants(r);
+  }, 0);
+}
+
+// The score shown = server score + my (optimistic) vote. Derived, never stored.
+function displayScore(c: Comment, votes: Votes): number {
+  if (votes[c.id]) {
+    return c.score + 1;
+  }
+  return c.score;
+}
+
+// Sort a copy. Never .sort() the array from state.
+function sortComments(list: Comment[], mode: SortMode, votes: Votes): Comment[] {
+  return [...list].sort((a, b) => {
+    if (mode === 'new') {
+      return a.minutesAgo - b.minutesAgo;
+    }
+    return displayScore(b, votes) - displayScore(a, votes);
+  });
+}
+
+function PostHeader({ thread }: { thread: Thread }) {
+  return (
+    <header className="post">
+      <div className="post-votes"><span className="post-arrow">▲</span><b>{thread.points}</b></div>
+      <div>
+        <h1>{thread.title}</h1>
+        <p className="post-meta">posted by {thread.author} · {thread.comments.length} threads</p>
+      </div>
+    </header>
+  );
+}
+
+type CommentNodeProps = {
+  comment: Comment;
+  sort: SortMode;
+  votes: Votes;
+  onVote: (c: Comment) => void;
+};
+
+// Recursive: a comment renders its replies with CommentNode.
+function CommentNode({ comment, sort, votes, onVote }: CommentNodeProps) {
+  // Collapse state is local: it only affects this subtree.
+  const [collapsed, setCollapsed] = useState(false);
+
+  const voted = votes[comment.id] === true;
+  const hiddenCount = countDescendants(comment);
+
+  let toggleLabel = '[–]';
+  if (collapsed) {
+    toggleLabel = '[+]';
+  }
+
+  let body = null;
+  if (collapsed) {
+    let noun = 'replies';
+    if (hiddenCount === 1) {
+      noun = 'reply';
+    }
+    let hiddenEl = null;
+    if (hiddenCount > 0) {
+      hiddenEl = <span className="hidden-count">{hiddenCount} {noun} hidden</span>;
+    }
+    body = hiddenEl;
+  } else {
+    let voteCls = 'vote-btn';
+    if (voted) {
+      voteCls = 'vote-btn is-voted';
+    }
+    let replies = null;
+    if (comment.replies.length > 0) {
+      replies = (
+        <div className="replies">
+          {sortComments(comment.replies, sort, votes).map((r) => {
+            return <CommentNode key={r.id} comment={r} sort={sort} votes={votes} onVote={onVote} />;
+          })}
+        </div>
+      );
+    }
+    body = (
+      <div>
+        <p className="comment-text">{comment.text}</p>
+        <div className="comment-actions">
+          <button type="button" className={voteCls} aria-label={'Upvote ' + comment.author} aria-pressed={voted} disabled={voted} onClick={() => { onVote(comment); }}>▲</button>
+          <span className="score">{displayScore(comment, votes)}</span>
+        </div>
+        {replies}
+      </div>
+    );
+  }
+
+  let cls = 'comment';
+  if (collapsed) {
+    cls = 'comment is-collapsed';
+  }
+
+  return (
+    <div className={cls} data-id={comment.id}>
+      <div className="comment-head">
+        <button type="button" className="collapse-btn" aria-expanded={!collapsed} aria-label={'Toggle comment by ' + comment.author} onClick={() => { setCollapsed(!collapsed); }}>{toggleLabel}</button>
+        <Avatar name={comment.author} />
+        <span className="comment-author">{comment.author}</span>
+        <span className="comment-time">{timeAgo(comment.minutesAgo)}</span>
+      </div>
+      {body}
+    </div>
+  );
+}
+
+export default function App() {
+  const [thread, setThread] = useState<Thread | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [votes, setVotes] = useState<Votes>({});
+  const [sort, setSort] = useState<SortMode>('top');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getThread().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setThread(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Optimistic: count the vote now, roll it back if the request fails.
+  function handleVote(c: Comment) {
+    setError('');
+    setVotes((prev) => {
+      return { ...prev, [c.id]: true };
+    });
+    upvoteComment(c.id, offline).catch(() => {
+      setVotes((prev) => {
+        const next = { ...prev };
+        delete next[c.id];
+        return next;
+      });
+      setError('Your vote on ' + c.author + '’s comment could not be saved. Try again.');
+    });
+  }
+
+  if (!thread) {
+    return <div className="app"><p className="loading">Loading discussion…</p></div>;
+  }
+
+  let errorEl = null;
+  if (error) {
+    errorEl = <div className="vote-error" role="alert">{error}</div>;
+  }
+
+  const topLevel = sortComments(thread.comments, sort, votes);
+
+  return (
+    <div className="app">
+      <nav className="topnav">
+        <span className="brand">threadline</span>
+        <label className="offline-toggle">
+          <input type="checkbox" checked={offline} onChange={(e) => { setOffline(e.target.checked); }} />
+          Simulate offline (votes fail)
+        </label>
+      </nav>
+      <PostHeader thread={thread} />
+      {errorEl}
+      <section className="comments">
+        <div className="comments-bar">
+          <span className="comments-title">Comments</span>
+          <label className="sort-label">
+            Sort by
+            <select className="sort-select" value={sort} onChange={(e) => { setSort(e.target.value as SortMode); }}>
+              <option value="top">Top</option>
+              <option value="new">New</option>
+            </select>
+          </label>
+        </div>
+        {topLevel.map((c) => {
+          return <CommentNode key={c.id} comment={c} sort={sort} votes={votes} onVote={handleVote} />;
+        })}
+      </section>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F2EF;
+  --surface: #FFFFFF;
+  --line: #E4E1DA;
+  --thread: #D9D5CC;
+  --text: #1C1B19;
+  --muted: #7A766D;
+  --accent: #FF5722;
+  --accent-soft: #FFEDE6;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 760px; margin: 0 auto; padding: 0 16px 40px; }
+.loading { color: var(--muted); text-align: center; margin-top: 80px; }
+
+.topnav { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 54px; }
+.brand { font-weight: 800; font-size: 18px; color: var(--accent); letter-spacing: -0.02em; }
+.offline-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+.post { display: flex; gap: 16px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.post h1 { margin: 0 0 6px; font-size: 20px; line-height: 1.3; }
+.post-meta { margin: 0; font-size: 13px; color: var(--muted); }
+.post-votes { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; }
+.post-arrow { color: var(--accent); }
+
+.comments { margin-top: 16px; padding: 8px 20px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.comment { padding-top: 14px; }
+.comment-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.avatar { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.comment-author { font-weight: 600; }
+.comment-time { color: var(--muted); }
+.comment-text { margin: 6px 0 6px 30px; font-size: 15px; line-height: 1.5; }
+.comment-actions { display: flex; align-items: center; gap: 6px; margin-left: 30px; font-size: 13px; color: var(--muted); }
+.vote-btn { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.vote-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.score { min-width: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.reply-count { margin-left: 8px; }
+
+/* ---- Added: tree, collapse, votes, sort ---- */
+.comment-head { margin-left: -4px; }
+.collapse-btn { padding: 0 4px; border: 0; background: none; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; cursor: pointer; }
+.collapse-btn:hover { color: var(--accent); }
+.replies { margin: 4px 0 0 10px; padding-left: 18px; border-left: 2px solid var(--line); }
+.replies:hover { border-left-color: var(--thread); }
+.comment.is-collapsed .comment-author { color: var(--muted); }
+.hidden-count { display: inline-block; margin: 4px 0 0 30px; padding: 2px 8px; border-radius: 999px; background: var(--bg); font-size: 12px; color: var(--muted); }
+.vote-btn.is-voted, .vote-btn:disabled.is-voted { background: var(--accent-soft); color: var(--accent); cursor: default; }
+.vote-error { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: #FDECEC; color: #B42318; font-size: 14px; }
+.comments-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px; border-bottom: 1px solid var(--line); }
+.comments-title { font-weight: 700; font-size: 15px; }
+.sort-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.sort-select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font: inherit; color: var(--text); }

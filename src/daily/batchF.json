@@ -1,0 +1,1081 @@
+{
+ "dc51": {
+  "kind": "drill",
+  "level": 5,
+  "order": 51,
+  "minutes": 40,
+  "changeAt": 27,
+  "title": "Permissions tree: tri-state checkboxes",
+  "focus": "src/App.tsx",
+  "summary": "A dev-console token page lists API scopes as a nested tree. Make it selectable with real tri-state checkboxes, then add a filter that keeps ancestors visible.",
+  "skills": [
+   "recursive components",
+   "derived state from leaves",
+   "ref.indeterminate",
+   "Set in state",
+   "tree filtering"
+  ],
+  "brief": "<p>An <b>acmecloud</b> “New fine-grained token” page. <code>PermissionsCard</code> loads a nested scope tree from <code>getScopes()</code> (random 0.4–1.2 s) and renders it read-only with the recursive <code>ScopeNode</code>. Groups can be nested (Repositories → Contents → Read contents). There are <b>12 leaf scopes</b>.</p><p>Read <code>utils/tree.ts</code> first: <code>getLeafIds(node)</code> and <code>countLeaves(nodes)</code> are already written and are the backbone of a good solution. <code>components/Field.tsx</code> wraps the form fields.</p><p>The trap in this one is <b>what you store</b>. If you store a checked flag for every node, you have to keep parents and children in sync by hand. If you store only the selected <b>leaf</b> ids, every group's state is a derivation.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~27 min):</b> a filter box.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–24 Core · 24–27 Next · 27–37 change · 37–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Selection is shared by the tree and the Generate button, so it lives in <code>App</code> as a <code>Set</code> of <b>leaf ids only</b>. A node's state is derived each render: count how many of <code>getLeafIds(node)</code> are in the set. All = checked, none = unchecked, some = indeterminate. Toggling any node gets its leaf ids: if they're all on, remove them, otherwise add them all. That one function handles leaves, groups and the indeterminate case. <code>indeterminate</code> isn't an attribute, so I need a tiny <code>TriCheckbox</code> with a ref and an effect that sets <code>ref.current.indeterminate</code>. For the filter I'll compute a <code>Set</code> of visible ids with a recursive walk and skip nodes not in it, so toggling still uses the full original nodes.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Every node (group and leaf) has a checkbox with its label as a clickable <code>&lt;label&gt;</code>. Clicking a leaf toggles it",
+   "Checking a group checks <b>all</b> of its descendants at every depth; unchecking a fully checked group clears them all. A group is checked when all its leaves are, unchecked when none are, and shows the native <b>indeterminate</b> dash (set via <code>ref.current.indeterminate</code>) when some are",
+   "The Permissions header shows <b>“3 of 12 selected”</b> (leaf scopes only, total from <code>countLeaves</code>). <b>Generate token</b> is disabled until there is a token name and at least one scope; clicking it shows “Token “ci-deploy” created with 3 scopes.”",
+   "Clicking an <b>indeterminate</b> group selects all of its descendants (it never clears them). Each group row also shows “2/5” of its own leaves",
+   "A <b>Clear</b> link next to the count (only when something is selected) empties the selection. Selected rows get the soft indigo background"
+  ],
+  "change": {
+   "title": "Filter that keeps ancestors",
+   "html": "<p>\"Security reviewers search for one scope, like <i>billing</i>, and get lost in the tree.\"</p><ul><li>Add a <b>“Filter scopes”</b> input under the card header. It matches label or id, case-insensitive.</li><li>A node is shown if it matches, if it's <b>inside</b> a matching group, or if it's an <b>ancestor</b> of a match (so “billing” shows Organization → Billing).</li><li>No match: “No scopes match “xyz”.”</li><li>While filtering, checking a group still selects <b>all</b> its leaves, including hidden ones, and its state still reflects all of them.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: don't build a filtered copy of the tree; compute a <code>Set</code> of visible ids and skip the others while rendering.</p>"
+  },
+  "hints": [
+   "State: <code>const [selected, setSelected] = useState&lt;Set&lt;string&gt;&gt;(new Set());</code> in <code>App</code>, leaf ids only. Pass <code>selected</code> and <code>onToggle</code> down through <code>PermissionsCard</code> into the recursive <code>ScopeNode</code>.",
+   "Per node, derive: <code>const ids = getLeafIds(node); const on = ids.filter((id) =&gt; { return selected.has(id); }).length;</code> then <code>checked = on === ids.length</code>, <code>indeterminate = on &gt; 0 &amp;&amp; !checked</code>.",
+   "Never mutate a Set in state. Copy it: <code>setSelected((prev) =&gt; { const next = new Set(prev); ...; return next; });</code>",
+   "Search: <b>mdn HTMLInputElement indeterminate</b>. It's a property only, so: <code>const ref = useRef&lt;HTMLInputElement&gt;(null); useEffect(() =&gt; { if (ref.current) { ref.current.indeterminate = indeterminate; } });</code>. Leaving out the deps array re-applies it after the browser clears it on click.",
+   "Toggle in one function: <code>const allOn = ids.every((id) =&gt; { return prev.has(id); });</code> then delete all if <code>allOn</code>, else add all. Indeterminate falls into the “add all” branch for free.",
+   "Change: <code>collectVisible(nodes, q, out)</code> returns true if anything under <code>nodes</code> is visible. A match adds its whole subtree; a node whose children returned true adds itself (it's an ancestor). Then in the maps: <code>if (visible &amp;&amp; !visible.has(child.id)) { return null; }</code>."
+  ],
+  "rubric": [
+   "Stored only leaf ids; every group state is derived (no sync effects)",
+   "Reused getLeafIds / countLeaves instead of re-walking the tree by hand",
+   "Set the indeterminate DOM property through a ref, and knows why an attribute doesn't work",
+   "Immutable Set updates with the updater form",
+   "Indeterminate click selects all (and can explain the choice)",
+   "Filter computed during render; ancestors kept; toggles still act on the full subtree",
+   "Labels linked to inputs (htmlFor/id) so the whole row is clickable and accessible"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#4F46E5"
+    ],
+    [
+     "--primary-soft",
+     "#EEF2FF"
+    ],
+    [
+     "--nav",
+     "#0B1220"
+    ],
+    [
+     "--border",
+     "#E4E7EF"
+    ],
+    [
+     "--muted",
+     "#6B7280"
+    ],
+    [
+     "Success bg",
+     "#ECFDF5"
+    ]
+   ],
+   "notes": [
+    [
+     "Checkbox",
+     "16×16 · accent-color primary"
+    ],
+    [
+     "Scope row",
+     "pad 8 18 8 14 · gap 12"
+    ],
+    [
+     "Nesting",
+     "indent 26 · 1px dashed left border"
+    ],
+    [
+     "Selected row",
+     "bg primary-soft"
+    ],
+    [
+     "Count pill",
+     "12.5/600 · primary on primary-soft · pill"
+    ],
+    [
+     "Group count",
+     "“2/5” · 12 · muted · tabular-nums"
+    ],
+    [
+     "Filter",
+     "full width · h 36 · pad 12 18 4"
+    ]
+   ]
+  }
+ },
+ "dc52": {
+  "kind": "drill",
+  "level": 5,
+  "order": 52,
+  "minutes": 40,
+  "changeAt": 28,
+  "title": "Streaming AI chat with Stop",
+  "focus": "src/App.tsx",
+  "summary": "A writing-assistant chat sends messages but never answers. Stream the reply token by token with a blinking cursor, a real Stop (AbortController) and polite auto-scroll.",
+  "skills": [
+   "AbortController",
+   "streaming updates",
+   "updater form under load",
+   "scroll position math",
+   "refs vs state"
+  ],
+  "brief": "<p><b>Quill</b> is an AI writing assistant. The thread, <code>MessageBubble</code> and <code>Composer</code> (Enter sends, Shift+Enter is a newline) already work, but <code>handleSend</code> only appends your message. There's a <code>TODO</code> where the reply should start.</p><p>Read <code>api.ts</code> carefully: <code>streamReply(prompt, onToken, signal)</code> calls <code>onToken</code> once per chunk (first token after 0.3–0.7 s, then every 15–60 ms) and resolves when done. If the <code>signal</code> is aborted it stops and <b>rejects</b> with an <code>AbortError</code>. Asking the same prompt twice returns a different answer. <code>utils/id.ts</code> has <code>makeId</code>.</p><p>This is the core interaction of every AI product. The interviewer will watch for: tokens appended with the updater form, the controller kept in a ref, AbortError treated as a normal outcome (not an error), and scroll that respects the reader.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~28 min):</b> Regenerate.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–22 Core · 22–28 Next · 28–37 change · 37–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"On send I append two messages at once: the user's, and an empty assistant message with <code>status: 'streaming'</code>. I keep its id in <code>streamingId</code> state, which drives the Stop button and disables sending. Each token does <code>setMessages(prev =&gt; prev.map(...))</code> to append to that one message; it has to be the updater form because tokens arrive faster than renders. The <code>AbortController</code> goes in a ref: it's not something I render. Stop calls <code>abort()</code>; the promise rejects with AbortError and I mark the message 'stopped'. For scroll I track whether the user is at the bottom in an <code>onScroll</code> handler, and only scroll to bottom in an effect on <code>messages</code> when they are.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Sending adds your message and an assistant message that fills in <b>token by token</b> as <code>streamReply</code> emits, with a blinking amber block <b>cursor</b> at the end while streaming. Before the first token, show three pulsing “thinking” dots",
+   "While streaming, the Send button is replaced by a <b>Stop</b> button and Enter does not send (you can still type the next prompt). Stop aborts via <code>AbortController</code>: tokens stop immediately, the cursor disappears and a small “Stopped” pill appears under the partial answer",
+   "When the stream completes the cursor disappears and Send comes back. An <code>AbortError</code> is not shown as an error; any other rejection shows “Something went wrong”",
+   "<b>Auto-scroll only if the user is at the bottom</b>: new tokens keep the thread pinned to the bottom, but if the user scrolls up to read, the thread stays where they put it. Sending a new message always scrolls down",
+   "While streaming and scrolled up, a floating <b>“↓ Jump to latest”</b> pill appears; clicking it scrolls down and resumes following. Leaving the page mid-stream aborts the request (effect cleanup)"
+  ],
+  "change": {
+   "title": "Regenerate the last answer",
+   "html": "<p>\"Users want a second opinion without retyping the prompt.\"</p><ul><li>Under the <b>last</b> assistant message only, when nothing is streaming, show <b>“↻ Regenerate”</b>.</li><li>Clicking it clears that answer <b>in place</b> (same message, not a new one) and streams a new answer for the user prompt right above it, with the same cursor, Stop and scroll behaviour.</li><li>Stopping a regenerate leaves the partial new answer with “Stopped”.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if your streaming code is one function <code>runStream(assistantId, prompt)</code>, this is ten lines.</p>"
+  },
+  "hints": [
+   "Message shape: <code>type Message = ChatMessage &amp; { status?: 'streaming' | 'done' | 'stopped' | 'error' };</code> Seed messages have no status.",
+   "Append both messages in one update: <code>setMessages((prev) =&gt; { return [...prev, userMsg, assistantMsg]; });</code> then start the stream with the assistant id.",
+   "Search: <b>mdn AbortController</b>. <code>const controller = new AbortController(); controllerRef.current = controller; streamReply(prompt, onToken, controller.signal)</code>. Stop is <code>controllerRef.current.abort()</code>.",
+   "Each token: <code>setMessages((prev) =&gt; { return prev.map((m) =&gt; { if (m.id !== id) { return m; } return { ...m, text: m.text + token }; }); });</code> Using <code>messages</code> from the closure would drop tokens.",
+   "<code>.catch((err) =&gt; { if (err.name === 'AbortError') { finish(id, 'stopped'); return; } finish(id, 'error'); })</code>",
+   "At bottom: <code>el.scrollHeight - el.scrollTop - el.clientHeight &lt; 40</code> in <code>onScroll</code>. Then <code>useEffect(() =&gt; { if (atBottom) { el.scrollTop = el.scrollHeight; } }, [messages, atBottom]);</code> (search: <b>mdn scrollHeight</b>).",
+   "Cursor CSS: an inline-block 8×1em span with <code>animation: blink 1s steps(1) infinite</code> and <code>@keyframes blink { 50% { opacity: 0; } }</code>."
+  ],
+  "rubric": [
+   "One streaming function reused by send and regenerate",
+   "Tokens appended with the updater form; no lost tokens",
+   "AbortController in a ref, aborted on Stop and on unmount",
+   "AbortError handled as a normal 'stopped' outcome, other errors surfaced",
+   "Sending disabled while streaming (button and Enter key)",
+   "Auto-scroll respects a user who scrolled up; threshold, not exact equality",
+   "Mentions accessibility: aria-busy while streaming, not announcing every token"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0F1115"
+    ],
+    [
+     "--surface",
+     "#171A21"
+    ],
+    [
+     "--surface-2",
+     "#1F232C"
+    ],
+    [
+     "--accent",
+     "#F5A524"
+    ],
+    [
+     "--muted",
+     "#8B909C"
+    ],
+    [
+     "--border",
+     "#2A2F3A"
+    ]
+   ],
+   "notes": [
+    [
+     "Cursor",
+     "8 × 1.05em · accent · blink 1s steps(1)"
+    ],
+    [
+     "Thinking dots",
+     "3 × 6px · gap 5 · staggered .15s"
+    ],
+    [
+     "Stop button",
+     "h 36 · surface-2 · 1px border · 10px square icon"
+    ],
+    [
+     "Stopped pill",
+     "12 · muted · 1px border · pill"
+    ],
+    [
+     "Regenerate",
+     "13 · muted · hover surface-2"
+    ],
+    [
+     "Jump pill",
+     "h 32 · centered · bottom 12 · shadow"
+    ]
+   ]
+  }
+ },
+ "dc53": {
+  "kind": "drill",
+  "level": 5,
+  "order": 53,
+  "minutes": 45,
+  "changeAt": 30,
+  "title": "Kanban: drag, drop, roll back",
+  "focus": "src/App.tsx",
+  "summary": "A sprint board renders four columns. Add HTML5 drag and drop with an insert indicator, persist moves optimistically, roll back when the API refuses, then add a keyboard alternative.",
+  "skills": [
+   "HTML5 drag and drop",
+   "insert index from pointer",
+   "optimistic update + rollback",
+   "toast timer",
+   "keyboard a11y + focus"
+  ],
+  "brief": "<p><b>Orbit</b>, a sprint board. <code>App</code> loads the board with <code>getBoard()</code> (0.4–1 s) and renders <code>Column</code> → <code>CardView</code>. Nothing moves yet.</p><p>Read <code>utils/board.ts</code> before writing anything: <code>findCard</code> and the pure <code>moveCardInBoard(board, cardId, toColumn, toIndex)</code> already do the array surgery, and they're exactly what you need for both the optimistic move <i>and</i> the rollback. <code>components/Toast.tsx</code> is a ready-made presentational toast.</p><p><code>moveCard(cardId, toColumn, toIndex)</code> takes 0.4–0.9 s. It <b>rejects</b> when you move an <b>unassigned</b> card (dashed avatar: ORB-44, ORB-45) into <b>Done</b>. Note how <code>toIndex</code> is defined: the position <i>after</i> the card is removed from its old spot.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4 and the change. <b>Change (~30 min):</b> keyboard moves.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–25 Core · 25–30 Next · 30–42 change · 42–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"All drag state lives in <code>App</code> next to the board: <code>dragId</code> and <code>dropTarget = { columnId, index }</code>. Each column is a drop zone: <code>onDragOver</code> must <code>preventDefault()</code>, and it computes the insert index by finding the first card whose vertical middle is below the pointer. I only set state when the target changes because dragover fires constantly. The column renders a 3px indicator at that index. On drop I convert the indicator index to the API's index (subtract one if moving down in the same column), then <code>commitMove</code>: remember where the card was, <code>setBoard(prev =&gt; moveCardInBoard(prev, ...))</code>, call the API, and on rejection move <b>just that card</b> back and show the toast. The toast clears itself with a timeout in an effect.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Cards are <code>draggable</code>. Dragging a card over any column shows a 3px indigo <b>insert indicator</b> where it will land (between cards, at the top, or at the end), the column tints, and the dragged card fades to 40%. Works across columns and within a column",
+   "Dropping moves the card <b>immediately</b> (optimistic) and calls <code>moveCard</code> with the correct index. Moving a card down within its own column lands exactly where the indicator was. Dropping where it already is does nothing and makes no API call",
+   "When the API rejects (unassigned card into Done), <b>only that card</b> goes back to its original column and position, and a toast shows the server's message (“Assign someone before moving ORB-44 to Done.”). The toast closes with ✕ or after 4 seconds",
+   "Indicator disappears when the drag leaves the column (not when it passes over a child card) and on drag end. <code>dragover</code> doesn't set state when the target hasn't changed"
+  ],
+  "change": {
+   "title": "Keyboard alternative",
+   "html": "<p>\"Accessibility review: drag and drop is mouse-only. We need a keyboard path (WCAG 2.5.7).\"</p><ul><li>Cards are focusable. <b>Enter</b> or <b>Space</b> (or a click) picks a card up: it gets an indigo ring and the top bar shows “Moving ORB-41 · ← → change column · ↑ ↓ reorder · Enter or Esc to drop”.</li><li>While picked up, <b>←/→</b> move it to the previous/next column (same position, clamped), <b>↑/↓</b> reorder it within the column. Each move goes through the same optimistic save + rollback.</li><li><b>Focus stays on the card</b> after it moves to another column. <b>Enter</b> or <b>Esc</b> puts it down.</li><li>Announce each move in a visually hidden <code>aria-live</code> region: “Moved ORB-41 to In review, position 1.”</li></ul>"
+  },
+  "hints": [
+   "Search: <b>mdn HTML drag and drop API</b>. The three you need: <code>onDragStart</code> (call <code>e.dataTransfer.setData('text/plain', id)</code>), <code>onDragOver</code> (must call <code>e.preventDefault()</code> or drop never fires), <code>onDrop</code>.",
+   "Insert index: <code>const els = e.currentTarget.querySelectorAll('[data-card-id]');</code> loop, and the first one where <code>e.clientY &lt; rect.top + rect.height / 2</code> is the index. None? It's <code>els.length</code>.",
+   "Render the indicator by building an array: <code>cards.forEach((card, i) =&gt; { if (indicatorAt === i) { items.push(indicator); } items.push(&lt;CardView ... /&gt;); });</code> then one more check for <code>indicatorAt === cards.length</code>.",
+   "Same-column move down: the indicator index counts the card you're dragging, the API index doesn't. <code>if (from.columnId === to.columnId &amp;&amp; from.index &lt; index) { index -= 1; }</code>",
+   "Rollback without clobbering other moves: <code>setBoard((prev) =&gt; { return moveCardInBoard(prev, cardId, from.columnId, from.index); });</code> rather than restoring a whole saved board.",
+   "dragleave fires when moving onto a child. Guard with <code>if (!e.currentTarget.contains(e.relatedTarget as Node)) { setDropTarget(null); }</code>",
+   "Change: a card that moves to another column is a new DOM node, so focus is lost. <code>useEffect(() =&gt; { boardRef.current.querySelector('[data-card-id=\"' + selectedId + '\"]').focus(); }, [board, selectedId]);</code> (with null checks)."
+  ],
+  "rubric": [
+   "Reused moveCardInBoard / findCard for the optimistic move and the rollback",
+   "preventDefault in dragover; state only updated when the drop target changes",
+   "Correct index math for moving down within a column (explained out loud)",
+   "Rollback is per-card (functional update), not a stale whole-board snapshot",
+   "Toast auto-dismiss in an effect with cleanup; restarts for a new message",
+   "Keyboard path: focusable cards, Enter/Space/Esc/arrows, focus restored after remount",
+   "aria-live announcement for moves and failures"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#F4F3EF"
+    ],
+    [
+     "--column",
+     "#EAE8E2"
+    ],
+    [
+     "--accent",
+     "#5B5BD6"
+    ],
+    [
+     "Column over",
+     "#E2E0F5"
+    ],
+    [
+     "--danger",
+     "#D93F0B"
+    ],
+    [
+     "Toast bg",
+     "#1F1E1B"
+    ]
+   ],
+   "notes": [
+    [
+     "Indicator",
+     "h 3 · radius 2 · accent · 3px soft ring"
+    ],
+    [
+     "Dragging card",
+     "opacity .4"
+    ],
+    [
+     "Selected card",
+     "2px accent outline · offset 2 · indigo shadow"
+    ],
+    [
+     "Column gap",
+     "8 between cards"
+    ],
+    [
+     "Toast",
+     "fixed bottom 24 · centered · radius 10 · pad 10 12"
+    ],
+    [
+     "Keyboard help",
+     "12 · muted · right of the top bar"
+    ]
+   ]
+  }
+ },
+ "dc54": {
+  "kind": "drill",
+  "level": 5,
+  "order": 54,
+  "minutes": 45,
+  "changeAt": 31,
+  "title": "Production typeahead for docs search",
+  "focus": "src/App.tsx",
+  "summary": "A docs site has a search box that does nothing. Build a real typeahead: debounce, cancel stale requests, cache, keyboard navigation, highlighted matches, and every state handled.",
+  "skills": [
+   "debounce hook",
+   "AbortController + race conditions",
+   "ref cache",
+   "combobox ARIA",
+   "delayed loading indicator"
+  ],
+  "brief": "<p><b>Tidewave</b> docs. The header has a <code>SearchBox</code> (controlled input, nothing else). <code>Sidebar</code> and <code>Article</code> work; <code>App</code> owns the current <code>page</code> and passes <code>onNavigate</code>.</p><p>Read <code>api.ts</code>: <code>searchDocs(query, signal, shouldFail)</code> behaves like <code>fetch</code>: it takes an <code>AbortSignal</code> and rejects with an <code>AbortError</code> when aborted. <b>Latency depends on the query:</b> 1–3 characters take 0.6–1.1 s, longer ones 0.12–0.24 s, so responses can come back out of order. The “Simulate API failure” checkbox makes it reject. <code>utils/text.ts</code> has <code>escapeRegExp</code>, which you'll want for highlighting.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~31 min):</b> no spinner flicker.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–25 Core · 25–31 Next · 31–41 change · 41–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Everything stays inside <code>SearchBox</code>; the only way out is <code>onNavigate</code>. I'll write a tiny <code>useDebouncedValue(query, 250)</code> hook. One effect keyed on the debounced query does the fetch: empty → idle; in the cache (a <code>Map</code> in a ref) → use it; otherwise make an <code>AbortController</code>, set loading, call the API, and abort in the cleanup. That cleanup is what kills the race: a slow 'us' can never overwrite a fast 'use'. AbortError is ignored, other errors set an error state. Keyboard lives on the input: arrows move <code>activeIndex</code>, Enter navigates, Escape closes. The listbox gets combobox ARIA with <code>aria-activedescendant</code>, and options use <code>onMouseDown preventDefault</code> so the input's blur doesn't close the panel before the click lands.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Typing opens a results panel under the input. Requests are <b>debounced 250 ms</b>, and when a new query starts, the previous request is <b>aborted</b> through its <code>AbortController</code>. The results always belong to the latest query, even when an older, slower request would have finished last",
+   "Each result shows the title with the matching text wrapped in <code>&lt;mark&gt;</code> (case-insensitive), the section on the right, and a one-line snippet. Clicking a result opens that page in the article and clears the search",
+   "States: “Searching…” with a small spinner while loading; “No results for “xyz”” when empty; with the failure toggle on, “Search is temporarily unavailable.” plus a <b>Retry</b> button that tries again. An AbortError is never shown as an error",
+   "Keyboard: ↓/↑ move the highlighted result (wrapping), Enter opens it, Escape closes the panel (a second Escape clears the input). The first result is highlighted when results arrive. ARIA: <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code>, <code>aria-activedescendant</code>, and <code>role=\"listbox\"</code>/<code>\"option\"</code> with <code>aria-selected</code>",
+   "Results are <b>cached in memory by query</b>: retyping a query you've searched shows its results without a network request. Pressing <b>/</b> anywhere outside a text field focuses the search box"
+  ],
+  "change": {
+   "title": "No spinner flicker",
+   "html": "<p>\"Design says the spinner flashing on every keystroke looks broken. Most searches come back in 200 ms.\"</p><ul><li>Show “Searching…” <b>only if the request has taken longer than 300 ms</b>. Fast queries (4+ characters) should never show it at all.</li><li>While a request is in flight but not yet “slow”, keep showing the previous results instead of blanking the panel.</li><li>Clean up the timer when the request finishes, is aborted, or the component unmounts.</li></ul>"
+  },
+  "hints": [
+   "Debounce as a hook: <code>useEffect(() =&gt; { const t = setTimeout(() =&gt; { setDebounced(value); }, delay); return () =&gt; { clearTimeout(t); }; }, [value, delay]);</code>",
+   "Search: <b>mdn AbortController</b> and <b>react useEffect race condition fetch</b>. Create the controller inside the effect and <code>return () =&gt; { controller.abort(); };</code>",
+   "In <code>.catch</code>: <code>if (err.name === 'AbortError') { return; }</code> before setting the error state.",
+   "Cache: <code>const cacheRef = useRef(new Map&lt;string, DocHit[]&gt;());</code> Check it at the top of the effect and <code>cacheRef.current.set(q, hits)</code> on success. A ref, because the cache itself never needs to re-render anything.",
+   "Highlight: <code>text.split(new RegExp('(' + escapeRegExp(q) + ')', 'ig'))</code>. With a capture group, matches land at odd indexes: <code>if (i % 2 === 1) { return &lt;mark key={i}&gt;{part}&lt;/mark&gt;; }</code>",
+   "Clicking an option blurs the input first. Put <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on each option so focus stays and the click lands.",
+   "Change: a second piece of state, <code>slow</code>. In the effect: <code>const t = setTimeout(() =&gt; { setSlow(true); }, 300);</code>, clear it and <code>setSlow(false)</code> when the promise settles, and <code>clearTimeout(t)</code> in the cleanup."
+  ],
+  "rubric": [
+   "Debounce extracted into a reusable hook",
+   "Abort in effect cleanup; explains the out-of-order race it prevents",
+   "AbortError ignored; real errors shown with a retry path",
+   "Cache in a ref keyed by normalized query",
+   "Complete combobox ARIA and keyboard model; mousedown/blur gotcha handled",
+   "Highlight uses escapeRegExp (a query like “(” doesn't crash)",
+   "Delayed loading indicator with timer cleanup; keeps stale results instead of flashing"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--accent",
+     "#0F9D7A"
+    ],
+    [
+     "--accent-soft",
+     "#E3F5EF"
+    ],
+    [
+     "--mark",
+     "#FFF1B8"
+    ],
+    [
+     "--border",
+     "#E3E8E6"
+    ],
+    [
+     "--muted",
+     "#5D6B67"
+    ],
+    [
+     "--danger",
+     "#C2410C"
+    ]
+   ],
+   "notes": [
+    [
+     "Panel",
+     "top 100% + 6 · radius 10 · pad 6 · shadow 0 16 40"
+    ],
+    [
+     "Result",
+     "pad 8 10 · radius 7 · 2-col grid"
+    ],
+    [
+     "Active result",
+     "bg accent-soft · title accent"
+    ],
+    [
+     "Mark",
+     "bg #FFF1B8 · radius 2"
+    ],
+    [
+     "Snippet",
+     "12.5 · muted · single line ellipsis"
+    ],
+    [
+     "Spinner",
+     "12px · 2px ring · .7s"
+    ]
+   ]
+  }
+ },
+ "dc55": {
+  "kind": "drill",
+  "level": 5,
+  "order": 55,
+  "minutes": 40,
+  "changeAt": 29,
+  "title": "Analytics grid: sticky, resizable, sortable",
+  "focus": "src/App.tsx",
+  "summary": "A campaign report renders a plain wide table. Turn it into a real data grid: sticky header and first column, drag-to-resize columns with pointer events, and sorting. Then persist widths.",
+  "skills": [
+   "position: sticky in tables",
+   "pointer events + setPointerCapture",
+   "refs for drag state",
+   "sorting a copy",
+   "safe localStorage"
+  ],
+  "brief": "<p>A marketing <b>Campaign performance</b> report. <code>App</code> loads 30 rows with <code>getCampaigns()</code> (0.4–1.1 s) and <code>CampaignTable</code> renders them inside a 480px-high scroll container. The table is wider than the container, so you can scroll both ways, and right now the header and campaign names scroll out of view.</p><p>Read <code>columns.ts</code>: every column has a <code>key</code>, <code>label</code>, default <code>width</code>, <code>align</code> and a <code>render</code> function that already formats the value (with <code>utils/format.ts</code>). Use it for everything; don't hard-code columns. <code>StatusPill</code> renders the status.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4 and the change. <b>Change (~29 min):</b> persist widths.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–24 Core · 24–29 Next · 29–37 change · 37–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Sticky is CSS: <code>th { position: sticky; top: 0 }</code> and the first cell of every row <code>left: 0</code>, with the top-left corner on the highest z-index. I know sticky table cells lose their borders with <code>border-collapse: collapse</code>, so I'll switch to <code>separate</code> with zero spacing, and give sticky cells a background. Widths live in state as <code>{ [key]: px }</code>, applied through a <code>&lt;colgroup&gt;</code> with <code>table-layout: fixed</code>. The resize handle is a 7px span at the right edge of each header: pointerdown captures the pointer and stores startX and startWidth in a <b>ref</b> (it changes every move and never renders), pointermove sets the width with a minimum. Sorting is <code>{ key, dir }</code> state and a sorted <b>copy</b> during render.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Inside the scroll container the <b>header row stays visible</b> when scrolling down and the <b>Campaign column stays visible</b> when scrolling right. The top-left header cell stays above both. Borders and backgrounds stay intact on sticky cells",
+   "Each header has a resize handle on its right edge (<code>cursor: col-resize</code>, 2px blue line on hover/drag). Dragging it changes that column's width live, using pointer events with <code>setPointerCapture</code>, never below <b>70px</b>. Other columns keep their widths (the table gets wider/narrower)",
+   "Clicking a header sorts by that column: first click ascending ▲, again descending ▼, and so on. Numbers sort numerically (Spend by dollars, not by the formatted string). Inactive headers show a faint ↕, the active header turns blue, and <code>&lt;th aria-sort&gt;</code> is set",
+   "Resizing never triggers a sort, the page doesn't select text during a drag, and double-clicking a handle resets that column to its default width"
+  ],
+  "change": {
+   "title": "Remember column widths",
+   "html": "<p>\"Analysts set up their widths every morning. Remember them.\"</p><ul><li>Persist widths in <code>localStorage</code> under <code>campaigns.columnWidths.v1</code> and restore them on load.</li><li>Save when a drag <b>ends</b>, not on every pointermove.</li><li>Storage can throw (private mode, quota) or contain garbage: wrap reads and writes in <code>try/catch</code>, ignore invalid values, and fall back to the defaults from <code>columns.ts</code>.</li></ul>"
+  },
+  "hints": [
+   "Search: <b>css position sticky table header border-collapse</b>. You'll want <code>border-collapse: separate; border-spacing: 0;</code> and a solid background on sticky cells, or rows show through.",
+   "Fixed widths: <code>table-layout: fixed</code>, a <code>style={{ width: total }}</code> on the table, and <code>&lt;colgroup&gt;{COLUMNS.map((c) =&gt; { return &lt;col key={c.key} style={{ width: widths[c.key] }} /&gt;; })}&lt;/colgroup&gt;</code>.",
+   "Search: <b>mdn setPointerCapture</b>. In pointerdown: <code>e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { key, startX: e.clientX, startWidth: widths[key] };</code>. Then pointermove on the same handle keeps firing even off the handle.",
+   "Move: <code>const w = Math.max(70, drag.startWidth + e.clientX - drag.startX); setWidths((prev) =&gt; { return { ...prev, [drag.key]: w }; });</code>",
+   "Keep the handle a sibling of the sort button (not inside it), so a drag doesn't click the button. <code>e.preventDefault()</code> in pointerdown stops text selection.",
+   "Sort a copy: <code>[...rows].sort((a, b) =&gt; { ... })</code>, comparing <code>a[key] - b[key]</code> for numbers and <code>localeCompare</code> for strings.",
+   "Change: lazy initial state <code>useState(loadWidths)</code> so storage is read once. Save in an effect: <code>useEffect(() =&gt; { if (resizingKey === null) { saveWidths(widths); } }, [widths, resizingKey]);</code>"
+  ],
+  "rubric": [
+   "Knew (or found quickly) the border-collapse + sticky gotcha and z-index layering for the corner cell",
+   "Columns driven by the COLUMNS config, widths via colgroup + table-layout fixed",
+   "Pointer capture; drag bookkeeping in a ref, width in state; min width enforced",
+   "Resize handle doesn't trigger sort or select text",
+   "Sorted copy, numeric compare on raw values not formatted strings, aria-sort",
+   "localStorage wrapped in try/catch, validated, lazy-loaded, saved on drag end",
+   "Talked about performance (re-render per pointermove is fine at 30 rows; would throttle with rAF or virtualize at 10k)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--accent",
+     "#2563EB"
+    ],
+    [
+     "--accent-soft",
+     "#E7EEFD"
+    ],
+    [
+     "Header bg",
+     "#F7F8FA"
+    ],
+    [
+     "--border",
+     "#E1E5EC"
+    ],
+    [
+     "Header border",
+     "#D5DBE5"
+    ],
+    [
+     "--muted",
+     "#64748B"
+    ]
+   ],
+   "notes": [
+    [
+     "Scroll box",
+     "h 480 · radius 10 · 1px border"
+    ],
+    [
+     "Row",
+     "h 36 · pad 0 12"
+    ],
+    [
+     "Header",
+     "11.5/600 uppercase · letter-spacing .4"
+    ],
+    [
+     "Resize handle",
+     "w 7 · line 1px #D5DBE5 · active 2px accent full height"
+    ],
+    [
+     "Sticky column",
+     "right border + 4px shadow"
+    ],
+    [
+     "Min width",
+     "70px"
+    ]
+   ]
+  }
+ },
+ "dc56": {
+  "kind": "drill",
+  "level": 5,
+  "order": 56,
+  "minutes": 40,
+  "changeAt": 28,
+  "title": "Photo lightbox with focus management",
+  "focus": "src/App.tsx",
+  "summary": "A photography portfolio shows a grid of thumbnails. Build an accessible fullscreen lightbox: arrow keys, Escape, a real focus trap, focus returned to the right thumbnail, and preloading. Then swipe.",
+  "skills": [
+   "modal dialog a11y",
+   "focus trap",
+   "ref arrays",
+   "image preloading",
+   "pointer-event gestures"
+  ],
+  "brief": "<p><b>Atlas</b>, a photographer's field-notes site. <code>App</code> loads 12 photos with <code>getPhotos()</code> (0.4–1 s) and renders a grid of <code>Thumbnail</code> buttons. Clicking one does nothing yet.</p><p><code>utils/wrap.ts</code> has <code>wrapIndex(i, length)</code>, which makes ←/→ wrap around without off-by-one bugs. Each <code>Photo</code> has a <code>src</code> (full size) and <code>thumb</code>.</p><p>This one is mostly about <b>focus</b>. The interviewer will Tab around inside your dialog, press Escape, and check where focus lands. Plan that before you write the markup.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~28 min):</b> drag to swipe.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–22 Core · 22–28 Next · 28–37 change · 37–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>openIndex: number | null</code>. The lightbox is only rendered when it's not null, so mount and unmount are my open and close. Inside, a <code>role=\"dialog\" aria-modal</code> container gets one <code>onKeyDown</code>: arrows call <code>onChange(wrapIndex(...))</code>, Escape calls <code>onClose</code>, and Tab is the trap: if focus is on the last button and you Tab, go to the first, and the reverse with Shift. On mount I focus the close button. To give focus back, I keep an array of thumbnail refs in <code>App</code> and focus <code>thumbRefs.current[openIndex]</code> in the close handler, which is the photo you were <i>viewing</i>, not necessarily the one you clicked. Preloading is an effect on <code>index</code> that creates <code>new Image()</code> for the neighbours.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking a thumbnail opens a fullscreen dark lightbox (<code>role=\"dialog\"</code>, <code>aria-modal=\"true\"</code>) with the full image, a caption (title in italic serif, location in small caps) and a counter “4 of 12”",
+   "<b>←/→</b> keys and the round ← → buttons show the previous/next photo, <b>wrapping</b> from 12 to 1 and 1 to 12. <b>Escape</b> and the ✕ button close it",
+   "On open, focus moves into the dialog (the ✕ button). <b>Tab and Shift+Tab stay inside</b> the dialog: from the last control Tab goes to the first, and the reverse",
+   "On close, focus returns to the <b>thumbnail of the photo that was showing</b> (open #4, press → twice, close: focus is on thumbnail #6)",
+   "The next and previous images are <b>preloaded</b> (<code>new Image().src = ...</code>) whenever the index changes, so arrowing is instant"
+  ],
+  "change": {
+   "title": "Drag to swipe",
+   "html": "<p>\"Half our traffic is on tablets. People try to swipe.\"</p><ul><li>Pressing on the image area and dragging horizontally moves the image with the pointer (pointer events, so mouse, pen and touch all work).</li><li>Releasing after more than <b>60px</b> left goes to the next photo, more than 60px right goes to the previous one; less than that snaps back with a short transition.</li><li>No transition while dragging (it should track the pointer exactly), and the browser's native image drag must not kick in.</li></ul>"
+  },
+  "hints": [
+   "State: <code>const [openIndex, setOpenIndex] = useState&lt;number | null&gt;(null);</code> Render <code>&lt;Lightbox index={openIndex} onChange={setOpenIndex} onClose={handleClose} /&gt;</code> only when it's not null.",
+   "Ref array for thumbnails: <code>const thumbRefs = useRef&lt;(HTMLButtonElement | null)[]&gt;([]);</code> and pass a callback ref: <code>buttonRef={(el) =&gt; { thumbRefs.current[i] = el; }}</code>. The Thumbnail puts it on its button: <code>ref={buttonRef}</code>.",
+   "Search: <b>focus trap react keydown tab</b> or <b>WAI-ARIA dialog modal pattern</b>. In the dialog's onKeyDown: get <code>dialogRef.current.querySelectorAll('button')</code>, and if <code>!e.shiftKey &amp;&amp; e.target === last</code>, <code>e.preventDefault(); first.focus();</code>",
+   "Initial focus: <code>useEffect(() =&gt; { closeRef.current.focus(); }, []);</code> in the Lightbox. Give the dialog <code>tabIndex={-1}</code> so clicks on empty space keep focus inside.",
+   "Preload: <code>useEffect(() =&gt; { [wrapIndex(index + 1, n), wrapIndex(index - 1, n)].forEach((i) =&gt; { const img = new Image(); img.src = photos[i].src; }); }, [index]);</code>",
+   "Change: search <b>mdn pointer events setPointerCapture</b>. Start x in a ref, <code>dragX</code> in state for the <code>translateX</code>. On pointerup compare <code>dx</code> to ±60. Add <code>draggable={false}</code> on the img and <code>touch-action: pan-y</code> on the stage."
+  ],
+  "rubric": [
+   "Lightbox mount/unmount = open/close; index lives in App",
+   "Uses wrapIndex; no off-by-one at the ends",
+   "Correct dialog ARIA and initial focus",
+   "Focus trap handles Tab and Shift+Tab at both ends",
+   "Focus returns to the currently viewed photo's thumbnail (ref array)",
+   "Preloads neighbours in an effect",
+   "Swipe uses pointer capture, threshold, no transition while dragging, native drag disabled"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0D0D0C"
+    ],
+    [
+     "--text",
+     "#EDE9E1"
+    ],
+    [
+     "--accent",
+     "#E7C873"
+    ],
+    [
+     "--muted",
+     "#8E897E"
+    ],
+    [
+     "Overlay",
+     "rgba(8,8,7,.96)"
+    ],
+    [
+     "Button bg",
+     "rgba(23,23,21,.6)"
+    ]
+   ],
+   "notes": [
+    [
+     "Nav buttons",
+     "44 round · 1px rgba(237,233,225,.18) · 16 from edge"
+    ],
+    [
+     "Close",
+     "38 round · top right · pad 14 18"
+    ],
+    [
+     "Counter",
+     "12 · uppercase · letter-spacing 1.6 · muted"
+    ],
+    [
+     "Caption",
+     "title italic serif 24 · location 12 uppercase accent"
+    ],
+    [
+     "Stage",
+     "pad 0 72 · image contain"
+    ],
+    [
+     "Swipe",
+     "threshold 60px · snap-back .25s"
+    ]
+   ]
+  }
+ },
+ "dc57": {
+  "kind": "drill",
+  "level": 5,
+  "order": 57,
+  "minutes": 45,
+  "changeAt": 31,
+  "title": "Shared checklist: optimistic edits + conflicts",
+  "focus": "src/App.tsx",
+  "summary": "A shared festival checklist is read-only. Make toggle, rename and delete instant with optimistic updates, roll back per task when the server refuses a stale version, and offer Reload. Then a batch action with partial failure.",
+  "skills": [
+   "optimistic updates",
+   "per-item rollback",
+   "version conflicts",
+   "inline edit",
+   "Promise.all / allSettled"
+  ],
+  "brief": "<p>The <b>HarborFest</b> vendor checklist is shared by four organizers. <code>App</code> loads tasks with <code>getTasks()</code>; <code>TaskRow</code> renders a checkbox (read-only), the title, “Last edited by”, and a ✕ that does nothing.</p><p>Read <code>api.ts</code> closely. Every <code>Task</code> has a <code>version</code>. <code>updateTask(id, patch, version)</code> and <code>deleteTask(id, version)</code> (0.4–0.9 s) succeed only if you send the version the server has; otherwise they throw a <code>ConflictError</code>. <b>Simulation:</b> right after you load, Priya edits task #3 (“Confirm food truck lineup”) in another tab, so <b>any write to #3 conflicts</b> until you fetch it again with <code>getTask(id)</code>.</p><p>A successful <code>updateTask</code> returns the saved task with its <b>new</b> version. If you don't keep it, your next edit to the same task conflicts with yourself.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4 and the change. <b>Change (~31 min):</b> Mark all done.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–25 Core · 25–31 Next · 31–42 change · 42–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Tasks stay in <code>App</code>. Client-only flags (<code>saving</code>, <code>conflicts</code>) go in separate maps keyed by id, not on the Task, so server copies can replace tasks wholesale. I'll write one <code>saveTask(task, patch)</code>: apply the patch locally, mark saving, call <code>updateTask</code> with the version I have; on success replace with the server's task (new version); on failure replace with the original <code>task</code> I was handed, and if it's a <code>ConflictError</code> flag the row. While a row is saving I disable it so I can't fire a second write with a stale version. Delete removes it and re-inserts at the old index on failure. Reload calls <code>getTask</code> and clears the flag. If <code>saveTask</code> resolves true/false instead of rejecting, the batch is just <code>Promise.all</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Toggling the checkbox updates the row and the “2 of 6 done” progress <b>instantly</b>, then saves with <code>updateTask</code>. While saving, the row is faded, says “Saving…”, and its controls are disabled. On success the row shows the server's copy (new version, “Last edited by You”)",
+   "When a save fails, <b>only that task</b> rolls back. A <code>ConflictError</code> also shows an inline amber message under the title: “Someone else changed this · <u>Reload</u>”. Reload fetches the latest with <code>getTask</code> (Priya's new title appears) and clears the message; after that, edits to #3 save normally",
+   "Delete (✕) removes the row immediately and calls <code>deleteTask</code>. If it fails, the task reappears <b>in its original position</b> (with the conflict message for a conflict)",
+   "Clicking a title turns it into an input (autofocused). <b>Enter</b> or blur saves the rename optimistically through the same path; <b>Escape</b> cancels; an empty or unchanged title doesn't save"
+  ],
+  "change": {
+   "title": "Mark all done (partial failure)",
+   "html": "<p>\"The night before the event, organizers want one button.\"</p><ul><li>Add a <b>Mark all done</b> button next to the progress bar (disabled when everything is done).</li><li>It marks every open task done <b>at once</b> (optimistic), saving each one with its own request.</li><li>Tasks that fail roll back individually and get the conflict message; the others stay done.</li><li>When all requests settle, show a summary line under the header: “Marked 3 of 4 tasks done. 1 couldn't be saved.”</li></ul>"
+  },
+  "hints": [
+   "Client-only flags: <code>const [saving, setSaving] = useState&lt;Record&lt;string, boolean&gt;&gt;({});</code> and the same for <code>conflicts</code>. Read with <code>Boolean(saving[t.id])</code>.",
+   "Replace one task: <code>setTasks((prev) =&gt; { return prev.map((t) =&gt; { if (t.id !== next.id) { return t; } return next; }); });</code>",
+   "One write path: <code>saveTask(task, patch)</code> returns <code>updateTask(...).then(() =&gt; true).catch(() =&gt; false)</code> (with braces + return, plus the rollback in the catch). Then every caller, including the batch, reuses it.",
+   "Conflict check: <code>if (err instanceof ConflictError) { ... }</code>. Import the class itself (not <code>import type</code>), because <code>instanceof</code> needs the runtime value.",
+   "Delete rollback: remember <code>index</code> before removing, then <code>next.splice(Math.min(index, next.length), 0, task)</code> on a copy.",
+   "Inline edit state belongs in <code>TaskRow</code> (<code>editing</code>, <code>draft</code>): nothing else needs it.",
+   "Change: search <b>mdn Promise.allSettled</b>. If <code>saveTask</code> never rejects, <code>Promise.all(targets.map((t) =&gt; { return saveTask(t, { done: true }); }))</code> gives you an array of booleans to count."
+  ],
+  "rubric": [
+   "One optimistic write function reused by toggle, rename and batch",
+   "Rollback is per task (restore that task), not a stale snapshot of the whole list",
+   "Keeps the server's returned version; disables a row while saving to avoid self-conflicts",
+   "ConflictError handled distinctly with a recovery path (Reload)",
+   "Delete restores at the original index",
+   "Client-only flags kept out of the server model",
+   "Batch reports partial failure accurately"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--accent",
+     "#E4572E"
+    ],
+    [
+     "--success",
+     "#2F9E6B"
+    ],
+    [
+     "--warn-bg",
+     "#FFF4DB"
+    ],
+    [
+     "--warn-text",
+     "#8A5A00"
+    ],
+    [
+     "--bg",
+     "#FBF7F1"
+    ],
+    [
+     "Summary bg",
+     "#F2FAF6"
+    ]
+   ],
+   "notes": [
+    [
+     "Row",
+     "pad 12 18 · gap 12"
+    ],
+    [
+     "Saving row",
+     "opacity .6 · meta “Saving…” italic"
+    ],
+    [
+     "Conflict",
+     "12.5/500 · pad 5 10 · radius 8 · amber · Reload bold underlined"
+    ],
+    [
+     "Rename input",
+     "1px accent border · 3px soft ring · radius 6"
+    ],
+    [
+     "Mark all done",
+     "h 32 · 13/600 · 1px border · radius 8"
+    ],
+    [
+     "Summary",
+     "13 · pad 9 18 · green tint"
+    ]
+   ]
+  }
+ },
+ "dc58": {
+  "kind": "drill",
+  "level": 5,
+  "order": 58,
+  "minutes": 40,
+  "changeAt": 28,
+  "title": "Filter popover with pending selections",
+  "focus": "src/App.tsx",
+  "summary": "An architecture studio's project list has a dead Filter button. Build a popover with status and owner checkboxes, search, Select all/Clear, Apply/Cancel draft semantics, removable chips and a count badge. Then sync to the URL.",
+  "skills": [
+   "draft vs applied state",
+   "popover dismissal",
+   "focus return",
+   "derived options",
+   "URLSearchParams + replaceState"
+  ],
+  "brief": "<p><b>Studio Varga</b>'s project list. <code>App</code> loads 18 projects with <code>getProjects()</code> (0.4–1 s) and renders <code>ProjectList</code>. The toolbar has a <b>Filter</b> button that does nothing.</p><p>Read <code>utils/list.ts</code>: <code>toggleInList</code> is exactly what a checkbox needs, and <code>uniqueSorted</code> builds the owner options from the data. <code>STATUSES</code> in <code>api.ts</code> is the fixed status list. <code>StatusBadge</code> and <code>Initials</code> already render rows.</p><p>The key product rule: selections in the popover are a <b>draft</b>. Nothing changes in the list until <b>Apply</b>; <b>Cancel</b>, Escape or clicking outside throws the draft away.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~28 min):</b> URL sync.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–22 Core · 22–28 Next · 28–36 change · 36–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Two copies of the filters. <code>applied</code> lives in <code>App</code> because the list, chips and badge all read it. The <code>draft</code> lives inside a <code>FilterPopover</code> component that's only mounted while open, initialised from <code>applied</code>. So opening gives a fresh copy, Apply calls <code>onApply(draft)</code>, and Cancel just unmounts. No syncing effects. The popover listens on <code>document</code> for Escape and mousedown outside (ignoring the Filter button itself, or it would close and reopen). Closing returns focus to the Filter button through a ref. Chips and the badge are derived from <code>applied</code>. Empty selection in a group means 'any'.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "<b>Filter</b> toggles a popover anchored under it with a <b>Status</b> section (6 checkboxes) and an <b>Owner</b> section (one checkbox per owner, from the data, sorted) with a <b>Search people</b> input that filters the owner list (“No one matches …”)",
+   "Checking boxes changes only the popover. <b>Apply</b> filters the list (status OR within a group, AND across groups; an empty group means any) and closes. <b>Cancel</b>, <b>Escape</b> and clicking outside close <b>without</b> applying, and reopening shows the applied selection again",
+   "Active filters appear as chips above the list (“Status: Design ✕”, “Owner: Hana Sato ✕”); ✕ removes one immediately, <b>Clear all</b> removes all. The Filter button shows a dark count <b>badge</b> (“3”) when filters are active, and the toolbar says “5 of 18 projects”",
+   "Each section has <b>Select all</b> and <b>Clear</b>. For owners they act on the <b>visible</b> (searched) owners only. No matches at all: “No projects match these filters.” with a Clear all button",
+   "Focus moves into the popover when it opens and returns to the Filter button when it closes. The button has <code>aria-expanded</code> and <code>aria-haspopup</code>"
+  ],
+  "change": {
+   "title": "Shareable filter URLs",
+   "html": "<p>\"PMs paste links to filtered lists in Slack, and the filters are lost.\"</p><ul><li>Whenever the applied filters change, write them to the query string as repeated params: <code>?status=Design&amp;status=On+hold&amp;owner=Hana+Sato</code>, using <code>history.replaceState</code> (no new history entries).</li><li>Keep any <b>other</b> query params and the <code>#hash</code> intact.</li><li>On load, initialise the applied filters from the URL.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">In this practice IDE the preview shares the page URL, which is exactly why you must not clobber other params or the hash.</p>"
+  },
+  "hints": [
+   "Draft without sync effects: render <code>&lt;FilterPopover applied={applied} ... /&gt;</code> only when open, and inside do <code>const [draft, setDraft] = useState(applied);</code>. Every open is a fresh copy.",
+   "Checkbox: <code>setDraft((prev) =&gt; { return { ...prev, statuses: toggleInList(prev.statuses, value) }; });</code>",
+   "Outside click: <code>document.addEventListener('mousedown', ...)</code> and <code>if (popRef.current.contains(e.target)) { return; }</code>. Also ignore the Filter button (pass its ref), or its own click reopens the popover.",
+   "If <code>onCancel</code> is a dependency of the listener effect, wrap it in <code>useCallback</code> so the listeners aren't re-added every render.",
+   "Filtering: <code>(applied.statuses.length === 0 || applied.statuses.includes(p.status)) &amp;&amp; (same for owners)</code>, computed during render.",
+   "Change: search <b>mdn URLSearchParams getAll</b> and <b>mdn history.replaceState</b>. Read with <code>new URLSearchParams(window.location.search).getAll('status')</code> in a lazy <code>useState(fn)</code>.",
+   "Writing: <code>const url = new URL(window.location.href); url.searchParams.delete('status'); applied.statuses.forEach((s) =&gt; { url.searchParams.append('status', s); }); history.replaceState(null, '', url.toString());</code> keeps everything else, hash included."
+  ],
+  "rubric": [
+   "Draft vs applied separated; popover mount = fresh draft; Cancel needs no code",
+   "Reused toggleInList / uniqueSorted; options derived from data",
+   "Escape + outside click with listener cleanup; anchor excluded",
+   "Focus into popover and back to the trigger; aria-expanded",
+   "Chips, badge and count derived from applied state",
+   "Select all/Clear scoped to visible owners",
+   "URL sync with replaceState, repeated params, other params and hash preserved, lazy init"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--ink",
+     "#1C1B19"
+    ],
+    [
+     "--accent",
+     "#B5562B"
+    ],
+    [
+     "--accent-soft",
+     "#F6E7DF"
+    ],
+    [
+     "--bg",
+     "#F6F4EF"
+    ],
+    [
+     "--border",
+     "#E4E0D6"
+    ],
+    [
+     "--muted",
+     "#7D786C"
+    ]
+   ],
+   "notes": [
+    [
+     "Popover",
+     "w 290 · top 100% + 6 · radius 12 · shadow 0 18 40"
+    ],
+    [
+     "Section",
+     "pad 12 14 8 · head 11 uppercase muted"
+    ],
+    [
+     "Option",
+     "13.5 · pad 5 4 · checkbox 15 accent ink"
+    ],
+    [
+     "Footer",
+     "Cancel ghost · Apply dark · h 32"
+    ],
+    [
+     "Chip",
+     "h 28 · pill · 1px border · ✕ 20 round"
+    ],
+    [
+     "Badge",
+     "18 · ink · 11/700"
+    ]
+   ]
+  }
+ },
+ "dc59": {
+  "kind": "drill",
+  "level": 5,
+  "order": 59,
+  "minutes": 45,
+  "changeAt": 31,
+  "title": "Booking date range picker",
+  "focus": "src/App.tsx",
+  "summary": "A cabin booking page shows one static month. Build a two-month range picker: click check-in then checkout, hover preview, past and booked nights blocked, a range that can't cross a booked night, and a live summary. Then arrow-key navigation.",
+  "skills": [
+   "date math with helpers",
+   "ISO strings as keys",
+   "derived disabled rules",
+   "hover preview",
+   "roving tabindex"
+  ],
+  "brief": "<p><b>Fernhill Cabins</b>, booking “The Alder Cabin”. <code>App</code> loads availability with <code>getAvailability('alder')</code> (0.4–1 s): a price per night and a list of <b>unavailable</b> nights as ISO strings. <code>MonthView</code> renders one month of day buttons, display only.</p><p>Read <code>utils/date.ts</code> first, it does the date math so you don't have to: <code>TODAY</code> (a fixed Mar 3 2026; never use <code>new Date()</code> for today), <code>toISO</code>/<code>fromISO</code>, <code>addDays</code>, <code>addMonths</code>, <code>getMonthGrid</code>, <code>formatShort</code> and <code>nightsBetween</code>. Note the comment: <b>ISO date strings compare correctly with &lt; and &gt;</b>, so keep selections as strings. <code>utils/money.ts</code> has <code>formatPrice</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4 and the change. <b>Change (~31 min):</b> keyboard navigation.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–25 Core · 25–31 Next · 31–42 change · 42–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>App</code>: <code>viewMonth</code> (first of the left month), <code>start</code> and <code>end</code> as ISO strings or null, and <code>hover</code>. Everything else is derived per day: disabled if it's before <code>TODAY</code>, booked, or, while I'm picking a checkout, on or after the first booked night after <code>start</code>; that's the rule that stops a range crossing a booking. Click logic: no start or a finished range → new start; a day on or before start → move start; otherwise it's the end. The range to draw is <code>end</code>, or the hovered day while picking. I'll pass a <code>getInfo(iso)</code> function down so <code>MonthView</code> stays dumb, and render it twice.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Two months side by side (March and April 2026 to start) with ‹ › buttons that move both by one month. ‹ is disabled on the current month. Today (Mar 3) is bold and underlined",
+   "Click a day to set check-in, then a later day to set checkout. Start and end are dark green circles, the nights in between light green. Clicking a day on or before check-in moves check-in; clicking after a complete range starts a new one. While choosing checkout, <b>hovering</b> previews the range",
+   "Past days (before the fixed <code>TODAY</code>) and booked nights (struck through) can't be selected. Once check-in is set, every day <b>on or after the next booked night</b> is disabled too, so a range never includes a booked night",
+   "Summary bar: “Add your check-in date” → “Mar 4 → Add checkout” → <b>“Mar 4 → Mar 9 · 5 nights”</b> with “$925 total” (1 night is singular). <b>Clear dates</b> resets; <b>Reserve</b> is enabled only with a full range"
+  ],
+  "change": {
+   "title": "Keyboard navigation",
+   "html": "<p>\"Accessibility audit: the calendar is a wall of 60 tab stops, and you can't use it without a mouse.\"</p><ul><li>Only <b>one</b> day is in the Tab order (roving <code>tabIndex</code>): today at first, then the last day you focused or clicked.</li><li><b>←/→</b> move one day, <b>↑/↓</b> one week, across month boundaries; going past the visible months shifts the view. Focus never goes before today.</li><li>Enter/Space select like a click, and arrowing while picking a checkout shows the same range preview as hovering.</li><li>Disabled days must still be <b>focusable</b> (you arrow over them): switch from <code>disabled</code> to <code>aria-disabled</code> and ignore clicks on them yourself.</li></ul>"
+  },
+  "hints": [
+   "Keep dates as ISO strings in state: <code>useState&lt;string | null&gt;(null)</code>. Comparisons are just <code>iso &lt; TODAY_ISO</code>, <code>iso &gt; start</code>.",
+   "The crossing rule: <code>const later = availability.unavailable.filter((u) =&gt; { return u &gt; start; }).sort();</code> then while picking an end, disable any <code>iso &gt;= later[0]</code>.",
+   "Click logic in order: <code>if (!start || end) { setStart(iso); setEnd(null); } else if (iso &lt;= start) { setStart(iso); } else { setEnd(iso); }</code>",
+   "Preview: <code>let rangeEnd = end; if (start &amp;&amp; !end &amp;&amp; hover &amp;&amp; hover &gt; start &amp;&amp; !isDisabled(hover)) { rangeEnd = hover; }</code> and a day is in range when <code>iso &gt; start &amp;&amp; iso &lt; rangeEnd</code>.",
+   "Two months: render <code>&lt;MonthView month={viewMonth} /&gt;</code> and <code>&lt;MonthView month={addMonths(viewMonth, 1)} /&gt;</code>. Pass a <code>getInfo(iso)</code> function rather than five props per day.",
+   "Change: search <b>roving tabindex</b> and <b>WAI-ARIA date picker dialog example</b>. Store <code>focusedIso</code>; give that button <code>tabIndex={0}</code> and all others <code>-1</code>.",
+   "After an arrow key the button may be in a month that wasn't rendered yet, so focus it in an effect: <code>calendarRef.current.querySelector('[data-date=\"' + focusedIso + '\"]').focus()</code>, guarded by a ref flag so it only runs after keyboard moves."
+  ],
+  "rubric": [
+   "Reused the date helpers; never called new Date() for today",
+   "ISO strings in state; comparisons are simple and correct",
+   "Disabled rules derived (past, booked, beyond next booking)",
+   "Click state machine handles restart and earlier-day cases",
+   "Hover preview computed, not stored as a range",
+   "Summary pluralises and totals with formatPrice",
+   "Roving tabindex, aria-disabled instead of disabled, focus follows arrows across months"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--forest",
+     "#2F5D46"
+    ],
+    [
+     "--forest-dark",
+     "#234635"
+    ],
+    [
+     "--forest-soft",
+     "#E3EDE6"
+    ],
+    [
+     "--moss",
+     "#A7C4A0"
+    ],
+    [
+     "Disabled text",
+     "#C3C1B8"
+    ],
+    [
+     "--bg",
+     "#F5F3EC"
+    ]
+   ],
+   "notes": [
+    [
+     "Months",
+     "flex · gap 32 · stack under 640px"
+    ],
+    [
+     "Day",
+     "h 38 · pill · 13.5"
+    ],
+    [
+     "Start / end",
+     "forest bg · white 600"
+    ],
+    [
+     "In range",
+     "forest-soft · square corners"
+    ],
+    [
+     "Booked",
+     "line-through · disabled color"
+    ],
+    [
+     "Nav",
+     "32 round · 1px border · absolute top corners"
+    ],
+    [
+     "Summary",
+     "600 · total 13 muted below"
+    ]
+   ]
+  }
+ },
+ "dc60": {
+  "kind": "drill",
+  "level": 5,
+  "order": 60,
+  "minutes": 45,
+  "changeAt": 32,
+  "title": "Capstone: AI chat conversation sidebar",
+  "focus": "src/App.tsx",
+  "summary": "The sidebar of an AI chat app lists conversations flat. Group them by date, add search, inline rename, delete with a 5-second Undo (deferred API delete) and New chat. Then pinning.",
+  "skills": [
+   "derived grouping",
+   "deferred delete + undo",
+   "timers in refs",
+   "inline edit",
+   "optimistic updates",
+   "selection edge cases"
+  ],
+  "brief": "<p>The capstone. <b>Lumen</b> is an AI chat app. <code>App</code> loads 14 conversations with <code>getConversations()</code> (0.4–1 s), sorts them newest first and renders a flat list of <code>ConversationRow</code>s. Selecting works and <code>ChatPane</code> shows the selected chat. The New chat button and the search box do nothing.</p><p>Read <code>utils/date.ts</code>: <code>NOW</code> is fixed (Mon Jun 15 2026, 2 pm) and <code>daysBetween(earlier, later)</code> counts <b>calendar</b> days, which is what grouping needs. In <code>api.ts</code>, note that <code>deleteConversation</code> is permanent; the server has no undo, so Undo has to happen <b>before</b> you call it.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next 4–5 and the change. <b>Change (~32 min):</b> pinning.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–26 Core · 26–32 Next · 32–41 change · 41–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list is a pipeline computed every render: filter by search → sort by <code>updatedAt</code> → bucket with a <code>groupFor(c)</code> function → render the groups in a fixed order, skipping empty ones. Nothing derived goes in state. Delete with undo: remove it from state immediately, start a 5-second timer that calls the API, and keep <code>{ conv, timer }</code> in a <b>ref</b> so Undo can <code>clearTimeout</code> and put the conversation back. A small <code>pending</code> state drives the toast. If a second delete happens during the window I finalise the first one right away, and on unmount I flush it. If the deleted chat was selected I select its neighbour in display order. Rename is local edit state in the row with an optimistic update. New chat calls the API, prepends and selects.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Conversations are grouped under <b>Today</b>, <b>Yesterday</b>, <b>Previous 7 days</b> (2–7 calendar days before <code>NOW</code>) and <b>Older</b>, newest first inside each group. Empty groups are not shown",
+   "<b>Search chats</b> filters by title (case-insensitive) and the groups recompute; nothing matching shows “No chats match “xyz””",
+   "Hovering or focusing a row reveals actions. <b>Delete</b> removes the chat immediately and shows a toast “Chat deleted · <b>Undo</b>” with a draining 5 s bar. Undo restores it in its place. The API delete is called <b>only</b> after 5 s without Undo. Deleting the selected chat selects its neighbour",
+   "<b>Rename</b> (✎ or double-click) swaps the title for an input with the text selected. <b>Enter</b> or blur saves (optimistic, then <code>renameConversation</code>), <b>Escape</b> cancels, an empty title is ignored",
+   "<b>+ New chat</b> calls <code>createConversation</code> (shows “Creating…” and is disabled meanwhile), adds “New chat” at the top of Today, selects it and clears the search. Deleting a second chat while a toast is open deletes the first one for real immediately; leaving the page flushes a pending delete"
+  ],
+  "change": {
+   "title": "Pinned conversations",
+   "html": "<p>\"Power users keep a few long-running chats. They want them at the top.\"</p><ul><li>Add a pin action to each row. Pinned chats appear in a <b>Pinned</b> section above Today, whatever their date, newest first.</li><li>Unpinning returns a chat to its date group. Pinning does <b>not</b> change <code>updatedAt</code>.</li><li>Optimistic via <code>setPinned(id, pinned)</code>, rolled back on failure. The pin icon is purple while pinned. Search and delete/undo keep working with pinned chats.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if grouping is one function, this is one more <code>if</code> at the top of it and one more entry in the group order.</p>"
+  },
+  "hints": [
+   "Grouping: <code>function groupFor(c) { const days = daysBetween(new Date(c.updatedAt), NOW); if (days &lt;= 0) { return 'Today'; } if (days === 1) { return 'Yesterday'; } if (days &lt;= 7) { return 'Previous 7 days'; } return 'Older'; }</code>",
+   "Bucket into an object, then render a fixed order: <code>GROUP_ORDER.map((g) =&gt; { const items = groups[g]; if (!items) { return null; } return &lt;section key={g}&gt;...&lt;/section&gt;; })</code>",
+   "Search: <b>mdn setTimeout clearTimeout</b>. The undo timer must be cancellable from a different handler, and changing it must not re-render: <code>const pendingRef = useRef&lt;{ conv: Conversation; timer: ReturnType&lt;typeof setTimeout&gt; } | null&gt;(null);</code>",
+   "Delete: <code>commitPending(); setConversations(remove); const timer = setTimeout(() =&gt; { commitPending(); }, 5000); pendingRef.current = { conv, timer }; setPending(conv);</code>. <code>commitPending</code> reads the ref, clears it, hides the toast and calls the API.",
+   "Undo: <code>clearTimeout(p.timer)</code>, clear the ref and toast, then <code>setConversations((prev) =&gt; { return [...prev, p.conv]; })</code>. The sort puts it back in its old position for free.",
+   "Rename input: <code>autoFocus</code> plus <code>onFocus={(e) =&gt; { e.target.select(); }}</code> selects the text. Keep <code>editing</code>/<code>draft</code> in the row.",
+   "Draining bar: a 3px element with <code>animation: drain 5s linear forwards</code> and <code>@keyframes drain { to { transform: scaleX(0); } }</code>. Give the toast <code>key={pending.id}</code> so the animation restarts for each delete."
+  ],
+  "rubric": [
+   "Search → sort → group pipeline derived during render; groups in fixed order, empty ones skipped",
+   "Used NOW and calendar-day math, not Date.now() or 24h arithmetic",
+   "Deferred delete: timer in a ref, API only after the window, Undo cancels",
+   "Edge cases: second delete during the window, unmount flush, deleting the selected chat",
+   "Inline rename with Enter/Escape/blur and optimistic update",
+   "New chat: loading state, prepends, selects, clears search",
+   "Pinning as one extra rule in groupFor, optimistic with rollback"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--side-bg",
+     "#111114"
+    ],
+    [
+     "--side-hover",
+     "#1C1C21"
+    ],
+    [
+     "--side-active",
+     "#26262D"
+    ],
+    [
+     "--accent",
+     "#A78BFA"
+    ],
+    [
+     "--side-muted",
+     "#85858F"
+    ],
+    [
+     "Toast bg",
+     "#F4F4F5"
+    ]
+   ],
+   "notes": [
+    [
+     "Group title",
+     "11/600 · muted · margin 10 10 4"
+    ],
+    [
+     "Row",
+     "pad 8 10 · radius 8 · title 13.5 ellipsis"
+    ],
+    [
+     "Row actions",
+     "26 square · revealed on hover/focus-within · fade-in gradient"
+    ],
+    [
+     "Rename input",
+     "h 34 · 1px accent · 3px soft ring"
+    ],
+    [
+     "Toast",
+     "bottom 12 inside sidebar · radius 10 · Undo dark pill"
+    ],
+    [
+     "Drain bar",
+     "3px accent · 5s linear"
+    ]
+   ]
+  }
+ }
+}

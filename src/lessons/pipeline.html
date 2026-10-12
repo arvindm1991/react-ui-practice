@@ -1,0 +1,368 @@
+<template id="tpl-pipeline">
+  <h1>Data pipelines</h1>
+  <p class="lede">Every screen shows data in some shape: a list, a count, one selected item, groups with headings. The data from the API almost never arrives in that shape. This lesson shows each tool you use to reshape it, one at a time, on the same small example, so you can see exactly what goes in and what comes out.</p>
+
+  <h2>The example we'll use everywhere</h2>
+  <p>Four people. Every example below starts from this list.</p>
+  <script type="text/x-code" data-lang="js" data-title="people">
+const people = [
+  { id: 'u1', name: 'Ada',   team: 'Research', active: true  },
+  { id: 'u2', name: 'Grace', team: 'Platform', active: false },
+  { id: 'u3', name: 'Alan',  team: 'Research', active: true  },
+  { id: 'u4', name: 'Kat',   team: 'Applied',  active: true  },
+];
+</script>
+  <p>Square brackets <code>[ ]</code> mean it's an <b>array</b>: a list, in order. Each item inside is an <b>object</b> in curly braces <code>{ }</code>: one person, with named fields. Keep an eye on which brackets come out of each tool. That's the most useful habit in this lesson.</p>
+
+  <!-- FILTER -->
+  <h2>1. filter: keep some items</h2>
+  <p><b>What it does:</b> goes through the list, asks your question about each item, and keeps the ones where the answer is yes.</p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const researchers = people.filter((p) => p.team === 'Research');
+</script>
+  <div class="trace"><b>What happens, item by item</b>
+    <ol>
+      <li>Ada: team is Research? <b class="yes">yes → keep</b></li>
+      <li>Grace: team is Research? <b class="no">no → skip</b></li>
+      <li>Alan: team is Research? <b class="yes">yes → keep</b></li>
+      <li>Kat: team is Research? <b class="no">no → skip</b></li>
+    </ol>
+  </div>
+  <div class="ba"><div><span>Before: 4 people</span><pre>[ Ada, Grace, Alan, Kat ]</pre></div><i>→</i><div><span>After: 2 people</span><pre>[
+  { id: 'u1', name: 'Ada',  team: 'Research', … },
+  { id: 'u3', name: 'Alan', team: 'Research', … },
+]</pre></div></div>
+  <p><b>You get back:</b> an array of the same kind of items, just fewer. If nothing matches, an empty array <code>[]</code>.</p>
+  <p><b>On a screen:</b> search boxes, filter tabs, "only show active".</p>
+
+  <!-- MAP -->
+  <h2>2. map: change every item</h2>
+  <p><b>What it does:</b> goes through the list and turns each item into something else. You always get back the same number of items.</p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const names = people.map((p) => p.name);
+</script>
+  <div class="trace"><b>What happens, item by item</b>
+    <ol>
+      <li>Ada's object → <code>'Ada'</code></li>
+      <li>Grace's object → <code>'Grace'</code></li>
+      <li>Alan's object → <code>'Alan'</code></li>
+      <li>Kat's object → <code>'Kat'</code></li>
+    </ol>
+  </div>
+  <div class="ba"><div><span>Before: 4 objects</span><pre>[ {Ada…}, {Grace…}, {Alan…}, {Kat…} ]</pre></div><i>→</i><div><span>After: 4 strings</span><pre>[ 'Ada', 'Grace', 'Alan', 'Kat' ]</pre></div></div>
+  <p>Whatever your function returns goes into that slot. Return a string, get strings. Return JSX, get a list of elements, which is exactly how lists render in React:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="map to JSX">
+{people.map((p) => <li key={p.id}>{p.name}</li>)}
+// → [ <li>Ada</li>, <li>Grace</li>, <li>Alan</li>, <li>Kat</li> ]
+</script>
+  <p><b>The trap:</b> if your function returns true/false, you get <code>[true, false, true, false]</code>. That's what happened in your Directory search. If you want to <i>keep some</i>, use <code>filter</code>. If you want to <i>change each</i>, use <code>map</code>.</p>
+
+  <!-- FIND -->
+  <h2>3. find: get one item</h2>
+  <p><b>What it does:</b> goes through the list and stops at the first item that matches. Gives you <b>that item itself</b>, not a list.</p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const selected = people.find((p) => p.id === 'u3');
+</script>
+  <div class="trace"><b>What happens</b>
+    <ol>
+      <li>Ada: id is 'u3'? no, keep looking</li>
+      <li>Grace: id is 'u3'? no, keep looking</li>
+      <li>Alan: id is 'u3'? <b class="yes">yes → stop, return Alan</b></li>
+    </ol>
+  </div>
+  <div class="ba"><div><span>filter gives</span><pre>[ { id: 'u3', name: 'Alan', … } ]</pre></div><i>vs</i><div><span>find gives</span><pre>{ id: 'u3', name: 'Alan', … }</pre></div></div>
+  <p>Notice the outer brackets. With <code>filter</code> you'd have to write <code>result[0].name</code>. With <code>find</code> it's just <code>selected.name</code>. If nothing matches, <code>find</code> gives <code>undefined</code>, which is why you check <code>if (!selected) return …</code> before using it.</p>
+  <p><b>On a screen:</b> the selected conversation, the open message, the user being edited.</p>
+
+  <!-- COUNT -->
+  <h2>4. Counting: length, and filter-then-length</h2>
+  <script type="text/x-code" data-lang="js" data-title="code">
+people.length                                   // → 4
+people.filter((p) => p.active).length           // → 3   (Ada, Alan, Kat)
+</script>
+  <p>To count a subset, filter first, then take the length. You get a plain <b>number</b>.</p>
+  <p><b>On a screen:</b> "3 active", "Showing 2 of 4", unread badges. "Showing X of Y" is <code>filtered.length</code> of <code>people.length</code>.</p>
+
+  <!-- SOME/EVERY -->
+  <h2>5. some / every: a yes-or-no about the whole list</h2>
+  <script type="text/x-code" data-lang="js" data-title="code">
+people.some((p) => !p.active)     // → true   (Grace is inactive: "is there ANY inactive person?")
+people.every((p) => p.active)     // → false  (not EVERYONE is active)
+</script>
+  <p>You get back <b>true or false</b>. <b>On a screen:</b> "show a warning if anyone is inactive", "enable the button only if every field is filled".</p>
+
+  <!-- SORT -->
+  <h2>6. sort: change the order</h2>
+  <p><b>What it does:</b> reorders the list. You give it a rule for comparing two items, <code>a</code> and <code>b</code>:</p>
+  <ul>
+    <li>return a <b>negative</b> number → <code>a</code> goes first</li>
+    <li>return a <b>positive</b> number → <code>b</code> goes first</li>
+  </ul>
+  <p>You don't need to think about that every time. Use these recipes:</p>
+  <script type="text/x-code" data-lang="js" data-title="recipes">
+[...people].sort((a, b) => a.name.localeCompare(b.name))     // A → Z by name
+[...orders].sort((a, b) => b.amount - a.amount)               // biggest amount first
+[...orders].sort((a, b) => a.amount - b.amount)               // smallest first
+[...chats].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))   // newest first
+</script>
+  <div class="ba"><div><span>Before</span><pre>[ Ada, Grace, Alan, Kat ]</pre></div><i>→</i><div><span>After (A → Z)</span><pre>[ Ada, Alan, Grace, Kat ]</pre></div></div>
+  <p><b>Why <code>[...people]</code>?</b> Unlike filter and map, <code>sort</code> rearranges the original list instead of making a new one. On state, that's a bug. <code>[...people]</code> makes a copy first, and you sort the copy. If the list just came out of <code>filter</code> or <code>map</code>, it's already a new list, so you can sort it directly.</p>
+
+  <!-- ARRAY VS OBJECT -->
+  <h2>7. Arrays vs objects: a list vs a phone book</h2>
+  <p>So far every result was an array, a list. Sometimes you want a different shape: an object you can <b>look things up in by name</b>.</p>
+  <p>Think of the difference between a list of contacts and a phone book with tabs:</p>
+  <div class="ba"><div><span>Array: a list (scan to find)</span><pre>[
+  { id: 'u1', name: 'Ada' },
+  { id: 'u2', name: 'Grace' },
+  { id: 'u3', name: 'Alan' },
+]
+// to get Alan: people.find(p =&gt; p.id === 'u3')</pre></div><i>vs</i><div><span>Object: a phone book (jump straight there)</span><pre>{
+  u1: { id: 'u1', name: 'Ada' },
+  u2: { id: 'u2', name: 'Grace' },
+  u3: { id: 'u3', name: 'Alan' },
+}
+// to get Alan: byId['u3']</pre></div></div>
+  <p>The simple rule: <b>arrays are for showing, objects are for looking up.</b></p>
+  <ul>
+    <li>Rendering a list, or order matters → array (it has <code>.map</code>, <code>.length</code>, an order).</li>
+    <li>"Give me the one for this key", many times → object.</li>
+  </ul>
+  <p>The catch: <b>an object has no <code>.map()</code></b>. So when a tool hands you an object and you want to render it, you turn it back into an array first. The next three sections are about exactly that.</p>
+
+  <!-- GROUPBY -->
+  <h2>8. Object.groupBy: sort items into buckets</h2>
+  <p><b>What it does:</b> goes through the list, asks "which bucket does this go in?", and puts each item in the right bucket. You get back an <b>object</b>: each bucket name is a key, and its value is the list of items in it.</p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const byTeam = Object.groupBy(people, (p) => p.team);
+</script>
+  <div class="trace"><b>What happens, item by item</b>
+    <ol>
+      <li>Ada → bucket "Research" (new bucket)</li>
+      <li>Grace → bucket "Platform" (new bucket)</li>
+      <li>Alan → bucket "Research" (joins Ada)</li>
+      <li>Kat → bucket "Applied" (new bucket)</li>
+    </ol>
+  </div>
+  <div class="ba"><div><span>Before: array</span><pre>[ Ada, Grace, Alan, Kat ]</pre></div><i>→</i><div><span>After: an OBJECT</span><pre>{
+  Research: [ {Ada…}, {Alan…} ],
+  Platform: [ {Grace…} ],
+  Applied:  [ {Kat…} ],
+}</pre></div></div>
+  <p>Look at the outer brackets: <code>{ }</code>, not <code>[ ]</code>. So <code>byTeam.map(…)</code> fails with "byTeam.map is not a function". You can read one bucket with <code>byTeam.Research</code> or <code>byTeam['Research']</code>, but to render all of them you need the next step.</p>
+
+  <!-- KEYS VALUES ENTRIES -->
+  <h2>9. Object.keys, values, entries: turn an object into an array</h2>
+  <p>Three tools, each pulling a different part of the object into an array. Here's what each gives you from the same <code>byTeam</code> object:</p>
+  <script type="text/x-code" data-lang="js" data-title="same object, three ways">
+Object.keys(byTeam)
+// → [ 'Research', 'Platform', 'Applied' ]                 just the bucket names
+
+Object.values(byTeam)
+// → [ [Ada, Alan], [Grace], [Kat] ]                        just the lists inside
+
+Object.entries(byTeam)
+// → [ ['Research', [Ada, Alan]],
+//     ['Platform', [Grace]],
+//     ['Applied',  [Kat]] ]                                 both, as [name, list] pairs
+</script>
+  <p>For a grouped list you need both the heading and the items, so <code>entries</code> is the one. Each element is a pair: a small two-item array of <code>[name, list]</code>. When you map over it, you can unpack the pair right in the arrow's parentheses:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="render the groups">
+{Object.entries(byTeam).map(([team, members]) => (
+  <section key={team}>
+    <h3>{team}</h3>                          {/* 'Research' */}
+    <ul>
+      {members.map((p) => <li key={p.id}>{p.name}</li>)}   {/* Ada, Alan */}
+    </ul>
+  </section>
+))}
+</script>
+  <p><code>([team, members]) =&gt;</code> means "this item is a pair; call the first part <code>team</code> and the second part <code>members</code>." It's the same as writing <code>(pair) =&gt; …</code> and then using <code>pair[0]</code> and <code>pair[1]</code>, just more readable.</p>
+
+  <!-- ORDER -->
+  <h2>10. When the order of groups matters</h2>
+  <p>Groups from <code>groupBy</code> come out in the order they were first seen in the data. Above, Research comes first only because Ada was first. For the chat sidebar the design says <b>Today, Yesterday, Previous 7 days, Older</b>, always in that order, whatever order the data arrives in.</p>
+  <p>So instead of looping over whatever buckets exist, loop over <b>the order you want</b>, and look each one up:</p>
+  <script type="text/x-code" data-lang="js" data-title="fixed order">
+const ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
+const byDay = Object.groupBy(chats, (c) => getDateGroup(c.updatedAt));
+// byDay → { Yesterday: [...], Today: [...], Older: [...] }   (whatever order)
+
+const sections = ORDER
+  .filter((label) => byDay[label])                         // skip groups with no chats
+  .map((label) => ({ label, items: byDay[label] }));        // look each one up
+// → [ { label: 'Today', items: [...] }, { label: 'Yesterday', items: [...] }, { label: 'Older', items: [...] } ]
+</script>
+  <p>Read it in plain words: "go through my list of labels in order; skip any that have no chats; for the rest, make a section with that label and its chats." <code>byDay[label]</code> is a phone-book lookup: it gives the list for that label, or <code>undefined</code> if there isn't one.</p>
+  <p>You can skip <code>groupBy</code> entirely and filter once per label: <code>items: chats.filter((c) =&gt; getDateGroup(c.updatedAt) === label)</code>. Same result, and it might feel more familiar.</p>
+
+  <!-- FROMENTRIES -->
+  <h2>11. Object.fromEntries: build a phone book from a list</h2>
+  <p>This is the reverse of <code>entries</code>: it turns a list of <code>[key, value]</code> pairs into an object. You use it to make a lookup table.</p>
+  <p><b>A real situation:</b> you have messages, and each one only stores the author's id. The screen needs the author's name.</p>
+  <script type="text/x-code" data-lang="js" data-title="the data">
+const messages = [
+  { id: 'm1', userId: 'u3', text: 'Mockups attached' },
+  { id: 'm2', userId: 'u1', text: 'Looks good!' },
+];
+// we want: [ 'Alan: Mockups attached', 'Ada: Looks good!' ]
+</script>
+  <p><b>Step 1:</b> turn each person into a pair, <code>[their id, the person]</code>:</p>
+  <script type="text/x-code" data-lang="js" data-title="make pairs with map">
+people.map((p) => [p.id, p])
+// → [ ['u1', {Ada…}],
+//     ['u2', {Grace…}],
+//     ['u3', {Alan…}],
+//     ['u4', {Kat…}] ]
+</script>
+  <p><b>Step 2:</b> turn the pairs into an object. The first part of each pair becomes the key, the second becomes the value:</p>
+  <script type="text/x-code" data-lang="js" data-title="pairs → object">
+const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+// → { u1: {Ada…}, u2: {Grace…}, u3: {Alan…}, u4: {Kat…} }
+</script>
+  <p><b>Step 3:</b> look up each message's author:</p>
+  <script type="text/x-code" data-lang="js" data-title="use the lookup">
+messages.map((m) => `${byId[m.userId].name}: ${m.text}`)
+// m1: byId['u3'] is Alan  → 'Alan: Mockups attached'
+// m2: byId['u1'] is Ada   → 'Ada: Looks good!'
+</script>
+  <p>Without the phone book you'd write <code>people.find((p) =&gt; p.id === m.userId).name</code> inside the map. That's also fine for small lists. The lookup object just reads more clearly and doesn't search the whole list each time.</p>
+
+  <!-- REDUCE -->
+  <h2>12. reduce: many items into one result</h2>
+  <p><b>What it does:</b> walks the list carrying a running result. You choose where it starts, and your function says how each item changes it. At the end you get the final result.</p>
+  <p><b>Example 1: a total.</b></p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const orders = [ { amount: 100 }, { amount: 250 }, { amount: 50 } ];
+const total = orders.reduce((sum, o) => sum + o.amount, 0);
+//                           ↑ running result   ↑ how it changes   ↑ start at 0
+</script>
+  <div class="trace"><b>What happens</b>
+    <ol>
+      <li>start: <code>sum = 0</code></li>
+      <li>order 1: <code>0 + 100</code> → <code>sum = 100</code></li>
+      <li>order 2: <code>100 + 250</code> → <code>sum = 350</code></li>
+      <li>order 3: <code>350 + 50</code> → <code>sum = 400</code></li>
+      <li>result: <b>400</b></li>
+    </ol>
+  </div>
+  <p><b>Example 2: count per team.</b> Start with an empty object and add one to the right key each time:</p>
+  <script type="text/x-code" data-lang="js" data-title="code">
+const counts = people.reduce((acc, p) => {
+  acc[p.team] = (acc[p.team] || 0) + 1;
+  return acc;
+}, {});
+</script>
+  <div class="trace"><b>What happens</b>
+    <ol>
+      <li>start: <code>{}</code></li>
+      <li>Ada (Research): no Research yet, so 0 + 1 → <code>{ Research: 1 }</code></li>
+      <li>Grace (Platform) → <code>{ Research: 1, Platform: 1 }</code></li>
+      <li>Alan (Research): 1 + 1 → <code>{ Research: 2, Platform: 1 }</code></li>
+      <li>Kat (Applied) → <code>{ Research: 2, Platform: 1, Applied: 1 }</code></li>
+    </ol>
+  </div>
+  <p>The starting value decides what you get back: start with <code>0</code> and you get a number; start with <code>{}</code> and you get an object (a phone book, so no <code>.map</code>).</p>
+  <p><b>When not to use it:</b> to count one kind of thing, <code>filter(...).length</code> is clearer. To group, <code>Object.groupBy</code> is clearer. If <code>reduce</code> is confusing you under pressure, a plain loop does the same job and is perfectly fine in an interview:</p>
+  <script type="text/x-code" data-lang="js" data-title="the same total, as a loop">
+let total = 0;
+for (const o of orders) total += o.amount;
+</script>
+
+  <!-- PUTTING IT TOGETHER -->
+  <h2>13. Putting it together: plan, then build step by step</h2>
+  <p>Requirement: <i>"Sidebar: search filters by title. Newest first. Grouped under Today, Yesterday, Previous 7 days, Older. Hide empty groups."</i></p>
+  <p><b>Before any code, turn each phrase into a step</b>, written as comments:</p>
+  <script type="text/x-code" data-lang="js" data-title="plan">
+// 1. "search filters by title"    → filter
+// 2. "newest first"                → sort
+// 3. "grouped under Today…"        → sections in a fixed order
+// 4. "hide empty groups"           → skip labels with no items
+</script>
+  <p><b>Then one line per step</b>, logging the shape after each one. Change the query below and watch every step in the console.</p>
+  <script type="text/x-play" data-title="The sidebar pipeline" data-h="520" data-ph="110">
+const ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
+function getDateGroup(iso) {   // pretend today is Oct 6
+  const day = new Date(iso).getDate();
+  return day === 6 ? 'Today' : day === 5 ? 'Yesterday' : day >= 1 && day < 5 ? 'Previous 7 days' : 'Older';
+}
+const chats = [
+  { id: 'c3', title: 'Draft launch email',       updatedAt: '2026-10-05T16:20:00' },
+  { id: 'c1', title: 'Refactor billing webhook', updatedAt: '2026-10-06T09:15:00' },
+  { id: 'c7', title: 'Trip plan: Kyoto',         updatedAt: '2026-09-20T18:00:00' },
+  { id: 'c2', title: 'Explain CSS grid',         updatedAt: '2026-10-06T07:40:00' },
+  { id: 'c4', title: 'SQL: weekly active users', updatedAt: '2026-10-05T10:05:00' },
+];
+
+export default function App() {
+  const query = 'e';
+
+  // 1. filter
+  const q = query.trim().toLowerCase();
+  const matching = chats.filter((c) => c.title.toLowerCase().includes(q));
+  console.log('1. filter → ARRAY:', matching.map((c) => c.title));
+
+  // 2. sort newest first (filter already made a new array, so sorting it is safe)
+  const sorted = matching.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  console.log('2. sort → ARRAY:', sorted.map((c) => c.title));
+
+  // 3 + 4. sections in a fixed order, skipping empty ones
+  const sections = ORDER
+    .map((label) => ({ label, items: sorted.filter((c) => getDateGroup(c.updatedAt) === label) }))
+    .filter((s) => s.items.length > 0);
+  console.log('3. sections → ARRAY of { label, items }:', sections.map((s) => s.label + ' (' + s.items.length + ')'));
+
+  // render: map inside a map
+  return (
+    <div>
+      {sections.map((s) => (
+        <div key={s.label}>
+          <b>{s.label}</b>
+          <ul style={{ margin: '2px 0 8px' }}>
+            {s.items.map((c) => <li key={c.id}>{c.title}</li>)}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Change <code>query</code> to <code>'sql'</code>: only Yesterday remains. Then <code>''</code>: everything shows.</li>
+    <li>Delete the <code>.filter((s) =&gt; s.items.length &gt; 0)</code> line: empty headings appear. That's what "hide empty groups" means in code.</li>
+    <li>Add a <code>console.log('sections', sections)</code> just above the return and open it in the console to see the full shape.</li>
+  </ol></div>
+
+  <h2>Recap: what comes back</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Tool</th><th>Gives back</th><th>Example result</th></tr>
+    <tr><td><code>filter</code></td><td>array, fewer items</td><td><code>[Ada, Alan]</code></td></tr>
+    <tr><td><code>map</code></td><td>array, same count</td><td><code>['Ada', 'Grace', 'Alan', 'Kat']</code></td></tr>
+    <tr><td><code>find</code></td><td>one item (or undefined)</td><td><code>{ id: 'u3', name: 'Alan' }</code></td></tr>
+    <tr><td><code>.length</code></td><td>number</td><td><code>4</code></td></tr>
+    <tr><td><code>some</code> / <code>every</code></td><td>true / false</td><td><code>true</code></td></tr>
+    <tr><td><code>[...arr].sort</code></td><td>array, reordered</td><td><code>[Ada, Alan, Grace, Kat]</code></td></tr>
+    <tr><td><code>Object.groupBy</code></td><td><b>object</b>: name → list</td><td><code>{ Research: [Ada, Alan], … }</code></td></tr>
+    <tr><td><code>Object.entries</code></td><td>array of [name, value] pairs</td><td><code>[['Research', [Ada, Alan]], …]</code></td></tr>
+    <tr><td><code>Object.fromEntries</code></td><td><b>object</b> from pairs</td><td><code>{ u1: Ada, u2: Grace, … }</code></td></tr>
+    <tr><td><code>reduce(…, 0)</code> / <code>reduce(…, {})</code></td><td>number / object</td><td><code>400</code> / <code>{ Research: 2, … }</code></td></tr>
+  </table></div>
+
+  <p>Now practise each one in the drills. Every drill shows the shape you produced next to the shape you needed.</p>
+  <div class="pager-cta"><button class="btn-open" data-goto="katas">Go to the data drills →</button></div>
+</template>
+<template id="tpl-katas">
+  <h1>Data drills</h1>
+  <p class="lede">Each drill gives you real data and the exact output you need. Write the code in the box, press Run (or Ctrl/⌘ + S), and compare. Under "Your output" you'll see the <b>shape</b> you produced, which is usually where the mistake is.</p>
+  <ul>
+    <li>Your code is the body of a function: the input data is already in variables, so just <code>return</code> the result.</li>
+    <li>Look at the expected output's shape <i>before</i> you write anything. Ask: what tool gives that shape?</li>
+    <li>Try without the hint first. If you change the input data, the page will tell you.</li>
+  </ul>
+  <h2>One tool at a time</h2>
+  <div data-katas="One tool at a time"></div>
+  <h2>Arrays ↔ objects</h2>
+  <div data-katas="Arrays ↔ objects"></div>
+  <h2>Full pipelines</h2>
+  <div data-katas="Full pipelines"></div>
+</template>

@@ -1,0 +1,585 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Product = {
+  id: string;
+  name: string;
+  price: number; // in CENTS: 2800 = $28.00
+  glyph: string;
+  tint: string;
+};
+
+export type CouponResult =
+  | { ok: true; code: string; percentOff: number }
+  | { ok: false; message: string };
+
+const PRODUCTS: Product[] = [
+  { id: 'p1', name: 'Gooseneck kettle', price: 4900, glyph: '🫖', tint: '#F1E4D3' },
+  { id: 'p2', name: 'Ceramic dripper', price: 2800, glyph: '☕', tint: '#E7EDE4' },
+  { id: 'p3', name: 'Paper filters (100)', price: 850, glyph: '📄', tint: '#F4EFE6' },
+  { id: 'p4', name: 'Hand burr grinder', price: 12900, glyph: '⚙️', tint: '#E4E7EE' },
+  { id: 'p5', name: 'Single-origin beans', price: 1950, glyph: '🫘', tint: '#EFE1D6' },
+  { id: 'p6', name: 'Brew scale', price: 3400, glyph: '⚖️', tint: '#E6EEF0' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /products -> Product[]
+export async function getProducts(): Promise<Product[]> {
+  await randomDelay(400, 900);
+  return PRODUCTS.map((p) => ({ ...p }));
+}
+
+// POST /coupons/validate { code } -> CouponResult
+// Only "SAVE10" (any case) is valid: 10% off. Anything else returns ok: false.
+export async function validateCoupon(code: string): Promise<CouponResult> {
+  await randomDelay(500, 1000);
+  const clean = code.trim().toUpperCase();
+  if (clean === 'SAVE10') {
+    return { ok: true, code: clean, percentOff: 10 };
+  }
+  return { ok: false, message: 'Code "' + clean + '" isn\'t valid.' };
+}
+@@@ shared src/utils/money.ts
+// All money is integer CENTS. Only format at the very end.
+export const TAX_RATE = 0.0825;
+
+// formatMoney(2800) -> "$28.00", formatMoney(-840) -> "-$8.40"
+export function formatMoney(cents: number): string {
+  let sign = '';
+  if (cents < 0) {
+    sign = '-';
+  }
+  return sign + '$' + (Math.abs(cents) / 100).toFixed(2);
+}
+
+// calcTax(7560) -> 624 (8.25%, rounded to the nearest cent)
+export function calcTax(cents: number): number {
+  return Math.round(cents * TAX_RATE);
+}
+
+// percentOf(5600, 10) -> 560
+export function percentOf(cents: number, percent: number): number {
+  return Math.round((cents * percent) / 100);
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProducts } from './api';
+import type { Product } from './api';
+import { formatMoney } from './utils/money';
+
+function Header() {
+  // TODO: the badge should show how many items are in the cart,
+  // and clicking the button should open the cart drawer.
+  return (
+    <header className="header">
+      <span className="logo">Ember &amp; Oak</span>
+      <nav className="nav"><a href="#">Brew</a><a href="#">Beans</a><a href="#">Journal</a></nav>
+      <button type="button" className="cart-btn">
+        Cart <span className="badge">0</span>
+      </button>
+    </header>
+  );
+}
+
+function ProductCard({ product }: { product: Product }) {
+  return (
+    <li className="product">
+      <div className="product-img" style={{ background: product.tint }}>{product.glyph}</div>
+      <div className="product-info">
+        <span className="product-name">{product.name}</span>
+        <span className="product-price">{formatMoney(product.price)}</span>
+      </div>
+      <button type="button" className="add-btn">Add to cart</button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProducts().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProducts(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let catalog;
+  if (loading) {
+    catalog = <p className="loading">Loading the shop…</p>;
+  } else {
+    catalog = (
+      <ul className="grid">
+        {products.map((p) => {
+          return <ProductCard key={p.id} product={p} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="app">
+      <Header />
+      <section className="banner">
+        <h1>Slow coffee, done right.</h1>
+        <p>Pour-over gear we actually use. Free shipping over $75.</p>
+      </section>
+      <main className="shop">{catalog}</main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F1EA;
+  --surface: #FFFDF9;
+  --espresso: #2B1D16;
+  --text: #2B1D16;
+  --muted: #8A7A6D;
+  --border: #E6DCCF;
+  --amber: #C8742B;
+  --amber-dark: #A65B1C;
+  --green: #3F7D4E;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.header { display: flex; align-items: center; gap: 24px; padding: 14px 24px; background: var(--espresso); color: #F6F1EA; }
+.logo { font-family: Georgia, serif; font-size: 20px; font-weight: 700; letter-spacing: 0.02em; }
+.nav { display: flex; gap: 18px; margin-right: auto; }
+.nav a { color: #D9CBBB; text-decoration: none; font-size: 14px; }
+.cart-btn { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid rgba(246, 241, 234, 0.3); border-radius: 999px; background: none; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber); color: #fff; font-size: 12px; display: inline-grid; place-items: center; }
+
+.banner { padding: 36px 24px 8px; max-width: 980px; margin: 0 auto; }
+.banner h1 { margin: 0 0 6px; font-family: Georgia, serif; font-size: 32px; }
+.banner p { margin: 0; color: var(--muted); }
+
+.shop { max-width: 980px; margin: 0 auto; padding: 20px 24px 48px; }
+.loading { color: var(--muted); }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.product { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.product-img { height: 130px; border-radius: 10px; display: grid; place-items: center; font-size: 48px; }
+.product-info { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.product-name { font-weight: 600; font-size: 15px; }
+.product-price { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.add-btn { height: 36px; border: 0; border-radius: 8px; background: var(--espresso); color: #F6F1EA; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.add-btn:hover { background: #47322A; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProducts } from './api';
+import type { Product } from './api';
+import { formatMoney } from './utils/money';
+import CartDrawer from './components/CartDrawer';
+import type { CartLine, Coupon } from './components/CartDrawer';
+
+function Header({ count, onOpenCart }: { count: number; onOpenCart: () => void }) {
+  return (
+    <header className="header">
+      <span className="logo">Ember &amp; Oak</span>
+      <nav className="nav"><a href="#">Brew</a><a href="#">Beans</a><a href="#">Journal</a></nav>
+      <button type="button" className="cart-btn" onClick={() => { onOpenCart(); }}>
+        Cart <span className="badge">{count}</span>
+      </button>
+    </header>
+  );
+}
+
+function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: string) => void }) {
+  return (
+    <li className="product">
+      <div className="product-img" style={{ background: product.tint }}>{product.glyph}</div>
+      <div className="product-info">
+        <span className="product-name">{product.name}</span>
+        <span className="product-price">{formatMoney(product.price)}</span>
+      </div>
+      <button type="button" className="add-btn" onClick={() => { onAdd(product.id); }}>Add to cart</button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  // The cart stores ids + quantities only. Names and prices come from products.
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // In App (not the drawer) so closing the drawer keeps the coupon.
+  const [coupon, setCoupon] = useState<Coupon | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProducts().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProducts(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function addToCart(productId: string) {
+    setCart((prev) => {
+      const existing = prev.find((line) => {
+        return line.productId === productId;
+      });
+      if (existing) {
+        return prev.map((line) => {
+          if (line.productId !== productId) {
+            return line;
+          }
+          return { ...line, qty: line.qty + 1 };
+        });
+      }
+      return [...prev, { productId, qty: 1 }];
+    });
+  }
+
+  function changeQty(productId: string, delta: number) {
+    setCart((prev) => {
+      return prev.map((line) => {
+        if (line.productId !== productId) {
+          return line;
+        }
+        return { ...line, qty: Math.max(1, line.qty + delta) };
+      });
+    });
+  }
+
+  function removeLine(productId: string) {
+    setCart((prev) => {
+      return prev.filter((line) => {
+        return line.productId !== productId;
+      });
+    });
+  }
+
+  // derived
+  const itemCount = cart.reduce((sum, line) => {
+    return sum + line.qty;
+  }, 0);
+
+  let catalog;
+  if (loading) {
+    catalog = <p className="loading">Loading the shop…</p>;
+  } else {
+    catalog = (
+      <ul className="grid">
+        {products.map((p) => {
+          return <ProductCard key={p.id} product={p} onAdd={addToCart} />;
+        })}
+      </ul>
+    );
+  }
+
+  let drawer = null;
+  if (drawerOpen) {
+    drawer = (
+      <CartDrawer
+        cart={cart}
+        products={products}
+        coupon={coupon}
+        onCouponChange={setCoupon}
+        onChangeQty={changeQty}
+        onRemove={removeLine}
+        onClose={() => { setDrawerOpen(false); }}
+      />
+    );
+  }
+
+  return (
+    <div className="app">
+      <Header count={itemCount} onOpenCart={() => { setDrawerOpen(true); }} />
+      <section className="banner">
+        <h1>Slow coffee, done right.</h1>
+        <p>Pour-over gear we actually use. Free shipping over $75.</p>
+      </section>
+      <main className="shop">{catalog}</main>
+      {drawer}
+    </div>
+  );
+}
+@@@ solution src/components/CartDrawer.tsx
+import React, { useState } from 'react';
+import { validateCoupon } from '../api';
+import type { Product } from '../api';
+import { formatMoney, calcTax, percentOf } from '../utils/money';
+
+export type CartLine = { productId: string; qty: number };
+export type Coupon = { code: string; percentOff: number };
+
+const FREE_SHIPPING_CENTS = 7500;
+
+type CartDrawerProps = {
+  cart: CartLine[];
+  products: Product[];
+  coupon: Coupon | null;
+  onCouponChange: (coupon: Coupon | null) => void;
+  onChangeQty: (productId: string, delta: number) => void;
+  onRemove: (productId: string) => void;
+  onClose: () => void;
+};
+
+function CouponForm({ onApply }: { onApply: (coupon: Coupon) => void }) {
+  const [code, setCode] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState('');
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (code.trim() === '' || checking) {
+      return;
+    }
+    setChecking(true);
+    setError('');
+    validateCoupon(code).then((result) => {
+      setChecking(false);
+      if (result.ok) {
+        onApply({ code: result.code, percentOff: result.percentOff });
+      } else {
+        setError(result.message);
+      }
+    });
+  }
+
+  let applyLabel = 'Apply';
+  if (checking) {
+    applyLabel = 'Checking…';
+  }
+  let errorEl = null;
+  if (error !== '') {
+    errorEl = <p className="coupon-error" role="alert">{error}</p>;
+  }
+
+  return (
+    <form className="coupon" onSubmit={handleSubmit}>
+      <div className="coupon-row">
+        <input
+          className="coupon-input"
+          placeholder="Coupon code"
+          aria-label="Coupon code"
+          value={code}
+          onChange={(e) => { setCode(e.target.value); }}
+        />
+        <button type="submit" className="coupon-btn" disabled={checking}>{applyLabel}</button>
+      </div>
+      {errorEl}
+    </form>
+  );
+}
+
+function ShippingProgress({ subtotal }: { subtotal: number }) {
+  const remaining = FREE_SHIPPING_CENTS - subtotal;
+  const percent = Math.min(100, Math.round((subtotal / FREE_SHIPPING_CENTS) * 100));
+
+  let message = <span>Add <b>{formatMoney(remaining)}</b> more for free shipping</span>;
+  let cls = 'ship';
+  if (remaining <= 0) {
+    message = <span>You've unlocked <b>free shipping</b> 🎉</span>;
+    cls = 'ship is-unlocked';
+  }
+
+  return (
+    <div className={cls}>
+      <p className="ship-text">{message}</p>
+      <div className="ship-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+        <div className="ship-fill" style={{ width: percent + '%' }} />
+      </div>
+    </div>
+  );
+}
+
+export default function CartDrawer({ cart, products, coupon, onCouponChange, onChangeQty, onRemove, onClose }: CartDrawerProps) {
+  // Join cart lines with product data. Skip lines whose product is unknown.
+  const lines: { productId: string; qty: number; product: Product }[] = [];
+  cart.forEach((line) => {
+    const product = products.find((p) => {
+      return p.id === line.productId;
+    });
+    if (!product) {
+      return;
+    }
+    lines.push({ ...line, product });
+  });
+
+  // derived totals, all in cents
+  const subtotal = lines.reduce((sum, line) => {
+    return sum + line.product.price * line.qty;
+  }, 0);
+  let discount = 0;
+  if (coupon) {
+    discount = percentOf(subtotal, coupon.percentOff);
+  }
+  const tax = calcTax(subtotal - discount);
+  const total = subtotal - discount + tax;
+
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }
+
+  let body;
+  if (lines.length === 0) {
+    body = <p className="cart-empty">Your cart is empty.</p>;
+  } else {
+    let couponArea = <CouponForm onApply={onCouponChange} />;
+    let discountRow = null;
+    if (coupon) {
+      couponArea = (
+        <div className="coupon-applied">
+          <span><b>{coupon.code}</b> applied · {coupon.percentOff}% off</span>
+          <button type="button" className="text-btn" onClick={() => { onCouponChange(null); }}>Remove</button>
+        </div>
+      );
+      discountRow = (
+        <div className="sum-row discount"><span>Discount</span><span>{formatMoney(-discount)}</span></div>
+      );
+    }
+
+    body = (
+      <div className="cart-body">
+        <ShippingProgress subtotal={subtotal} />
+        <ul className="lines">
+          {lines.map((line) => {
+            const atMin = line.qty <= 1;
+            const lineTotal = line.product.price * line.qty;
+            return (
+              <li key={line.productId} className="line">
+                <span className="line-img" style={{ background: line.product.tint }}>{line.product.glyph}</span>
+                <div className="line-main">
+                  <span className="line-name">{line.product.name}</span>
+                  <div className="qty">
+                    <button type="button" className="qty-btn" aria-label="Decrease quantity" disabled={atMin} onClick={() => { onChangeQty(line.productId, -1); }}>−</button>
+                    <span className="qty-value">{line.qty}</span>
+                    <button type="button" className="qty-btn" aria-label="Increase quantity" onClick={() => { onChangeQty(line.productId, 1); }}>+</button>
+                    <button type="button" className="text-btn" onClick={() => { onRemove(line.productId); }}>Remove</button>
+                  </div>
+                </div>
+                <span className="line-total">{formatMoney(lineTotal)}</span>
+              </li>
+            );
+          })}
+        </ul>
+        {couponArea}
+        <div className="summary">
+          <div className="sum-row"><span>Subtotal</span><span className="subtotal">{formatMoney(subtotal)}</span></div>
+          {discountRow}
+          <div className="sum-row"><span>Tax (8.25%)</span><span className="tax">{formatMoney(tax)}</span></div>
+          <div className="sum-row total"><span>Total</span><span className="total-value">{formatMoney(total)}</span></div>
+        </div>
+        <button type="button" className="checkout">Checkout</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="drawer-backdrop" onClick={handleBackdropClick}>
+      <aside className="drawer" role="dialog" aria-label="Your cart">
+        <div className="drawer-head">
+          <h2>Your cart</h2>
+          <button type="button" className="close-btn" aria-label="Close cart" onClick={() => { onClose(); }}>✕</button>
+        </div>
+        {body}
+      </aside>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F1EA;
+  --surface: #FFFDF9;
+  --espresso: #2B1D16;
+  --text: #2B1D16;
+  --muted: #8A7A6D;
+  --border: #E6DCCF;
+  --amber: #C8742B;
+  --amber-dark: #A65B1C;
+  --green: #3F7D4E;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.header { display: flex; align-items: center; gap: 24px; padding: 14px 24px; background: var(--espresso); color: #F6F1EA; }
+.logo { font-family: Georgia, serif; font-size: 20px; font-weight: 700; letter-spacing: 0.02em; }
+.nav { display: flex; gap: 18px; margin-right: auto; }
+.nav a { color: #D9CBBB; text-decoration: none; font-size: 14px; }
+.cart-btn { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid rgba(246, 241, 234, 0.3); border-radius: 999px; background: none; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber); color: #fff; font-size: 12px; display: inline-grid; place-items: center; }
+
+.banner { padding: 36px 24px 8px; max-width: 980px; margin: 0 auto; }
+.banner h1 { margin: 0 0 6px; font-family: Georgia, serif; font-size: 32px; }
+.banner p { margin: 0; color: var(--muted); }
+
+.shop { max-width: 980px; margin: 0 auto; padding: 20px 24px 48px; }
+.loading { color: var(--muted); }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.product { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.product-img { height: 130px; border-radius: 10px; display: grid; place-items: center; font-size: 48px; }
+.product-info { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.product-name { font-weight: 600; font-size: 15px; }
+.product-price { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.add-btn { height: 36px; border: 0; border-radius: 8px; background: var(--espresso); color: #F6F1EA; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.add-btn:hover { background: #47322A; }
+
+/* ---- Added: cart drawer ---- */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(43, 29, 22, 0.45); display: flex; justify-content: flex-end; z-index: 20; }
+.drawer { width: 100%; max-width: 400px; height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(43, 29, 22, 0.2); overflow-y: auto; }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.drawer-head h2 { margin: 0; font-family: Georgia, serif; font-size: 20px; }
+.close-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; font-size: 16px; cursor: pointer; color: var(--text); }
+.close-btn:hover { background: var(--bg); }
+.cart-empty { margin: 0; padding: 48px 20px; text-align: center; color: var(--muted); }
+.cart-body { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.ship { padding: 12px 14px; border-radius: 12px; background: #FBF3E8; }
+.ship.is-unlocked { background: #EAF4EC; }
+.ship-text { margin: 0 0 8px; font-size: 13px; }
+.ship-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.ship-fill { height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.3s ease; }
+.ship.is-unlocked .ship-fill { background: var(--green); }
+
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.line { display: flex; gap: 12px; align-items: flex-start; }
+.line-img { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; font-size: 24px; }
+.line-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.line-name { font-weight: 600; font-size: 14px; }
+.line-total { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.qty { display: flex; align-items: center; gap: 6px; }
+.qty-btn { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 7px; background: #fff; font-size: 15px; line-height: 1; cursor: pointer; color: var(--text); }
+.qty-btn:disabled { opacity: 0.4; cursor: default; }
+.qty-value { min-width: 18px; text-align: center; font-size: 14px; font-weight: 600; }
+.text-btn { margin-left: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+
+.coupon-row { display: flex; gap: 8px; }
+.coupon-input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; text-transform: uppercase; background: #fff; color: var(--text); }
+.coupon-input:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
+.coupon-btn { height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--espresso); color: #F6F1EA; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.coupon-btn:disabled { opacity: 0.6; cursor: progress; }
+.coupon-error { margin: 6px 0 0; font-size: 13px; color: #B42318; }
+.coupon-applied { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; background: #EAF4EC; color: var(--green); font-size: 14px; }
+
+.summary { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sum-row { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
+.sum-row.discount { color: var(--green); }
+.sum-row.total { font-size: 17px; font-weight: 700; padding-top: 6px; }
+.checkout { height: 46px; border: 0; border-radius: 10px; background: var(--amber); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.checkout:hover { background: var(--amber-dark); }

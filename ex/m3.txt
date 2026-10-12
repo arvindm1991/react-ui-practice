@@ -1,0 +1,444 @@
+@@@ shared src/App.jsx
+import React from 'react';
+import UsagePage from './pages/UsagePage';
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="topbar-brand">Console</span>
+        <span className="topbar-org">Acme Research · Production</span>
+      </header>
+      <UsagePage />
+    </div>
+  );
+}
+@@@ shared src/api.js
+// Fake API. Treat it like a real backend you can't change.
+//
+// getUsage(range) where range is '7d' | '30d'
+// resolves to:
+// {
+//   range: '7d',
+//   models: [{ id: 'opus', name: 'Claude Opus' }, ...],
+//   days: [
+//     {
+//       date: '2026-09-28',
+//       usage: {
+//         opus:   { tokens: 812000, requests: 140 },
+//         sonnet: { tokens: ...,    requests: ... },
+//         haiku:  { tokens: ...,    requests: ... },
+//       },
+//     },
+//     ... one entry per day, oldest first
+//   ],
+// }
+
+const MODELS = [
+  { id: 'opus', name: 'Claude Opus', base: 420000, perRequest: 5200 },
+  { id: 'sonnet', name: 'Claude Sonnet', base: 980000, perRequest: 3100 },
+  { id: 'haiku', name: 'Claude Haiku', base: 610000, perRequest: 1400 },
+];
+
+function seededRandom(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+function isoDay(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function getUsage(range = '7d') {
+  const count = range === '30d' ? 30 : 7;
+  const rand = seededRandom(count === 30 ? 7 : 3);
+  const today = new Date();
+  const days = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    const usage = {};
+    MODELS.forEach((m) => {
+      const tokens = Math.round(m.base * (weekend ? 0.45 : 1) * (0.65 + rand() * 0.7));
+      usage[m.id] = { tokens, requests: Math.max(1, Math.round(tokens / m.perRequest)) };
+    });
+    days.push({ date: isoDay(d), usage });
+  }
+  const result = { range, models: MODELS.map(({ id, name }) => ({ id, name })), days };
+  return new Promise((resolve) => setTimeout(() => resolve(result), 650));
+}
+@@@ shared src/utils/format.js
+const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+const whole = new Intl.NumberFormat('en-US');
+
+// 1234567 -> "1.2M"
+export function formatCompact(n) {
+  return compact.format(n);
+}
+
+// 1234567 -> "1,234,567"
+export function formatNumber(n) {
+  return whole.format(Math.round(n));
+}
+
+// '2026-09-28' -> "Sep 28"
+export function formatDay(isoDay) {
+  return new Date(isoDay + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// 0.4567 -> "45.7%"
+export function formatPercent(fraction) {
+  return (fraction * 100).toFixed(1) + '%';
+}
+@@@ starter src/pages/UsagePage.jsx
+import React, { useEffect, useState } from 'react';
+import { getUsage } from '../api';
+
+// TODO: Build the usage dashboard from the design. Read the Task tab first.
+export default function UsagePage() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    getUsage('7d').then(setData);
+  }, []);
+
+  if (!data) return <p>Loading…</p>;
+
+  return (
+    <div>
+      <h1>Usage</h1>
+      <p>{data.days.length} days of data loaded.</p>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F7F7F8;
+  --surface: #FFFFFF;
+  --border: #E4E4E7;
+  --text: #18181B;
+  --muted: #71717A;
+  --accent: #4F46E5;
+  --accent-soft: #EEF0FF;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-brand { font-weight: 700; }
+.topbar-org { font-size: 13px; color: var(--muted); }
+@@@ solution src/pages/UsagePage.jsx
+import React, { useEffect, useState } from 'react';
+import { getUsage } from '../api';
+import { formatCompact, formatNumber, formatDay, formatPercent } from '../utils/format';
+
+const RANGES = [
+  { id: '7d', label: '7 days' },
+  { id: '30d', label: '30 days' },
+];
+
+// Includes the mid-session change (click a model to filter).
+export default function UsagePage() {
+  const [range, setRange] = useState('7d');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [modelId, setModelId] = useState(null); // null = all models
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getUsage(range).then((result) => {
+      if (cancelled) return;
+      setData(result);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [range]);
+
+  return (
+    <main className="usage">
+      <header className="usage-header">
+        <div>
+          <h1>Usage</h1>
+          <p className="usage-sub">
+            {modelId && data
+              ? `Showing ${data.models.find((m) => m.id === modelId).name} only`
+              : 'All models'}
+          </p>
+        </div>
+        <div className="segmented" role="tablist" aria-label="Date range">
+          {RANGES.map((r) => (
+            <button
+              key={r.id}
+              role="tab"
+              aria-selected={range === r.id}
+              className={'segment' + (range === r.id ? ' is-active' : '')}
+              onClick={() => setRange(r.id)}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {!data ? (
+        <div className="panel panel-loading">Loading usage…</div>
+      ) : (
+        <Dashboard
+          data={data}
+          modelId={modelId}
+          onModelClick={(id) => setModelId((cur) => (cur === id ? null : id))}
+          dimmed={loading}
+        />
+      )}
+    </main>
+  );
+}
+
+// Pure helpers keep the component body readable.
+function totalsForDay(day, modelId) {
+  const entries = Object.entries(day.usage).filter(([id]) => !modelId || id === modelId);
+  return entries.reduce(
+    (acc, [, u]) => ({ tokens: acc.tokens + u.tokens, requests: acc.requests + u.requests }),
+    { tokens: 0, requests: 0 }
+  );
+}
+
+function Dashboard({ data, modelId, onModelClick, dimmed }) {
+  const daily = data.days.map((d) => ({ date: d.date, ...totalsForDay(d, modelId) }));
+  const totalTokens = daily.reduce((s, d) => s + d.tokens, 0);
+  const totalRequests = daily.reduce((s, d) => s + d.requests, 0);
+  const maxTokens = Math.max(...daily.map((d) => d.tokens), 1);
+
+  // Breakdown always shows all models so you can switch between them.
+  const allTokens = data.days.reduce((s, d) => s + totalsForDay(d, null).tokens, 0);
+  const byModel = data.models
+    .map((m) => ({
+      ...m,
+      tokens: data.days.reduce((s, d) => s + d.usage[m.id].tokens, 0),
+    }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  return (
+    <div className={'dashboard' + (dimmed ? ' is-dimmed' : '')}>
+      <section className="stats">
+        <StatCard label="Total tokens" value={formatCompact(totalTokens)} detail={formatNumber(totalTokens)} />
+        <StatCard label="Requests" value={formatNumber(totalRequests)} />
+        <StatCard
+          label="Avg tokens / request"
+          value={formatNumber(totalRequests ? totalTokens / totalRequests : 0)}
+        />
+      </section>
+
+      <section className="panel">
+        <h2 className="panel-title">Daily tokens</h2>
+        <div className="chart" role="img" aria-label="Daily token usage bar chart">
+          {daily.map((d) => (
+            <div key={d.date} className="bar-col">
+              <div className="bar-track">
+                <div
+                  className="bar"
+                  style={{ height: `${(d.tokens / maxTokens) * 100}%` }}
+                  title={`${formatDay(d.date)}: ${formatNumber(d.tokens)} tokens`}
+                />
+              </div>
+              {daily.length <= 7 && <span className="bar-label">{formatDay(d.date)}</span>}
+            </div>
+          ))}
+        </div>
+        {daily.length > 7 && (
+          <div className="chart-range">
+            <span>{formatDay(daily[0].date)}</span>
+            <span>{formatDay(daily[daily.length - 1].date)}</span>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2 className="panel-title">By model</h2>
+        <ul className="models">
+          {byModel.map((m) => {
+            const share = allTokens ? m.tokens / allTokens : 0;
+            const active = modelId === m.id;
+            return (
+              <li key={m.id}>
+                <button
+                  className={'model-row' + (active ? ' is-active' : '') + (modelId && !active ? ' is-faded' : '')}
+                  onClick={() => onModelClick(m.id)}
+                  aria-pressed={active}
+                >
+                  <span className="model-name">{m.name}</span>
+                  <span className="model-value">
+                    {formatCompact(m.tokens)} · {formatPercent(share)}
+                  </span>
+                  <span className="model-track">
+                    <span className="model-fill" style={{ width: formatPercent(share) }} />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function StatCard({ label, value, detail }) {
+  return (
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value" title={detail}>{value}</span>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F7F7F8;
+  --surface: #FFFFFF;
+  --border: #E4E4E7;
+  --text: #18181B;
+  --muted: #71717A;
+  --accent: #4F46E5;
+  --accent-soft: #EEF0FF;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-brand { font-weight: 700; }
+.topbar-org { font-size: 13px; color: var(--muted); }
+
+/* ---- Usage page ---- */
+.usage { max-width: 880px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.usage-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.usage-header h1 { margin: 0; font-size: 22px; }
+.usage-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: #EDEDF0;
+  border-radius: 8px;
+}
+.segment {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.segment.is-active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard { display: flex; flex-direction: column; gap: 16px; transition: opacity 0.15s; }
+.dashboard.is-dimmed { opacity: 0.5; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 640px) {
+  .stats { grid-template-columns: 1fr; }
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stat-label { font-size: 13px; color: var(--muted); }
+.stat-value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.panel {
+  padding: 16px 20px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.panel-loading { color: var(--muted); text-align: center; padding: 48px; }
+.panel-title { margin: 0 0 16px; font-size: 14px; font-weight: 600; }
+
+.chart { display: flex; align-items: stretch; gap: 6px; height: 180px; }
+.bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.bar-track { flex: 1; display: flex; align-items: flex-end; }
+.bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  transition: height 0.25s ease;
+}
+.bar:hover { background: #3730A3; }
+.bar-label { font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; }
+.chart-range { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); }
+
+.models { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.model-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.model-row:hover { background: #F4F4F5; }
+.model-row.is-active { background: var(--accent-soft); border-color: #C7CBFA; }
+.model-row.is-faded { opacity: 0.5; }
+.model-name { font-size: 14px; font-weight: 500; }
+.model-value { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.model-track { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #EDEDF0; overflow: hidden; }
+.model-fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }

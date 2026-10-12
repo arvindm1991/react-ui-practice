@@ -1,0 +1,597 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Tier = 'Premium' | 'Standard' | 'Balcony';
+
+export type Seat = {
+  id: string;      // "C5"
+  row: string;     // "C"
+  number: number;  // 5
+  tier: Tier;
+  price: number;
+  taken: boolean;
+};
+
+export type SeatMap = {
+  show: string;
+  when: string;
+  rows: string[];
+  seatsPerRow: number;
+  seats: Seat[];   // row by row, left to right
+};
+
+const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const PER_ROW = 10;
+const TAKEN = new Set(['A3', 'A4', 'B7', 'C1', 'C2', 'D5', 'D6', 'E9', 'F1', 'F2', 'F3', 'F10']);
+
+function tierFor(row: string): { tier: Tier; price: number } {
+  if (row === 'A' || row === 'B') {
+    return { tier: 'Premium', price: 95 };
+  }
+  if (row === 'C' || row === 'D') {
+    return { tier: 'Standard', price: 65 };
+  }
+  return { tier: 'Balcony', price: 40 };
+}
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /shows/hamlet/seats -> SeatMap
+export async function getSeatMap(): Promise<SeatMap> {
+  await randomDelay(400, 1000);
+  const seats: Seat[] = [];
+  ROWS.forEach((row) => {
+    for (let n = 1; n <= PER_ROW; n++) {
+      const id = row + n;
+      const t = tierFor(row);
+      seats.push({ id: id, row: row, number: n, tier: t.tier, price: t.price, taken: TAKEN.has(id) });
+    }
+  });
+  return { show: 'Hamlet', when: 'Fri 14 Nov · 7:30 PM', rows: [...ROWS], seatsPerRow: PER_ROW, seats: seats };
+}
+
+// POST /shows/hamlet/bookings { seatIds } -> { confirmation }
+// Simulated race: someone else always grabs seat C5 while you check out.
+// Any booking that includes C5 is rejected (and C5 becomes taken).
+export async function bookSeats(seatIds: string[]): Promise<{ confirmation: string }> {
+  console.log('POST /bookings', seatIds.join(','));
+  await randomDelay(800, 1400);
+  if (seatIds.includes('C5')) {
+    TAKEN.add('C5');
+    throw new Error('Seat C5 was just taken by someone else.');
+  }
+  seatIds.forEach((id) => {
+    TAKEN.add(id);
+  });
+  return { confirmation: 'LMN-' + (4800 + TAKEN.size) };
+}
+@@@ shared src/utils/money.ts
+// formatPrice(65) -> "$65", formatPrice(130.5) -> "$130.50"
+export function formatPrice(n: number): string {
+  if (Number.isInteger(n)) {
+    return '$' + n;
+  }
+  return '$' + n.toFixed(2);
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getSeatMap } from './api';
+import type { Seat, SeatMap } from './api';
+import { formatPrice } from './utils/money';
+
+function ShowHeader({ show, when }: { show: string; when: string }) {
+  return (
+    <header className="show-header">
+      <p className="venue">Lumen Playhouse</p>
+      <h1>{show}</h1>
+      <p className="when">{when}</p>
+    </header>
+  );
+}
+
+function Legend() {
+  return (
+    <ul className="legend">
+      <li><span className="dot tier-premium" /> Premium · $95</li>
+      <li><span className="dot tier-standard" /> Standard · $65</li>
+      <li><span className="dot tier-balcony" /> Balcony · $40</li>
+      <li><span className="dot is-taken" /> Taken</li>
+    </ul>
+  );
+}
+
+function SeatGrid({ map }: { map: SeatMap }) {
+  // TODO: seats can't be selected yet
+  return (
+    <div className="seat-map">
+      <div className="stage">Stage</div>
+      {map.rows.map((row) => {
+        const seats = map.seats.filter((s) => {
+          return s.row === row;
+        });
+        return (
+          <div key={row} className="seat-row">
+            <span className="row-label">{row}</span>
+            {seats.map((s: Seat) => {
+              let cls = 'seat tier-' + s.tier.toLowerCase();
+              if (s.taken) {
+                cls = 'seat is-taken';
+              }
+              return <button key={s.id} type="button" className={cls} disabled={s.taken}>{s.number}</button>;
+            })}
+            <span className="row-label">{row}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Summary() {
+  return (
+    <aside className="summary">
+      <h2>Your seats</h2>
+      <p className="summary-empty">Pick up to 4 seats on the map.</p>
+      <div className="summary-total"><span>Total</span><b>{formatPrice(0)}</b></div>
+      <button type="button" className="book-btn" disabled>Book seats</button>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [map, setMap] = useState<SeatMap | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSeatMap().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setMap(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!map) {
+    return <div className="app"><p className="loading">Loading seat map…</p></div>;
+  }
+
+  return (
+    <div className="app">
+      <ShowHeader show={map.show} when={map.when} />
+      <div className="layout">
+        <section className="map-panel">
+          <SeatGrid map={map} />
+          <Legend />
+        </section>
+        <Summary />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #170B10;
+  --panel: #22121A;
+  --panel-2: #2E1922;
+  --line: #3D2430;
+  --text: #F6ECE6;
+  --muted: #B19AA3;
+  --gold: #E6B85C;
+  --premium: #C9455E;
+  --standard: #8E5BD0;
+  --balcony: #3C8FB5;
+  --taken: #4A3540;
+  --serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 980px; margin: 0 auto; padding: 28px 20px 40px; }
+.loading { color: var(--muted); text-align: center; margin-top: 80px; }
+
+.show-header { text-align: center; margin-bottom: 24px; }
+.show-header p { margin: 0; }
+.venue { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.show-header h1 { margin: 6px 0; font-family: var(--serif); font-size: 40px; font-weight: 700; font-style: italic; }
+.when { font-size: 14px; color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+@media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+.map-panel { padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow-x: auto; }
+
+.seat-map { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.stage { width: 70%; margin-bottom: 22px; padding: 8px; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(180deg, rgba(230, 184, 92, 0.35), rgba(230, 184, 92, 0.05)); color: var(--gold); text-align: center; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; }
+.seat-row { display: flex; align-items: center; gap: 6px; }
+.row-label { width: 18px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seat { width: 30px; height: 28px; padding: 0; border: 0; border-radius: 8px 8px 4px 4px; color: rgba(255, 255, 255, 0.85); font: 600 11px system-ui, sans-serif; cursor: pointer; }
+.seat:nth-child(6) { margin-left: 18px; } /* aisle */
+.tier-premium { background: var(--premium); }
+.tier-standard { background: var(--standard); }
+.tier-balcony { background: var(--balcony); }
+.seat.is-taken, .dot.is-taken { background: var(--taken); color: transparent; cursor: not-allowed; }
+
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+
+.summary { padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.summary h2 { margin: 0 0 12px; font-family: var(--serif); font-size: 20px; }
+.summary-empty { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.summary-total { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.summary-total b { font-size: 22px; color: var(--gold); }
+.book-btn { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--gold); color: #2A1408; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.book-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { bookSeats, getSeatMap } from './api';
+import type { Seat, SeatMap } from './api';
+import { formatPrice } from './utils/money';
+
+const MAX_SEATS = 4;
+
+function ShowHeader({ show, when }: { show: string; when: string }) {
+  return (
+    <header className="show-header">
+      <p className="venue">Lumen Playhouse</p>
+      <h1>{show}</h1>
+      <p className="when">{when}</p>
+    </header>
+  );
+}
+
+function Legend() {
+  return (
+    <ul className="legend">
+      <li><span className="dot tier-premium" /> Premium · $95</li>
+      <li><span className="dot tier-standard" /> Standard · $65</li>
+      <li><span className="dot tier-balcony" /> Balcony · $40</li>
+      <li><span className="dot is-selected" /> Selected</li>
+      <li><span className="dot is-taken" /> Taken</li>
+    </ul>
+  );
+}
+
+type SeatGridProps = {
+  map: SeatMap;
+  selected: string[];
+  onToggle: (seat: Seat) => void;
+};
+
+function SeatGrid({ map, selected, onToggle }: SeatGridProps) {
+  // Roving tabindex: only one seat is in the Tab order; arrow keys move it.
+  const [focusId, setFocusId] = useState(map.seats[0].id);
+  const seatRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function moveFocus(seat: Seat, dRow: number, dCol: number) {
+    const rowIndex = map.rows.indexOf(seat.row) + dRow;
+    const number = seat.number + dCol;
+    if (rowIndex < 0 || rowIndex >= map.rows.length || number < 1 || number > map.seatsPerRow) {
+      return; // edge of the map: stay put
+    }
+    const id = map.rows[rowIndex] + number;
+    setFocusId(id);
+    const el = seatRefs.current[id];
+    if (el) {
+      el.focus();
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, seat: Seat) {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      moveFocus(seat, 0, 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      moveFocus(seat, 0, -1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveFocus(seat, 1, 0);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(seat, -1, 0);
+    }
+    // Enter and Space already "click" a <button>, so they toggle for free.
+  }
+
+  return (
+    <div className="seat-map" role="group" aria-label="Seat map. Use arrow keys to move between seats.">
+      <div className="stage">Stage</div>
+      {map.rows.map((row) => {
+        const seats = map.seats.filter((s) => {
+          return s.row === row;
+        });
+        return (
+          <div key={row} className="seat-row">
+            <span className="row-label">{row}</span>
+            {seats.map((s) => {
+              const isSelected = selected.includes(s.id);
+              let cls = 'seat tier-' + s.tier.toLowerCase();
+              if (s.taken) {
+                cls = 'seat is-taken';
+              } else if (isSelected) {
+                cls = cls + ' is-selected';
+              }
+              let label = 'Row ' + s.row + ', seat ' + s.number + ', ' + s.tier + ' ' + formatPrice(s.price);
+              if (s.taken) {
+                label = label + ', taken';
+              }
+              let tabIndex = -1;
+              if (s.id === focusId) {
+                tabIndex = 0;
+              }
+              // aria-disabled instead of disabled, so arrow keys can still move across taken seats
+              return (
+                <button
+                  key={s.id}
+                  ref={(el) => { seatRefs.current[s.id] = el; }}
+                  type="button"
+                  className={cls}
+                  tabIndex={tabIndex}
+                  aria-label={label}
+                  aria-pressed={isSelected}
+                  aria-disabled={s.taken}
+                  onClick={() => { onToggle(s); }}
+                  onKeyDown={(e) => { handleKeyDown(e, s); }}
+                  onFocus={() => { setFocusId(s.id); }}
+                >
+                  {s.number}
+                </button>
+              );
+            })}
+            <span className="row-label">{row}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+type SummaryProps = {
+  seats: Seat[];
+  booking: boolean;
+  onRemove: (seat: Seat) => void;
+  onBook: () => void;
+};
+
+function Summary({ seats, booking, onRemove, onBook }: SummaryProps) {
+  // derived
+  const total = seats.reduce((sum, s) => {
+    return sum + s.price;
+  }, 0);
+
+  let list = <p className="summary-empty">Pick up to {MAX_SEATS} seats on the map.</p>;
+  if (seats.length > 0) {
+    list = (
+      <ul className="picked">
+        {seats.map((s) => {
+          return (
+            <li key={s.id} className="picked-row">
+              <span className={'dot tier-' + s.tier.toLowerCase()} />
+              <span className="picked-seat">{s.id}</span>
+              <span className="picked-tier">{s.tier}</span>
+              <span className="picked-price">{formatPrice(s.price)}</span>
+              <button type="button" className="picked-remove" aria-label={'Remove seat ' + s.id} onClick={() => { onRemove(s); }}>×</button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  let bookLabel = 'Book seats';
+  if (seats.length > 0) {
+    let noun = 'seats';
+    if (seats.length === 1) {
+      noun = 'seat';
+    }
+    bookLabel = 'Book ' + seats.length + ' ' + noun + ' · ' + formatPrice(total);
+  }
+  if (booking) {
+    bookLabel = 'Booking…';
+  }
+
+  return (
+    <aside className="summary">
+      <h2>Your seats <span className="picked-count">{seats.length} / {MAX_SEATS}</span></h2>
+      {list}
+      <div className="summary-total"><span>Total</span><b>{formatPrice(total)}</b></div>
+      <button type="button" className="book-btn" disabled={seats.length === 0 || booking} onClick={() => { onBook(); }}>{bookLabel}</button>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [map, setMap] = useState<SeatMap | null>(null);
+  const [reloadKey, setReloadKey] = useState(0); // bump to refetch the map
+  const [selected, setSelected] = useState<string[]>([]);
+  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getSeatMap().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setMap(data);
+      // Drop any selected seat that is now taken.
+      setSelected((prev) => {
+        return prev.filter((id) => {
+          const seat = data.seats.find((s) => {
+            return s.id === id;
+          });
+          return seat !== undefined && !seat.taken;
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  function handleToggle(seat: Seat) {
+    if (seat.taken || booking) {
+      return;
+    }
+    setConfirmation('');
+    if (selected.includes(seat.id)) {
+      setNotice('');
+      setSelected((prev) => {
+        return prev.filter((id) => {
+          return id !== seat.id;
+        });
+      });
+      return;
+    }
+    if (selected.length >= MAX_SEATS) {
+      setNotice('You can select up to ' + MAX_SEATS + ' seats.');
+      return;
+    }
+    setSelected((prev) => {
+      return [...prev, seat.id];
+    });
+  }
+
+  function handleBook() {
+    const ids = selected;
+    setBooking(true);
+    setError('');
+    setNotice('');
+    bookSeats(ids)
+      .then((res) => {
+        setConfirmation('Booked! Confirmation ' + res.confirmation + ' · seats ' + ids.join(', '));
+        setSelected([]);
+      })
+      .catch((err: Error) => {
+        setError(err.message + ' We refreshed the map. Please choose another seat.');
+      })
+      .finally(() => {
+        setBooking(false);
+        setReloadKey((k) => {
+          return k + 1;
+        });
+      });
+  }
+
+  if (!map) {
+    return <div className="app"><p className="loading">Loading seat map…</p></div>;
+  }
+
+  // derived: the full seat objects, in the order they were picked
+  const selectedSeats: Seat[] = [];
+  selected.forEach((id) => {
+    const seat = map.seats.find((s) => {
+      return s.id === id;
+    });
+    if (seat) {
+      selectedSeats.push(seat);
+    }
+  });
+
+  let banner = null;
+  if (error) {
+    banner = <div className="banner is-error" role="alert">{error}</div>;
+  } else if (confirmation) {
+    banner = <div className="banner is-success" role="status">{confirmation}</div>;
+  } else if (notice) {
+    banner = <div className="banner is-notice" role="status">{notice}</div>;
+  }
+
+  return (
+    <div className="app">
+      <ShowHeader show={map.show} when={map.when} />
+      {banner}
+      <div className="layout">
+        <section className="map-panel">
+          <SeatGrid map={map} selected={selected} onToggle={handleToggle} />
+          <Legend />
+        </section>
+        <Summary seats={selectedSeats} booking={booking} onRemove={handleToggle} onBook={handleBook} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #170B10;
+  --panel: #22121A;
+  --panel-2: #2E1922;
+  --line: #3D2430;
+  --text: #F6ECE6;
+  --muted: #B19AA3;
+  --gold: #E6B85C;
+  --premium: #C9455E;
+  --standard: #8E5BD0;
+  --balcony: #3C8FB5;
+  --taken: #4A3540;
+  --serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 980px; margin: 0 auto; padding: 28px 20px 40px; }
+.loading { color: var(--muted); text-align: center; margin-top: 80px; }
+
+.show-header { text-align: center; margin-bottom: 24px; }
+.show-header p { margin: 0; }
+.venue { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.show-header h1 { margin: 6px 0; font-family: var(--serif); font-size: 40px; font-weight: 700; font-style: italic; }
+.when { font-size: 14px; color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+@media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+.map-panel { padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow-x: auto; }
+
+.seat-map { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.stage { width: 70%; margin-bottom: 22px; padding: 8px; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(180deg, rgba(230, 184, 92, 0.35), rgba(230, 184, 92, 0.05)); color: var(--gold); text-align: center; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; }
+.seat-row { display: flex; align-items: center; gap: 6px; }
+.row-label { width: 18px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seat { width: 30px; height: 28px; padding: 0; border: 0; border-radius: 8px 8px 4px 4px; color: rgba(255, 255, 255, 0.85); font: 600 11px system-ui, sans-serif; cursor: pointer; }
+.seat:nth-child(6) { margin-left: 18px; } /* aisle */
+.tier-premium { background: var(--premium); }
+.tier-standard { background: var(--standard); }
+.tier-balcony { background: var(--balcony); }
+.seat.is-taken, .dot.is-taken { background: var(--taken); color: transparent; cursor: not-allowed; }
+
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+
+.summary { padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.summary h2 { margin: 0 0 12px; font-family: var(--serif); font-size: 20px; }
+.summary-empty { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.summary-total { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.summary-total b { font-size: 22px; color: var(--gold); }
+.book-btn { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--gold); color: #2A1408; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.book-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Added: selection, summary, booking, keyboard ---- */
+.seat:hover:not(.is-taken) { filter: brightness(1.15); }
+.seat.is-selected, .dot.is-selected { background: var(--gold); color: #2A1408; box-shadow: 0 0 0 2px rgba(230, 184, 92, 0.35); }
+.seat:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.summary h2 { display: flex; justify-content: space-between; align-items: baseline; }
+.picked-count { font-family: system-ui, sans-serif; font-size: 12px; font-weight: 600; color: var(--muted); }
+.picked { list-style: none; margin: 0 0 12px; padding: 0; }
+.picked-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14px; border-bottom: 1px dashed var(--line); }
+.picked-row:last-child { border-bottom: 0; }
+.picked-seat { font-weight: 700; min-width: 30px; }
+.picked-tier { flex: 1; color: var(--muted); font-size: 13px; }
+.picked-price { font-variant-numeric: tabular-nums; }
+.picked-remove { width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.picked-remove:hover { color: var(--text); }
+.banner { margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 500; }
+.banner.is-error { background: rgba(201, 69, 94, 0.18); border: 1px solid var(--premium); color: #FFC9D3; }
+.banner.is-success { background: rgba(77, 170, 120, 0.16); border: 1px solid #4DAA78; color: #BDF0D2; }
+.banner.is-notice { background: var(--panel-2); border: 1px solid var(--line); color: var(--gold); }

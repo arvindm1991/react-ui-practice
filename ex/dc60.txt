@@ -1,0 +1,688 @@
+@@@ shared src/utils/date.ts
+// "Now" is fixed so the groups are the same every time you open the app.
+// Use NOW, never new Date() / Date.now(), for anything relative.
+export const NOW = new Date(2026, 5, 15, 14, 0); // Mon, Jun 15 2026, 2:00 pm (months are 0-based)
+
+// Midnight at the start of the same calendar day.
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Whole calendar days from `earlier` to `later`: daysBetween(Jun 14 23:00, Jun 15 01:00) -> 1
+export function daysBetween(earlier: Date, later: Date): number {
+  return Math.round((startOfDay(later).getTime() - startOfDay(earlier).getTime()) / 86400000);
+}
+
+// "2:05 pm" for today, "Jun 12" otherwise
+export function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (daysBetween(d, NOW) === 0) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+import { NOW } from './utils/date';
+
+export type Conversation = {
+  id: string;
+  title: string;
+  updatedAt: string; // ISO date-time
+  pinned: boolean;
+};
+
+let DB: Conversation[] = [
+  { id: 'c1', title: 'Refactor the billing webhook handler', updatedAt: '2026-06-15T13:20:00', pinned: false },
+  { id: 'c2', title: 'Trip ideas for Lisbon in October', updatedAt: '2026-06-15T10:05:00', pinned: false },
+  { id: 'c3', title: 'Explain vector clocks simply', updatedAt: '2026-06-15T08:40:00', pinned: false },
+  { id: 'c4', title: 'Draft a reply to the landlord', updatedAt: '2026-06-14T21:10:00', pinned: false },
+  { id: 'c5', title: 'SQL: top customers by month', updatedAt: '2026-06-14T16:30:00', pinned: false },
+  { id: 'c6', title: 'Birthday party checklist', updatedAt: '2026-06-13T19:00:00', pinned: false },
+  { id: 'c7', title: 'Postgres vs DynamoDB for event data', updatedAt: '2026-06-12T11:15:00', pinned: false },
+  { id: 'c8', title: 'Resume bullets for a PM role', updatedAt: '2026-06-10T09:30:00', pinned: false },
+  { id: 'c9', title: 'Sourdough starter troubleshooting', updatedAt: '2026-06-08T18:45:00', pinned: false },
+  { id: 'c10', title: 'Q3 planning doc outline', updatedAt: '2026-06-02T15:00:00', pinned: false },
+  { id: 'c11', title: 'Learn Rust ownership', updatedAt: '2026-05-20T20:20:00', pinned: false },
+  { id: 'c12', title: 'Wedding toast draft', updatedAt: '2026-05-03T12:00:00', pinned: false },
+  { id: 'c13', title: 'Marathon training plan', updatedAt: '2026-04-11T07:10:00', pinned: false },
+  { id: 'c14', title: 'Tax questions about RSUs', updatedAt: '2026-03-28T17:35:00', pinned: false },
+];
+let nextId = 15;
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function patch(id: string, changes: Partial<Conversation>): Conversation {
+  const current = DB.find((c) => c.id === id);
+  if (!current) {
+    throw new Error('Conversation ' + id + ' not found');
+  }
+  const next = { ...current, ...changes };
+  DB = DB.map((c) => (c.id === id ? next : c));
+  return { ...next };
+}
+
+// GET /conversations -> Conversation[] (unsorted)
+export async function getConversations(): Promise<Conversation[]> {
+  await randomDelay(400, 1000);
+  return DB.map((c) => ({ ...c }));
+}
+
+// POST /conversations -> the new, empty conversation
+export async function createConversation(): Promise<Conversation> {
+  await randomDelay(300, 700);
+  const conv: Conversation = { id: 'c' + nextId, title: 'New chat', updatedAt: NOW.toISOString(), pinned: false };
+  nextId += 1;
+  DB = [conv, ...DB];
+  return { ...conv };
+}
+
+// PATCH /conversations/:id { title }
+export async function renameConversation(id: string, title: string): Promise<Conversation> {
+  await randomDelay(300, 800);
+  return patch(id, { title });
+}
+
+// PATCH /conversations/:id { pinned }  (does not change updatedAt)
+export async function setPinned(id: string, pinned: boolean): Promise<Conversation> {
+  await randomDelay(300, 800);
+  return patch(id, { pinned });
+}
+
+// DELETE /conversations/:id   (permanent: there is no undo on the server)
+export async function deleteConversation(id: string): Promise<void> {
+  await randomDelay(300, 800);
+  DB = DB.filter((c) => c.id !== id);
+}
+@@@ shared src/components/ChatPane.tsx
+import React from 'react';
+import type { Conversation } from '../api';
+
+// The right-hand side. Placeholder thread; not part of this task.
+export default function ChatPane({ conversation }: { conversation: Conversation | null }) {
+  if (!conversation) {
+    return (
+      <main className="chat-pane is-empty">
+        <p>Select a chat or start a new one.</p>
+      </main>
+    );
+  }
+  return (
+    <main className="chat-pane">
+      <header className="chat-head">
+        <h2>{conversation.title}</h2>
+      </header>
+      <div className="chat-body">
+        <div className="bubble bubble-user">Can you pick up where we left off?</div>
+        <div className="bubble bubble-ai">Of course. Here is a quick recap of “{conversation.title}”, and the two open questions from last time…</div>
+      </div>
+      <div className="chat-input">Message Lumen…</div>
+    </main>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getConversations } from './api';
+import type { Conversation } from './api';
+import { formatWhen } from './utils/date';
+import ChatPane from './components/ChatPane';
+
+type RowProps = {
+  conversation: Conversation;
+  selected: boolean;
+  onSelect: (id: string) => void;
+};
+
+function ConversationRow({ conversation, selected, onSelect }: RowProps) {
+  let cls = 'conv';
+  if (selected) {
+    cls = 'conv is-selected';
+  }
+  return (
+    <li className={cls}>
+      <button type="button" className="conv-main" aria-current={selected} onClick={() => { onSelect(conversation.id); }}>
+        <span className="conv-title">{conversation.title}</span>
+        <span className="conv-when">{formatWhen(conversation.updatedAt)}</span>
+      </button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getConversations().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setConversations(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // newest first (copy before sorting: never sort state in place)
+  const sorted = [...conversations].sort((a, b) => {
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+
+  let list;
+  if (loading) {
+    list = <p className="side-msg">Loading chats…</p>;
+  } else {
+    list = (
+      <ul className="conv-list">
+        {sorted.map((c) => {
+          return <ConversationRow key={c.id} conversation={c} selected={c.id === selectedId} onSelect={setSelectedId} />;
+        })}
+      </ul>
+    );
+  }
+
+  const selected = conversations.find((c) => {
+    return c.id === selectedId;
+  }) || null;
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="side-top">
+          <span className="brand">◎ Lumen</span>
+          <button type="button" className="new-chat">+ New chat</button>
+        </div>
+        <input className="side-search" type="search" placeholder="Search chats" aria-label="Search chats" />
+        <nav className="side-scroll" aria-label="Chats">
+          {list}
+        </nav>
+      </aside>
+      <ChatPane conversation={selected} />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --side-bg: #111114;
+  --side-hover: #1C1C21;
+  --side-active: #26262D;
+  --side-text: #E4E4E9;
+  --side-muted: #85858F;
+  --side-border: #24242A;
+  --accent: #A78BFA;
+  --main-bg: #FAFAFB;
+  --text: #18181B;
+  --muted: #71717A;
+  --border: #E7E7EA;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--main-bg); }
+
+.app { height: 100vh; display: grid; grid-template-columns: 280px 1fr; }
+
+.sidebar { display: flex; flex-direction: column; min-height: 0; background: var(--side-bg); color: var(--side-text); border-right: 1px solid var(--side-border); }
+.side-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 10px 16px; }
+.brand { font-weight: 700; letter-spacing: 0.2px; }
+.new-chat { height: 30px; padding: 0 10px; border: 1px solid #34343C; border-radius: 8px; background: transparent; color: var(--side-text); font: inherit; font-size: 13px; cursor: pointer; }
+.new-chat:hover { background: var(--side-hover); }
+.side-search { margin: 0 12px 8px; height: 32px; padding: 0 10px; border: 1px solid var(--side-border); border-radius: 8px; background: #18181C; color: var(--side-text); font: inherit; font-size: 13px; }
+.side-search::placeholder { color: var(--side-muted); }
+.side-search:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.side-scroll { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
+.side-msg { padding: 16px 8px; color: var(--side-muted); font-size: 13px; }
+
+.conv-list { list-style: none; margin: 0; padding: 0; }
+.conv { position: relative; display: flex; align-items: center; border-radius: 8px; }
+.conv:hover { background: var(--side-hover); }
+.conv.is-selected { background: var(--side-active); }
+.conv-main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.conv-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13.5px; }
+.conv-when { font-size: 11px; color: var(--side-muted); white-space: nowrap; }
+
+.chat-pane { display: flex; flex-direction: column; min-width: 0; }
+.chat-pane.is-empty { align-items: center; justify-content: center; color: var(--muted); }
+.chat-head { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.chat-head h2 { margin: 0; font-size: 16px; }
+.chat-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 24px; }
+.bubble { max-width: 70%; padding: 10px 14px; border-radius: 14px; }
+.bubble-user { align-self: flex-end; background: #EDE9FE; }
+.bubble-ai { background: #fff; border: 1px solid var(--border); }
+.chat-input { margin: 0 24px 24px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--muted); }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getConversations, createConversation, renameConversation, deleteConversation, setPinned } from './api';
+import type { Conversation } from './api';
+import { NOW, daysBetween, formatWhen } from './utils/date';
+import ChatPane from './components/ChatPane';
+
+const UNDO_MS = 5000;
+const GROUP_ORDER = ['Pinned', 'Today', 'Yesterday', 'Previous 7 days', 'Older'];
+
+function groupFor(c: Conversation): string {
+  if (c.pinned) {
+    return 'Pinned';
+  }
+  const days = daysBetween(new Date(c.updatedAt), NOW);
+  if (days <= 0) {
+    return 'Today';
+  }
+  if (days === 1) {
+    return 'Yesterday';
+  }
+  if (days <= 7) {
+    return 'Previous 7 days';
+  }
+  return 'Older';
+}
+
+type RowProps = {
+  conversation: Conversation;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (conv: Conversation) => void;
+  onTogglePin: (conv: Conversation) => void;
+};
+
+function ConversationRow({ conversation, selected, onSelect, onRename, onDelete, onTogglePin }: RowProps) {
+  // Edit state is local: nothing outside the row needs it.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  function startEdit() {
+    setDraft(conversation.title);
+    setEditing(true);
+  }
+
+  function commit() {
+    setEditing(false);
+    const title = draft.trim();
+    if (title !== '' && title !== conversation.title) {
+      onRename(conversation.id, title);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      commit();
+    } else if (e.key === 'Escape') {
+      setEditing(false);
+    }
+  }
+
+  let cls = 'conv';
+  if (selected) {
+    cls += ' is-selected';
+  }
+
+  if (editing) {
+    return (
+      <li className={cls + ' is-editing'}>
+        <input
+          className="conv-input"
+          aria-label="Chat title"
+          autoFocus
+          value={draft}
+          onFocus={(e) => { e.target.select(); }}
+          onChange={(e) => { setDraft(e.target.value); }}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { commit(); }}
+        />
+      </li>
+    );
+  }
+
+  let pinLabel = 'Pin';
+  let pinCls = 'conv-action';
+  if (conversation.pinned) {
+    pinLabel = 'Unpin';
+    pinCls = 'conv-action is-pinned';
+  }
+
+  return (
+    <li className={cls}>
+      <button
+        type="button"
+        className="conv-main"
+        aria-current={selected}
+        onClick={() => { onSelect(conversation.id); }}
+        onDoubleClick={() => { startEdit(); }}
+      >
+        <span className="conv-title">{conversation.title}</span>
+        <span className="conv-when">{formatWhen(conversation.updatedAt)}</span>
+      </button>
+      <div className="conv-actions">
+        <button type="button" className={pinCls} aria-label={pinLabel + ' ' + conversation.title} title={pinLabel} onClick={() => { onTogglePin(conversation); }}>⚲</button>
+        <button type="button" className="conv-action" aria-label={'Rename ' + conversation.title} title="Rename" onClick={() => { startEdit(); }}>✎</button>
+        <button type="button" className="conv-action" aria-label={'Delete ' + conversation.title} title="Delete" onClick={() => { onDelete(conversation); }}>✕</button>
+      </div>
+    </li>
+  );
+}
+
+type PendingDelete = { conv: Conversation; timer: ReturnType<typeof setTimeout> };
+
+export default function App() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState(false);
+  // The toast shows this; the ref holds the timer so Undo can cancel it.
+  const [pending, setPending] = useState<Conversation | null>(null);
+  const pendingRef = useRef<PendingDelete | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getConversations().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setConversations(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Leaving the page with an undo window open: the user meant it, so delete for real.
+  useEffect(() => {
+    return () => {
+      const p = pendingRef.current;
+      if (p) {
+        clearTimeout(p.timer);
+        deleteConversation(p.conv.id);
+      }
+    };
+  }, []);
+
+  function commitPendingDelete() {
+    const p = pendingRef.current;
+    if (!p) {
+      return;
+    }
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    setPending(null);
+    deleteConversation(p.conv.id);
+  }
+
+  function handleDelete(conv: Conversation, nextSelectedId: string | null) {
+    commitPendingDelete(); // one undo at a time: a second delete finalizes the first
+    setConversations((prev) => {
+      return prev.filter((c) => {
+        return c.id !== conv.id;
+      });
+    });
+    if (selectedId === conv.id) {
+      setSelectedId(nextSelectedId);
+    }
+    // Deferred: the API delete only happens if nobody clicks Undo within 5 s.
+    const timer = setTimeout(() => {
+      commitPendingDelete();
+    }, UNDO_MS);
+    pendingRef.current = { conv, timer };
+    setPending(conv);
+  }
+
+  function handleUndo() {
+    const p = pendingRef.current;
+    if (!p) {
+      return;
+    }
+    clearTimeout(p.timer);
+    pendingRef.current = null;
+    setPending(null);
+    setConversations((prev) => {
+      return [...prev, p.conv]; // sorting puts it back in its old place
+    });
+  }
+
+  function replaceConversation(next: Conversation) {
+    setConversations((prev) => {
+      return prev.map((c) => {
+        if (c.id !== next.id) {
+          return c;
+        }
+        return next;
+      });
+    });
+  }
+
+  function handleRename(id: string, title: string) {
+    const before = conversations.find((c) => {
+      return c.id === id;
+    });
+    if (!before) {
+      return;
+    }
+    replaceConversation({ ...before, title }); // optimistic
+    renameConversation(id, title).catch(() => {
+      replaceConversation(before);
+    });
+  }
+
+  // Change: pinning moves a chat to the Pinned section without touching its date.
+  function handleTogglePin(conv: Conversation) {
+    replaceConversation({ ...conv, pinned: !conv.pinned });
+    setPinned(conv.id, !conv.pinned).catch(() => {
+      replaceConversation(conv);
+    });
+  }
+
+  function handleNewChat() {
+    setCreating(true);
+    createConversation().then((conv) => {
+      setConversations((prev) => {
+        return [conv, ...prev];
+      });
+      setSelectedId(conv.id);
+      setQuery('');
+      setCreating(false);
+    });
+  }
+
+  // derived: search -> sort -> group (never stored)
+  const q = query.trim().toLowerCase();
+  const sorted = conversations
+    .filter((c) => {
+      return c.title.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  const groups: Record<string, Conversation[]> = {};
+  sorted.forEach((c) => {
+    const g = groupFor(c);
+    if (!groups[g]) {
+      groups[g] = [];
+    }
+    groups[g].push(c);
+  });
+  // Display order, used to pick a neighbour when the selected chat is deleted.
+  const ordered: Conversation[] = [];
+  GROUP_ORDER.forEach((g) => {
+    (groups[g] || []).forEach((c) => {
+      ordered.push(c);
+    });
+  });
+
+  function deleteWithNeighbour(conv: Conversation) {
+    const i = ordered.findIndex((c) => {
+      return c.id === conv.id;
+    });
+    const neighbour = ordered[i + 1] || ordered[i - 1] || null;
+    let nextId: string | null = null;
+    if (neighbour) {
+      nextId = neighbour.id;
+    }
+    handleDelete(conv, nextId);
+  }
+
+  let list;
+  if (loading) {
+    list = <p className="side-msg">Loading chats…</p>;
+  } else if (sorted.length === 0 && q !== '') {
+    list = <p className="side-msg">No chats match “{query.trim()}”</p>;
+  } else {
+    list = GROUP_ORDER.map((g) => {
+      const items = groups[g];
+      if (!items) {
+        return null;
+      }
+      return (
+        <section key={g} className="conv-group" aria-label={g}>
+          <h3 className="group-title">{g}</h3>
+          <ul className="conv-list">
+            {items.map((c) => {
+              return (
+                <ConversationRow
+                  key={c.id}
+                  conversation={c}
+                  selected={c.id === selectedId}
+                  onSelect={setSelectedId}
+                  onRename={handleRename}
+                  onDelete={deleteWithNeighbour}
+                  onTogglePin={handleTogglePin}
+                />
+              );
+            })}
+          </ul>
+        </section>
+      );
+    });
+  }
+
+  let toast = null;
+  if (pending) {
+    toast = (
+      <div className="undo-toast" role="status" key={pending.id}>
+        <span className="undo-text">Chat deleted</span>
+        <button type="button" className="undo-btn" onClick={() => { handleUndo(); }}>Undo</button>
+        <span className="undo-timer" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  const selected = conversations.find((c) => {
+    return c.id === selectedId;
+  }) || null;
+
+  let newLabel = '+ New chat';
+  if (creating) {
+    newLabel = 'Creating…';
+  }
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="side-top">
+          <span className="brand">◎ Lumen</span>
+          <button type="button" className="new-chat" disabled={creating} onClick={() => { handleNewChat(); }}>{newLabel}</button>
+        </div>
+        <input
+          className="side-search"
+          type="search"
+          placeholder="Search chats"
+          aria-label="Search chats"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); }}
+        />
+        <nav className="side-scroll" aria-label="Chats">
+          {list}
+        </nav>
+        {toast}
+      </aside>
+      <ChatPane conversation={selected} />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --side-bg: #111114;
+  --side-hover: #1C1C21;
+  --side-active: #26262D;
+  --side-text: #E4E4E9;
+  --side-muted: #85858F;
+  --side-border: #24242A;
+  --accent: #A78BFA;
+  --main-bg: #FAFAFB;
+  --text: #18181B;
+  --muted: #71717A;
+  --border: #E7E7EA;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--main-bg); }
+
+.app { height: 100vh; display: grid; grid-template-columns: 280px 1fr; }
+
+.sidebar { display: flex; flex-direction: column; min-height: 0; background: var(--side-bg); color: var(--side-text); border-right: 1px solid var(--side-border); }
+.side-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 10px 16px; }
+.brand { font-weight: 700; letter-spacing: 0.2px; }
+.new-chat { height: 30px; padding: 0 10px; border: 1px solid #34343C; border-radius: 8px; background: transparent; color: var(--side-text); font: inherit; font-size: 13px; cursor: pointer; }
+.new-chat:hover { background: var(--side-hover); }
+.side-search { margin: 0 12px 8px; height: 32px; padding: 0 10px; border: 1px solid var(--side-border); border-radius: 8px; background: #18181C; color: var(--side-text); font: inherit; font-size: 13px; }
+.side-search::placeholder { color: var(--side-muted); }
+.side-search:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.side-scroll { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
+.side-msg { padding: 16px 8px; color: var(--side-muted); font-size: 13px; }
+
+.conv-list { list-style: none; margin: 0; padding: 0; }
+.conv { position: relative; display: flex; align-items: center; border-radius: 8px; }
+.conv:hover { background: var(--side-hover); }
+.conv.is-selected { background: var(--side-active); }
+.conv-main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.conv-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13.5px; }
+.conv-when { font-size: 11px; color: var(--side-muted); white-space: nowrap; }
+
+.chat-pane { display: flex; flex-direction: column; min-width: 0; }
+.chat-pane.is-empty { align-items: center; justify-content: center; color: var(--muted); }
+.chat-head { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.chat-head h2 { margin: 0; font-size: 16px; }
+.chat-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 24px; }
+.bubble { max-width: 70%; padding: 10px 14px; border-radius: 14px; }
+.bubble-user { align-self: flex-end; background: #EDE9FE; }
+.bubble-ai { background: #fff; border: 1px solid var(--border); }
+.chat-input { margin: 0 24px 24px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--muted); }
+
+/* ---- Added: groups, row actions, rename, undo toast ---- */
+.sidebar { position: relative; }
+.new-chat:disabled { opacity: 0.5; cursor: default; }
+.conv-group { margin-bottom: 10px; }
+.group-title { margin: 10px 10px 4px; font-size: 11px; font-weight: 600; color: var(--side-muted); letter-spacing: 0.3px; }
+
+.conv-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; gap: 1px; padding-left: 16px; background: linear-gradient(90deg, transparent, var(--side-hover) 14px); border-radius: 0 8px 8px 0; }
+.conv.is-selected .conv-actions { background: linear-gradient(90deg, transparent, var(--side-active) 14px); }
+.conv:hover .conv-actions, .conv:focus-within .conv-actions { display: flex; }
+.conv-action { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--side-muted); font-size: 12px; cursor: pointer; }
+.conv-action:hover { background: #303038; color: var(--side-text); }
+.conv-action.is-pinned { color: var(--accent); }
+.conv-main:focus-visible, .conv-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.conv-input { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--accent); border-radius: 8px; background: #18181C; color: var(--side-text); font: inherit; font-size: 13.5px; }
+.conv-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25); }
+
+.undo-toast { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; overflow: hidden; border-radius: 10px; background: #F4F4F5; color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: toast-in 0.18s ease; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+.undo-text { flex: 1; font-size: 13px; }
+.undo-btn { padding: 4px 10px; border: 0; border-radius: 6px; background: #18181B; color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.undo-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); transform-origin: left; animation: drain 5s linear forwards; }
+@keyframes drain { to { transform: scaleX(0); } }
+
+@media (max-width: 640px) {
+  .app { grid-template-columns: 1fr; }
+  .chat-pane { display: none; }
+}

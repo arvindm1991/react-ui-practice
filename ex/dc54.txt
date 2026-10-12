@@ -1,0 +1,592 @@
+@@@ shared src/pages.ts
+// The docs site's pages (also what the search backend indexes).
+export type Page = {
+  id: string;
+  title: string;
+  section: string;
+  snippet: string;
+};
+
+export const PAGES: Page[] = [
+  { id: 'install', title: 'Installation', section: 'Getting started', snippet: 'Add Tidewave to an existing project or start from a template.' },
+  { id: 'quick-start', title: 'Quick start', section: 'Getting started', snippet: 'Build and ship your first Tidewave app in ten minutes.' },
+  { id: 'structure', title: 'Project structure', section: 'Getting started', snippet: 'Where routes, components and server code live by convention.' },
+  { id: 'components', title: 'Components', section: 'Core concepts', snippet: 'Functions that return markup. The building block of every screen.' },
+  { id: 'props', title: 'Passing props', section: 'Core concepts', snippet: 'Send data from a parent to a child, and callbacks back up.' },
+  { id: 'state', title: 'State and re-rendering', section: 'Core concepts', snippet: 'How state updates are batched and when components render again.' },
+  { id: 'effects', title: 'Synchronizing with effects', section: 'Core concepts', snippet: 'Connect a component to something outside Tidewave, and clean up after it.' },
+  { id: 'context', title: 'Sharing data with context', section: 'Core concepts', snippet: 'Avoid passing the same prop through ten layers.' },
+  { id: 'use-state', title: 'useState', section: 'Hooks', snippet: 'Declare a state variable that survives re-renders.' },
+  { id: 'use-effect', title: 'useEffect', section: 'Hooks', snippet: 'Run side effects after render, with optional cleanup.' },
+  { id: 'use-memo', title: 'useMemo', section: 'Hooks', snippet: 'Cache an expensive calculation between renders.' },
+  { id: 'use-callback', title: 'useCallback', section: 'Hooks', snippet: 'Keep the same function identity between renders.' },
+  { id: 'use-ref', title: 'useRef', section: 'Hooks', snippet: 'Hold a mutable value or a DOM node without re-rendering.' },
+  { id: 'use-reducer', title: 'useReducer', section: 'Hooks', snippet: 'Move complex state transitions into a single reducer function.' },
+  { id: 'use-transition', title: 'useTransition', section: 'Hooks', snippet: 'Mark an update as non-urgent so typing stays responsive.' },
+  { id: 'use-deferred', title: 'useDeferredValue', section: 'Hooks', snippet: 'Show stale content while fresh content renders in the background.' },
+  { id: 'fetching', title: 'Fetching data', section: 'Data', snippet: 'Load data on the server or the client, with loading and error states.' },
+  { id: 'caching', title: 'Caching and revalidation', section: 'Data', snippet: 'Keep responses fresh without refetching on every render.' },
+  { id: 'mutations', title: 'Mutations', section: 'Data', snippet: 'Send writes to the server and update the UI when they land.' },
+  { id: 'optimistic', title: 'Optimistic updates', section: 'Data', snippet: 'Show the result before the server confirms, and roll back on failure.' },
+  { id: 'forms', title: 'Forms and validation', section: 'Guides', snippet: 'Controlled inputs, field errors and submit states.' },
+  { id: 'routing', title: 'Routing', section: 'Guides', snippet: 'File-based routes, layouts, and dynamic segments.' },
+  { id: 'testing', title: 'Testing components', section: 'Guides', snippet: 'Render components in tests and assert on what the user sees.' },
+  { id: 'errors', title: 'Error boundaries', section: 'Guides', snippet: 'Catch rendering errors and show a fallback instead of a blank page.' },
+  { id: 'a11y', title: 'Accessibility', section: 'Guides', snippet: 'Keyboard support, focus management and ARIA patterns.' },
+];
+@@@ shared src/api.ts
+// Fake search API. Treat it like a real backend you can't change.
+import { PAGES } from './pages';
+import type { Page } from './pages';
+
+export type DocHit = Page;
+
+function abortError(): DOMException {
+  return new DOMException('The request was aborted.', 'AbortError');
+}
+
+// Like fetch: waits `ms`, but rejects with an AbortError as soon as `signal` aborts.
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(abortError());
+      return;
+    }
+    function onAbort() {
+      clearTimeout(timer);
+      reject(abortError());
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+// GET /search?q=...
+// Latency: queries of 1-3 characters scan the whole index and take 0.6-1.1 s.
+// Longer queries hit the prefix index and take 0.12-0.24 s.
+// Pass shouldFail = true to get a rejected promise (for the error state).
+export async function searchDocs(query: string, signal: AbortSignal, shouldFail = false): Promise<DocHit[]> {
+  const q = query.trim().toLowerCase();
+  const ms = q.length <= 3 ? 600 + Math.random() * 500 : 120 + Math.random() * 120;
+  await abortableDelay(ms, signal);
+  if (shouldFail) {
+    throw new Error('Search is temporarily unavailable.');
+  }
+  return PAGES
+    .filter((p) => p.title.toLowerCase().includes(q) || p.section.toLowerCase().includes(q))
+    .slice(0, 8)
+    .map((p) => ({ ...p }));
+}
+@@@ shared src/utils/text.ts
+// Escape a string so it can be used inside new RegExp(...)
+// escapeRegExp('a.b(c)') -> 'a\\.b\\(c\\)'
+export function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+@@@ shared src/components/Sidebar.tsx
+import React from 'react';
+import { PAGES } from '../pages';
+import type { Page } from '../pages';
+
+type SidebarProps = {
+  currentId: string;
+  onNavigate: (page: Page) => void;
+};
+
+export default function Sidebar({ currentId, onNavigate }: SidebarProps) {
+  const sections: string[] = [];
+  PAGES.forEach((p) => {
+    if (!sections.includes(p.section)) {
+      sections.push(p.section);
+    }
+  });
+
+  return (
+    <nav className="sidebar" aria-label="Docs">
+      {sections.map((section) => {
+        return (
+          <div key={section} className="nav-section">
+            <h4>{section}</h4>
+            {PAGES.filter((p) => p.section === section).map((p) => {
+              let cls = 'nav-link';
+              if (p.id === currentId) {
+                cls = 'nav-link is-current';
+              }
+              return (
+                <button key={p.id} type="button" className={cls} onClick={() => { onNavigate(p); }}>
+                  {p.title}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { PAGES } from './pages';
+import type { Page } from './pages';
+import Sidebar from './components/Sidebar';
+
+type SearchBoxProps = {
+  shouldFail: boolean;
+  onNavigate: (page: Page) => void;
+};
+
+// TODO: make this a real typeahead (see the task)
+function SearchBox({ shouldFail, onNavigate }: SearchBoxProps) {
+  const [query, setQuery] = useState('');
+
+  return (
+    <div className="search">
+      <span className="search-icon" aria-hidden="true">⌕</span>
+      <input
+        className="search-input"
+        type="text"
+        placeholder="Search docs"
+        aria-label="Search docs"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); }}
+      />
+      <kbd className="search-kbd">/</kbd>
+    </div>
+  );
+}
+
+function Article({ page }: { page: Page }) {
+  return (
+    <article className="article">
+      <p className="crumb">{page.section}</p>
+      <h1>{page.title}</h1>
+      <p className="lede">{page.snippet}</p>
+      <pre className="code">{'import { mount } from "tidewave";\n\nmount(<App />, document.getElementById("root"));'}</pre>
+      <p>Every page in these docs has runnable examples. Edit them in place and the preview updates as you type.</p>
+    </article>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>(PAGES[1]);
+  const [shouldFail, setShouldFail] = useState(false);
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">≋ Tidewave <span className="version">v4.2</span></span>
+        <SearchBox shouldFail={shouldFail} onNavigate={setPage} />
+        <label className="dev-toggle">
+          <input type="checkbox" checked={shouldFail} onChange={(e) => { setShouldFail(e.target.checked); }} />
+          Simulate API failure
+        </label>
+      </header>
+      <div className="layout">
+        <Sidebar currentId={page.id} onNavigate={setPage} />
+        <Article page={page} />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --sidebar: #F7F9F8;
+  --border: #E3E8E6;
+  --text: #0E1A17;
+  --muted: #5D6B67;
+  --accent: #0F9D7A;
+  --accent-soft: #E3F5EF;
+  --mark: #FFF1B8;
+  --danger: #C2410C;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 18px; height: 56px; padding: 0 20px; background: rgba(255, 255, 255, 0.92); border-bottom: 1px solid var(--border); backdrop-filter: blur(6px); }
+.logo { font-weight: 700; font-size: 16px; color: var(--text); white-space: nowrap; }
+.version { font: 500 11px var(--mono); color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+
+.search { position: relative; flex: 1; max-width: 460px; }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; pointer-events: none; }
+.search-input { width: 100%; height: 36px; padding: 0 36px 0 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--sidebar); font: inherit; color: var(--text); }
+.search-input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+.search-kbd { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 11px var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; background: #fff; }
+
+.dev-toggle { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 56px); }
+.sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 18px 12px; }
+.nav-section { margin-bottom: 16px; }
+.nav-section h4 { margin: 0 0 4px; padding: 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.nav-link { display: block; width: 100%; text-align: left; padding: 4px 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.nav-link:hover { background: #ECF1EF; }
+.nav-link.is-current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.article { max-width: 680px; padding: 36px 40px 60px; }
+.crumb { margin: 0; font-size: 13px; color: var(--accent); font-weight: 600; }
+.article h1 { margin: 4px 0 10px; font-size: 32px; letter-spacing: -0.6px; }
+.lede { font-size: 17px; color: var(--muted); margin: 0 0 22px; }
+.code { margin: 0 0 22px; padding: 16px 18px; border-radius: 10px; background: #0E1A17; color: #CFEDE4; font: 13px/1.6 var(--mono); overflow-x: auto; }
+
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar, .dev-toggle, .search-kbd { display: none; }
+  .article { padding: 24px 16px; }
+}
+@@@ solution src/hooks/useDebouncedValue.ts
+import { useEffect, useState } from 'react';
+
+// Returns `value`, but only after it has stopped changing for `delay` ms.
+export function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebounced(value);
+    }, delay);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [value, delay]);
+  return debounced;
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { PAGES } from './pages';
+import type { Page } from './pages';
+import { searchDocs } from './api';
+import type { DocHit } from './api';
+import Sidebar from './components/Sidebar';
+import { escapeRegExp } from './utils/text';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
+
+type Status = 'idle' | 'loading' | 'done' | 'error';
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  if (query === '') {
+    return <span>{text}</span>;
+  }
+  // A capture group keeps the matches in the split result, at the odd indexes.
+  const parts = text.split(new RegExp('(' + escapeRegExp(query) + ')', 'ig'));
+  return (
+    <span>
+      {parts.map((part, i) => {
+        if (i % 2 === 1) {
+          return <mark key={i}>{part}</mark>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
+
+type SearchBoxProps = {
+  shouldFail: boolean;
+  onNavigate: (page: Page) => void;
+};
+
+function SearchBox({ shouldFail, onNavigate }: SearchBoxProps) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<DocHit[]>([]);
+  const [status, setStatus] = useState<Status>('idle');
+  const [slow, setSlow] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [retry, setRetry] = useState(0);
+  // Cache lives in a ref: it never needs to cause a render by itself.
+  const cacheRef = useRef(new Map<string, DocHit[]>());
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const debounced = useDebouncedValue(query.trim().toLowerCase(), 250);
+
+  useEffect(() => {
+    if (debounced === '') {
+      setResults([]);
+      setStatus('idle');
+      setSlow(false);
+      return;
+    }
+    const cached = cacheRef.current.get(debounced);
+    if (cached) {
+      setResults(cached);
+      setStatus('done');
+      setSlow(false);
+      setActiveIndex(0);
+      return;
+    }
+    const controller = new AbortController();
+    setStatus('loading');
+    // Change: only admit to "Searching…" if it takes longer than 300 ms.
+    const slowTimer = setTimeout(() => {
+      setSlow(true);
+    }, 300);
+
+    searchDocs(debounced, controller.signal, shouldFail)
+      .then((hits) => {
+        cacheRef.current.set(debounced, hits);
+        setResults(hits);
+        setStatus('done');
+        setActiveIndex(0);
+        setSlow(false);
+        clearTimeout(slowTimer);
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') {
+          return; // a newer query replaced this one: not an error
+        }
+        setStatus('error');
+        setSlow(false);
+        clearTimeout(slowTimer);
+      });
+
+    // A newer query (or unmount) cancels the request in flight.
+    return () => {
+      controller.abort();
+      clearTimeout(slowTimer);
+    };
+  }, [debounced, shouldFail, retry]);
+
+  // "/" anywhere on the page focuses search (unless you're typing in a field).
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, []);
+
+  function choose(hit: DocHit) {
+    onNavigate(hit);
+    setQuery('');
+    setOpen(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const count = results.length;
+    if (e.key === 'ArrowDown' && count > 0) {
+      e.preventDefault(); // stop the caret jumping to the end
+      setOpen(true);
+      setActiveIndex((i) => {
+        return (i + 1) % count;
+      });
+    } else if (e.key === 'ArrowUp' && count > 0) {
+      e.preventDefault();
+      setActiveIndex((i) => {
+        return (i - 1 + count) % count;
+      });
+    } else if (e.key === 'Enter') {
+      const hit = results[activeIndex];
+      if (open && hit && status !== 'error') {
+        choose(hit);
+      }
+    } else if (e.key === 'Escape') {
+      if (open) {
+        setOpen(false);
+      } else {
+        setQuery('');
+      }
+    }
+  }
+
+  // derived
+  const showPanel = open && query.trim() !== '' && status !== 'idle';
+  const showResults = results.length > 0 && status !== 'error';
+
+  let statusEl = null;
+  if (status === 'loading' && slow) {
+    statusEl = <p className="search-status"><span className="spinner" aria-hidden="true" />Searching…</p>;
+  }
+
+  let body = null;
+  if (status === 'error') {
+    body = (
+      <div className="search-msg is-error">
+        <span>Search is temporarily unavailable.</span>
+        <button type="button" className="retry-btn" onMouseDown={(e) => { e.preventDefault(); }} onClick={() => { setRetry((n) => { return n + 1; }); }}>Retry</button>
+      </div>
+    );
+  } else if (status === 'done' && results.length === 0) {
+    body = <p className="search-msg">No results for “{query.trim()}”</p>;
+  } else if (showResults) {
+    body = (
+      <ul className="results" role="listbox" id="search-results" aria-label="Search results">
+        {results.map((hit, i) => {
+          let cls = 'result';
+          if (i === activeIndex) {
+            cls = 'result is-active';
+          }
+          return (
+            <li
+              key={hit.id}
+              id={'hit-' + hit.id}
+              role="option"
+              aria-selected={i === activeIndex}
+              className={cls}
+              onMouseDown={(e) => { e.preventDefault(); }}
+              onMouseEnter={() => { setActiveIndex(i); }}
+              onClick={() => { choose(hit); }}
+            >
+              <span className="result-section">{hit.section}</span>
+              <span className="result-title"><Highlight text={hit.title} query={debounced} /></span>
+              <span className="result-snippet">{hit.snippet}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  let panel = null;
+  if (showPanel && (statusEl || body)) {
+    panel = (
+      <div className="search-panel">
+        {statusEl}
+        {body}
+      </div>
+    );
+  }
+
+  let activeDescendant: string | undefined = undefined;
+  if (showPanel && showResults && results[activeIndex]) {
+    activeDescendant = 'hit-' + results[activeIndex].id;
+  }
+
+  return (
+    <div className="search">
+      <span className="search-icon" aria-hidden="true">⌕</span>
+      <input
+        ref={inputRef}
+        className="search-input"
+        type="text"
+        placeholder="Search docs"
+        aria-label="Search docs"
+        role="combobox"
+        aria-expanded={panel !== null}
+        aria-controls="search-results"
+        aria-autocomplete="list"
+        aria-activedescendant={activeDescendant}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onKeyDown={handleKeyDown}
+        onFocus={() => { setOpen(true); }}
+        onBlur={() => { setOpen(false); }}
+      />
+      <kbd className="search-kbd">/</kbd>
+      {panel}
+    </div>
+  );
+}
+
+function Article({ page }: { page: Page }) {
+  return (
+    <article className="article">
+      <p className="crumb">{page.section}</p>
+      <h1>{page.title}</h1>
+      <p className="lede">{page.snippet}</p>
+      <pre className="code">{'import { mount } from "tidewave";\n\nmount(<App />, document.getElementById("root"));'}</pre>
+      <p>Every page in these docs has runnable examples. Edit them in place and the preview updates as you type.</p>
+    </article>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>(PAGES[1]);
+  const [shouldFail, setShouldFail] = useState(false);
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">≋ Tidewave <span className="version">v4.2</span></span>
+        <SearchBox shouldFail={shouldFail} onNavigate={setPage} />
+        <label className="dev-toggle">
+          <input type="checkbox" checked={shouldFail} onChange={(e) => { setShouldFail(e.target.checked); }} />
+          Simulate API failure
+        </label>
+      </header>
+      <div className="layout">
+        <Sidebar currentId={page.id} onNavigate={setPage} />
+        <Article page={page} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --sidebar: #F7F9F8;
+  --border: #E3E8E6;
+  --text: #0E1A17;
+  --muted: #5D6B67;
+  --accent: #0F9D7A;
+  --accent-soft: #E3F5EF;
+  --mark: #FFF1B8;
+  --danger: #C2410C;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 18px; height: 56px; padding: 0 20px; background: rgba(255, 255, 255, 0.92); border-bottom: 1px solid var(--border); backdrop-filter: blur(6px); }
+.logo { font-weight: 700; font-size: 16px; color: var(--text); white-space: nowrap; }
+.version { font: 500 11px var(--mono); color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+
+.search { position: relative; flex: 1; max-width: 460px; }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; pointer-events: none; }
+.search-input { width: 100%; height: 36px; padding: 0 36px 0 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--sidebar); font: inherit; color: var(--text); }
+.search-input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+.search-kbd { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 11px var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; background: #fff; }
+
+.dev-toggle { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 56px); }
+.sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 18px 12px; }
+.nav-section { margin-bottom: 16px; }
+.nav-section h4 { margin: 0 0 4px; padding: 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.nav-link { display: block; width: 100%; text-align: left; padding: 4px 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.nav-link:hover { background: #ECF1EF; }
+.nav-link.is-current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.article { max-width: 680px; padding: 36px 40px 60px; }
+.crumb { margin: 0; font-size: 13px; color: var(--accent); font-weight: 600; }
+.article h1 { margin: 4px 0 10px; font-size: 32px; letter-spacing: -0.6px; }
+.lede { font-size: 17px; color: var(--muted); margin: 0 0 22px; }
+.code { margin: 0 0 22px; padding: 16px 18px; border-radius: 10px; background: #0E1A17; color: #CFEDE4; font: 13px/1.6 var(--mono); overflow-x: auto; }
+
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar, .dev-toggle, .search-kbd { display: none; }
+  .article { padding: 24px 16px; }
+}
+
+/* ---- Added: typeahead panel ---- */
+.search-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-height: 420px; overflow-y: auto; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 40px rgba(14, 26, 23, 0.14); padding: 6px; }
+.search-status { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+.spinner { width: 12px; height: 12px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.results { list-style: none; margin: 0; padding: 0; }
+.result { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+.result.is-active { background: var(--accent-soft); }
+.result-title { grid-column: 1; grid-row: 1; font-weight: 600; }
+.result-section { grid-column: 2; grid-row: 1; font-size: 11.5px; color: var(--muted); align-self: center; }
+.result-snippet { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+.result.is-active .result-title { color: var(--accent); }
+
+.search-msg { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 14px 10px; font-size: 13px; color: var(--muted); }
+.search-msg.is-error { color: var(--danger); }
+.retry-btn { height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer; }

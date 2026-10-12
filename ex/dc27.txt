@@ -1,0 +1,414 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type ColumnId = 'todo' | 'doing' | 'done';
+export type Label = 'design' | 'eng' | 'research';
+
+export type Card = {
+  id: string;
+  title: string;
+  column: ColumnId;
+  label: Label;
+};
+
+const CARDS: Card[] = [
+  { id: 'c1', title: 'Interview 5 churned customers', column: 'todo', label: 'research' },
+  { id: 'c2', title: 'Empty state for Reports', column: 'todo', label: 'design' },
+  { id: 'c3', title: 'Rate-limit the export endpoint', column: 'todo', label: 'eng' },
+  { id: 'c4', title: 'Onboarding checklist v2', column: 'doing', label: 'design' },
+  { id: 'c5', title: 'Migrate billing webhooks', column: 'doing', label: 'eng' },
+  { id: 'c6', title: 'Pricing page A/B test', column: 'done', label: 'research' },
+  { id: 'c7', title: 'Fix SSO redirect loop', column: 'done', label: 'eng' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /boards/q4/cards -> Card[]
+export async function getCards(): Promise<Card[]> {
+  await randomDelay(500, 1200);
+  return CARDS.map((c) => ({ ...c }));
+}
+@@@ shared src/board.ts
+import type { ColumnId } from './api';
+
+// Left-to-right order of the board. Moving a card means moving it
+// to the previous / next entry in this list.
+export const COLUMNS: { id: ColumnId; title: string }[] = [
+  { id: 'todo', title: 'To do' },
+  { id: 'doing', title: 'Doing' },
+  { id: 'done', title: 'Done' },
+];
+
+export const LABEL_NAMES: Record<string, string> = {
+  design: 'Design',
+  eng: 'Engineering',
+  research: 'Research',
+};
+@@@ starter src/App.tsx
+import React from 'react';
+import type { Card } from './api';
+import { COLUMNS, LABEL_NAMES } from './board';
+
+function CardView({ card }: { card: Card }) {
+  return (
+    <li className="card">
+      <span className={'label label-' + card.label}>{LABEL_NAMES[card.label]}</span>
+      <p className="card-title">{card.title}</p>
+    </li>
+  );
+}
+
+type ColumnProps = {
+  title: string;
+  cards: Card[];
+};
+
+function Column({ title, cards }: ColumnProps) {
+  let empty = null;
+  if (cards.length === 0) {
+    empty = <p className="column-empty">No cards</p>;
+  }
+  return (
+    <section className="column">
+      <header className="column-head">
+        <h2>{title}</h2>
+      </header>
+      <ul className="card-list">
+        {cards.map((card) => {
+          return <CardView key={card.id} card={card} />;
+        })}
+      </ul>
+      {empty}
+    </section>
+  );
+}
+
+// TODO: load the cards with getCards(), let cards move left/right,
+// show a count in each column header, and add new cards to To do.
+function Board() {
+  const cards: Card[] = [];
+
+  return (
+    <div className="board">
+      {COLUMNS.map((col) => {
+        const inColumn = cards.filter((c) => {
+          return c.column === col.id;
+        });
+        return <Column key={col.id} title={col.title} cards={inColumn} />;
+      })}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">▦ Trellis</span>
+        <span className="crumb">Product / <b>Q4 roadmap</b></span>
+        <div className="people"><span>RK</span><span>MA</span><span>+3</span></div>
+      </header>
+      <Board />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F0FF;
+  --column: #FFFFFF;
+  --card: #FFFFFF;
+  --border: #E6E1F5;
+  --text: #221B3A;
+  --muted: #7A7394;
+  --primary: #6D4AFF;
+  --primary-soft: #ECE6FF;
+  --design: #DB2777;
+  --eng: #2563EB;
+  --research: #D97706;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 16px; padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; color: var(--primary); font-size: 17px; }
+.crumb { font-size: 14px; color: var(--muted); margin-right: auto; }
+.crumb b { color: var(--text); }
+.people { display: flex; }
+.people span { width: 28px; height: 28px; margin-left: -6px; border-radius: 50%; border: 2px solid #fff; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 20px 22px; align-items: start; }
+.column { background: rgba(255, 255, 255, 0.55); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+.column-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.column-empty { margin: 0; padding: 18px 0; text-align: center; font-size: 13px; color: var(--muted); border: 1.5px dashed var(--border); border-radius: 10px; }
+
+.card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(34, 27, 58, 0.06); display: flex; flex-direction: column; gap: 6px; }
+.card-title { margin: 0; font-size: 14px; line-height: 1.4; }
+.label { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.label-design { color: var(--design); background: #FCE7F3; }
+.label-eng { color: var(--eng); background: #DBEAFE; }
+.label-research { color: var(--research); background: #FEF3C7; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCards } from './api';
+import type { Card, ColumnId } from './api';
+import { COLUMNS, LABEL_NAMES } from './board';
+
+const WIP_LIMIT = 3;
+
+type CardViewProps = {
+  card: Card;
+  canLeft: boolean;
+  canRight: boolean;
+  onMove: (id: string, step: number) => void;
+};
+
+function CardView({ card, canLeft, canRight, onMove }: CardViewProps) {
+  return (
+    <li className="card">
+      <span className={'label label-' + card.label}>{LABEL_NAMES[card.label]}</span>
+      <p className="card-title">{card.title}</p>
+      <div className="card-actions">
+        <button type="button" className="move-btn" aria-label="Move left" disabled={!canLeft} onClick={() => { onMove(card.id, -1); }}>←</button>
+        <button type="button" className="move-btn" aria-label="Move right" disabled={!canRight} onClick={() => { onMove(card.id, 1); }}>→</button>
+      </div>
+    </li>
+  );
+}
+
+function AddCardForm({ onAdd }: { onAdd: (title: string) => void }) {
+  const [title, setTitle] = useState('');
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (title.trim() === '') {
+      return;
+    }
+    onAdd(title.trim());
+    setTitle('');
+  }
+
+  return (
+    <form className="add-form" onSubmit={handleSubmit}>
+      <input
+        className="add-input"
+        placeholder="New card title"
+        value={title}
+        onChange={(e) => { setTitle(e.target.value); }}
+      />
+      <button type="submit" className="add-btn">Add</button>
+    </form>
+  );
+}
+
+type ColumnProps = {
+  title: string;
+  index: number;
+  cards: Card[];
+  limit: number | null;
+  onMove: (id: string, step: number) => void;
+  children?: React.ReactNode;
+};
+
+function Column({ title, index, cards, limit, onMove, children }: ColumnProps) {
+  let empty = null;
+  if (cards.length === 0) {
+    empty = <p className="column-empty">No cards</p>;
+  }
+
+  const canLeft = index > 0;
+  const canRight = index < COLUMNS.length - 1;
+
+  let countText = String(cards.length);
+  let countCls = 'count';
+  if (limit !== null) {
+    countText = cards.length + ' / ' + limit;
+    if (cards.length >= limit) {
+      countCls = 'count is-full';
+    }
+  }
+
+  return (
+    <section className="column">
+      <header className="column-head">
+        <h2>{title}</h2>
+        <span className={countCls}>{countText}</span>
+      </header>
+      <ul className="card-list">
+        {cards.map((card) => {
+          return <CardView key={card.id} card={card} canLeft={canLeft} canRight={canRight} onMove={onMove} />;
+        })}
+      </ul>
+      {empty}
+      {children}
+    </section>
+  );
+}
+
+function Board() {
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getCards().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setCards(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived: which cards are in a column is never stored separately
+  function cardsIn(column: ColumnId) {
+    return cards.filter((c) => {
+      return c.column === column;
+    });
+  }
+
+  function moveCard(id: string, step: number) {
+    const card = cards.find((c) => {
+      return c.id === id;
+    });
+    if (!card) {
+      return;
+    }
+    const from = COLUMNS.findIndex((col) => {
+      return col.id === card.column;
+    });
+    const target = COLUMNS[from + step];
+    if (!target) {
+      return;
+    }
+    // WIP limit: check against the current cards before moving.
+    if (target.id === 'doing' && cardsIn('doing').length >= WIP_LIMIT) {
+      setNotice('Doing is at its WIP limit of ' + WIP_LIMIT + '. Finish something first.');
+      return;
+    }
+    setNotice('');
+    setCards((prev) => {
+      return prev.map((c) => {
+        if (c.id !== id) {
+          return c;
+        }
+        return { ...c, column: target.id };
+      });
+    });
+  }
+
+  function addCard(title: string) {
+    const card: Card = { id: 'new-' + Date.now(), title, column: 'todo', label: 'design' };
+    setCards((prev) => {
+      return [...prev, card];
+    });
+  }
+
+  if (loading) {
+    return <p className="board-loading">Loading board…</p>;
+  }
+
+  let noticeEl = null;
+  if (notice !== '') {
+    noticeEl = <p className="wip-notice" role="alert">{notice}</p>;
+  }
+
+  return (
+    <div>
+      {noticeEl}
+      <div className="board">
+        {COLUMNS.map((col, index) => {
+          let limit: number | null = null;
+          if (col.id === 'doing') {
+            limit = WIP_LIMIT;
+          }
+          let form = null;
+          if (col.id === 'todo') {
+            form = <AddCardForm onAdd={addCard} />;
+          }
+          return (
+            <Column key={col.id} title={col.title} index={index} cards={cardsIn(col.id)} limit={limit} onMove={moveCard}>
+              {form}
+            </Column>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">▦ Trellis</span>
+        <span className="crumb">Product / <b>Q4 roadmap</b></span>
+        <div className="people"><span>RK</span><span>MA</span><span>+3</span></div>
+      </header>
+      <Board />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F0FF;
+  --column: #FFFFFF;
+  --card: #FFFFFF;
+  --border: #E6E1F5;
+  --text: #221B3A;
+  --muted: #7A7394;
+  --primary: #6D4AFF;
+  --primary-soft: #ECE6FF;
+  --design: #DB2777;
+  --eng: #2563EB;
+  --research: #D97706;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 16px; padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; color: var(--primary); font-size: 17px; }
+.crumb { font-size: 14px; color: var(--muted); margin-right: auto; }
+.crumb b { color: var(--text); }
+.people { display: flex; }
+.people span { width: 28px; height: 28px; margin-left: -6px; border-radius: 50%; border: 2px solid #fff; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 20px 22px; align-items: start; }
+.column { background: rgba(255, 255, 255, 0.55); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+.column-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.column-empty { margin: 0; padding: 18px 0; text-align: center; font-size: 13px; color: var(--muted); border: 1.5px dashed var(--border); border-radius: 10px; }
+
+.card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(34, 27, 58, 0.06); display: flex; flex-direction: column; gap: 6px; }
+.card-title { margin: 0; font-size: 14px; line-height: 1.4; }
+.label { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.label-design { color: var(--design); background: #FCE7F3; }
+.label-eng { color: var(--eng); background: #DBEAFE; }
+.label-research { color: var(--research); background: #FEF3C7; }
+
+/* ---- Added: moves, counts, add form, WIP limit ---- */
+.board-loading { margin: 0; padding: 48px 0; text-align: center; color: var(--muted); font-size: 14px; }
+.count { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; }
+.count.is-full { background: #FEE2E2; color: #B91C1C; }
+.card-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.move-btn { width: 28px; height: 24px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--muted); font-size: 13px; cursor: pointer; }
+.move-btn:hover:not(:disabled) { color: var(--primary); border-color: var(--primary); }
+.move-btn:disabled { opacity: 0.35; cursor: default; }
+.add-form { display: flex; gap: 6px; }
+.add-input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; color: var(--text); }
+.add-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+.add-btn { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.wip-notice { margin: 16px 22px 0; padding: 10px 14px; border-radius: 10px; background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; font-size: 14px; }

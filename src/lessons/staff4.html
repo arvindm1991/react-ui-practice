@@ -1,0 +1,399 @@
+<template id="tpl-st-perf">
+  <h1>Performance: finding what's actually slow</h1>
+  <p class="lede">Performance work goes wrong in one predictable way: someone guesses the cause, sprinkles <code>useMemo</code> everywhere, and the page is exactly as slow as before. This lesson is about the opposite habit. First understand how React does its work, then measure, then fix the one thing the measurement points at. We'll end by walking a real-feeling slow dashboard from complaint to fix.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain trigger → render → commit, and the three things that cause a component to re-render</li>
+    <li>Pick the right tool to measure a slow load versus a slow interaction</li>
+    <li>Say when <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> help and when they're noise, and what the React Compiler changes</li>
+    <li>Use state placement, split context, virtualization and code splitting to remove work instead of speeding it up</li>
+    <li>Name what moves each Core Web Vital (LCP, INP, CLS)</li>
+  </ul></div>
+
+  <h2>1. The app: Lexi's teacher dashboard, at two sizes</h2>
+  <p>Lexi's teacher dashboard shows one class: a header with the teacher's name, summary charts (minutes read this week, books finished), a search box, and a list of students. Each student row has a name, reading level, a small sparkline of the last 14 days, and a "live now" dot if they're reading at this moment. The page polls for live sessions every 5 seconds.</p>
+  <p>With a class of 28 students, it's instant. Then Lexi sells to a district, and district reading coaches get a view of <b>all 600 students</b> in a school on the same component. Two complaints arrive in the same week: "the page takes forever to load" and "typing in the search box freezes." These are two <em>different</em> problems, with different tools and different fixes. Telling them apart is the first staff move.</p>
+
+  <h2>2. How React actually does its work</h2>
+  <p>Every screen update in React goes through three steps:</p>
+  <ul>
+    <li><b>Trigger</b>: something tells React the UI might need to change.</li>
+    <li><b>Render</b>: React calls your component functions to get the new JSX, then compares it with the JSX from last time to find what's different. This is pure JavaScript. Nothing on screen changes yet.</li>
+    <li><b>Commit</b>: React applies <em>only the differences</em> to the real DOM. Then the browser does layout and paints the pixels.</li>
+  </ul>
+  <svg viewBox="0 0 680 250" width="100%" role="img" aria-label="Three causes of a re-render feed a trigger, then render, then commit, then the browser paints" style="font-family:var(--font-body);font-size:12px;margin:12px 0 20px">
+    <defs><marker id="st4-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--muted)"/></marker></defs>
+    <rect x="10" y="20" width="170" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="95" y="44" text-anchor="middle" style="fill:currentColor">its own state changed</text>
+    <rect x="10" y="80" width="170" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="95" y="104" text-anchor="middle" style="fill:currentColor">its parent re-rendered</text>
+    <rect x="10" y="140" width="170" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="95" y="164" text-anchor="middle" style="fill:currentColor">a context it reads changed</text>
+    <g style="stroke:var(--muted);stroke-width:1.3;fill:none">
+      <path d="M180 40 L215 92" marker-end="url(#st4-arrow)"/>
+      <path d="M180 100 L213 100" marker-end="url(#st4-arrow)"/>
+      <path d="M180 160 L215 108" marker-end="url(#st4-arrow)"/>
+      <path d="M305 100 L338 100" marker-end="url(#st4-arrow)"/>
+      <path d="M490 100 L518 100" marker-end="url(#st4-arrow)"/>
+      <path d="M595 140 L595 178" marker-end="url(#st4-arrow)"/>
+    </g>
+    <rect x="215" y="80" width="90" height="40" rx="8" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="260" y="104" text-anchor="middle" style="fill:currentColor;font-weight:600">Trigger</text>
+    <rect x="340" y="60" width="150" height="80" rx="8" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="415" y="84" text-anchor="middle" style="fill:currentColor;font-weight:600">Render</text>
+    <text x="415" y="104" text-anchor="middle" style="fill:currentColor">call components,</text>
+    <text x="415" y="120" text-anchor="middle" style="fill:currentColor">diff new vs old JSX</text>
+    <rect x="520" y="60" width="150" height="80" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="595" y="84" text-anchor="middle" style="fill:currentColor;font-weight:600">Commit</text>
+    <text x="595" y="104" text-anchor="middle" style="fill:currentColor">change only the</text>
+    <text x="595" y="120" text-anchor="middle" style="fill:currentColor">DOM nodes that differ</text>
+    <rect x="520" y="180" width="150" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="595" y="204" text-anchor="middle" style="fill:currentColor">browser lays out + paints</text>
+    <text x="415" y="166" text-anchor="middle" style="fill:var(--muted)">plain JS: usually cheap,</text>
+    <text x="415" y="182" text-anchor="middle" style="fill:var(--muted)">expensive only × many</text>
+    <text x="415" y="198" text-anchor="middle" style="fill:var(--muted)">or with heavy work inside</text>
+  </svg>
+  <p>A component re-renders for exactly three reasons: <b>its own state changed</b>, <b>its parent re-rendered</b>, or <b>a context it reads changed</b>. Notice what's missing: "its props changed". By default, when a parent re-renders, every child re-renders too, whether its props changed or not. Props only matter when you've opted into skipping with <code>memo</code> (section 4).</p>
+  <p>That sounds wasteful, but <b>most re-renders are cheap</b>. Calling a function that returns a few JSX objects takes microseconds. If the output is the same as last time, the commit step touches nothing in the DOM, which is the genuinely expensive part. A re-render only becomes a problem when you multiply it (600 rows × a sparkline each × every keystroke) or when a component does heavy work during render (sorting thousands of items, formatting hundreds of dates, building chart geometry).</p>
+  <div class="callout is-key"><span class="callout-label">The rule</span>
+    <p>"It re-renders" is not a bug. "It re-renders, it's slow, and I measured that the re-render is why" is a bug.</p></div>
+
+  <h2>3. Measure before you fix</h2>
+  <p>Slow loading and slow interaction are different problems, and each has its own tool.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Tool</th><th>Answers</th><th>How to use it</th></tr>
+    <tr><td><b>React DevTools Profiler</b></td><td>Which components rendered, how long each took, and why</td><td>Record, do the slow thing, stop. Read the flame graph: wide bars are slow components. Turn on "Record why each component rendered" in settings to see "props changed" / "hook changed" / "parent rendered".</td></tr>
+    <tr><td><b>Chrome Performance panel</b></td><td>What the main thread did, millisecond by millisecond, including non-React work (layout, paint, third-party scripts)</td><td>Set CPU throttling to 4× or 6× (your laptop is not a school Chromebook), record an interaction, look for red-cornered <b>long tasks</b> (over 50 ms). Recent React versions add their own tracks here showing renders and commits.</td></tr>
+    <tr><td><b>Lighthouse</b></td><td>How the page <em>loads</em> in a lab: LCP, CLS, total blocking time, and a list of likely causes</td><td>Run in an incognito window, mobile preset. Good for load problems; it doesn't click around, so it barely sees interaction slowness.</td></tr>
+    <tr><td><b>Field data</b> (real-user monitoring)</td><td>What real users on real devices experience</td><td>The <code>web-vitals</code> library sending LCP/INP/CLS to your analytics, or Chrome's public field dataset. Lab tools tell you <em>why</em>; field data tells you <em>whether it matters</em>.</td></tr>
+  </table></div>
+  <p>The order matters: field data or a user complaint tells you <em>which</em> page and <em>which</em> metric; a lab tool reproduces it; the Profiler or Performance panel tells you <em>which code</em>. Then you fix, and measure again with the same setup so you can show a before and after number.</p>
+
+  <h2>4. memo, useMemo and useCallback: honest version</h2>
+  <p>These three tools all do the same kind of thing: <b>remember something from the last render so you can skip work</b>.</p>
+  <ul>
+    <li><code>memo(Component)</code> wraps a component so that when its parent re-renders, React compares the new props with the old ones (shallowly: same values, same object references). If all are equal, it skips rendering that component and its whole subtree.</li>
+    <li><code>useMemo(() =&gt; compute(), [deps])</code> remembers a computed value until a dependency changes.</li>
+    <li><code>useCallback(fn, [deps])</code> remembers a function, so it's the <em>same function object</em> across renders.</li>
+  </ul>
+  <p>Here is the part people miss: <code>useCallback</code> on its own does nothing useful. A new function every render is harmless. It only matters if that function is passed to a <code>memo</code> child (where a new function would make the props "different" and defeat the memo) or is listed in an effect's dependencies. Same for <code>useMemo</code> on an object: it only matters if someone compares that object by reference.</p>
+  <div class="ba"><div><span>Noise: memo that can never skip</span><pre>const Row = memo(StudentRow);
+
+// in the parent, every render:
+&lt;Row
+  student={s}
+  style={{ padding: 8 }}       // new object
+  onOpen={() =&gt; open(s.id)}  // new function
+/&gt;</pre></div><i>→</i><div><span>Works: stable props</span><pre>const Row = memo(StudentRow);
+const handleOpen = useCallback(
+  (id: string) =&gt; open(id), [open]);
+
+&lt;Row
+  student={s}
+  onOpen={handleOpen}  // Row calls onOpen(student.id)
+/&gt;</pre></div></div>
+  <p>When they help: a component that's slow to render (you measured it), that re-renders often with the same props (you saw "parent rendered" in the Profiler), and whose props you can keep stable. When they're noise: a cheap component, props that change every time anyway, or no one comparing the remembered value. Memoization isn't free either: it costs memory, a comparison on every render, and readability.</p>
+
+  <h3>The React Compiler</h3>
+  <p>The React Compiler is a build-time tool (a Babel plugin, also wired into frameworks like Next.js and Vite through a config option) that reached a stable 1.0 in late 2025. It reads your components and automatically inserts the equivalent of <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> wherever it can prove it's safe, at a finer grain than most people would write by hand. It relies on your code following the Rules of React (components are pure during render, no mutating props or state), and skips components that break them.</p>
+  <p>What it changes: in a codebase with the compiler on, hand-written memoization becomes mostly unnecessary, and the "new object every render" class of problem largely disappears. What it doesn't change: it can't make a 600-row list fast if every row really needs rendering, can't shrink your bundle, can't fix a slow API, and can't fix a context that changes every 5 seconds. Architecture problems stay architecture problems.</p>
+
+  <h2>5. Remove work: move state down, split context</h2>
+  <p>The best fix for a re-render is usually not to make it cheaper but to make it not happen. Two moves do most of the work.</p>
+  <h3>Move state down to where it's used</h3>
+  <p>If <code>query</code> lives at the top of the dashboard, every keystroke re-renders the header, the charts and the list. If it lives in a <code>StudentPanel</code> that contains only the search box and the list, the charts never re-render while typing. Same behaviour, a fraction of the work, no memoization needed. The sibling trick, passing expensive content in as <code>children</code>, works for the same reason: JSX created by the parent doesn't re-render when the child's state changes.</p>
+  <h3>Split context by how often it changes</h3>
+  <p>A context re-renders <em>every</em> component that reads it whenever its value changes. Lexi's dashboard had one context holding the teacher, the theme and the live sessions. Live sessions update every 5 seconds, so every 5 seconds every reader of the context re-rendered, including the header that only wanted the teacher's name.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Before: one context, new value every render">
+<DashboardContext.Provider value={{ teacher, theme, liveSessions }}>
+  {children}
+</DashboardContext.Provider>
+</script>
+  <script type="text/x-code" data-lang="tsx" data-title="After: split by update frequency">
+export function DashboardProviders({ teacher, children }: Props) {
+  const liveSessions = useLiveSessions();   // changes every 5 s
+
+  return (
+    <TeacherContext.Provider value={teacher}>        {/* changes ~never */}
+      <LiveSessionsContext.Provider value={liveSessions}>
+        {children}
+      </LiveSessionsContext.Provider>
+    </TeacherContext.Provider>
+  );
+}
+
+// Only the components that show a "live now" dot read LiveSessionsContext.
+</script>
+  <p>Two details make this work: each context holds one thing (so its value isn't a fresh object literal on every render), and only the components that genuinely need the fast-changing value subscribe to it. Even better for the live dot: store live sessions as a <code>Set</code> of student ids and have each row ask "am I live?", or use a small external store with selectors, so a row only re-renders when <em>its</em> answer changes.</p>
+
+  <h2>6. List virtualization</h2>
+  <p>Rendering 600 rows means 600 components, a few thousand DOM nodes, and 600 sparkline SVGs, even though a screen only shows about 12 rows at a time. <b>Virtualization</b> (also called windowing) renders only the rows in or near the visible area, and a tall empty spacer that keeps the scrollbar honest. As you scroll, rows are swapped in and out.</p>
+  <svg viewBox="0 0 680 260" width="100%" role="img" aria-label="600 rows of data on the left; only the dozen rows in the visible window are rendered as DOM nodes on the right inside a tall spacer" style="font-family:var(--font-body);font-size:12px;margin:12px 0 20px">
+    <text x="20" y="16" style="fill:currentColor;font-weight:600">The data: 600 students</text>
+    <g style="fill:var(--surface-2);stroke:var(--line)">
+      <rect x="20" y="28" width="220" height="10" rx="2"/><rect x="20" y="42" width="220" height="10" rx="2"/>
+      <rect x="20" y="56" width="220" height="10" rx="2"/><rect x="20" y="70" width="220" height="10" rx="2"/>
+      <rect x="20" y="84" width="220" height="10" rx="2"/><rect x="20" y="98" width="220" height="10" rx="2"/>
+      <rect x="20" y="112" width="220" height="10" rx="2"/><rect x="20" y="126" width="220" height="10" rx="2"/>
+      <rect x="20" y="140" width="220" height="10" rx="2"/><rect x="20" y="154" width="220" height="10" rx="2"/>
+      <rect x="20" y="168" width="220" height="10" rx="2"/><rect x="20" y="182" width="220" height="10" rx="2"/>
+      <rect x="20" y="196" width="220" height="10" rx="2"/><rect x="20" y="210" width="220" height="10" rx="2"/>
+      <rect x="20" y="224" width="220" height="10" rx="2"/>
+    </g>
+    <text x="130" y="252" text-anchor="middle" style="fill:var(--muted)">… 585 more</text>
+    <rect x="12" y="94" width="236" height="74" rx="6" style="fill:none;stroke:var(--accent);stroke-width:2"/>
+    <text x="256" y="128" style="fill:var(--accent);font-weight:600">on screen</text>
+    <path d="M330 131 L404 131" style="stroke:var(--muted);stroke-width:1.3;fill:none" marker-end="url(#st4-arrow2)"/>
+    <defs><marker id="st4-arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--muted)"/></marker></defs>
+    <text x="330" y="122" style="fill:var(--muted)">render only</text>
+    <text x="330" y="150" style="fill:var(--muted)">these + a few</text>
+    <text x="420" y="16" style="fill:currentColor;font-weight:600">The DOM: ~16 rows</text>
+    <rect x="420" y="28" width="220" height="210" rx="6" style="fill:none;stroke:var(--muted);stroke-dasharray:5 4"/>
+    <text x="530" y="56" text-anchor="middle" style="fill:var(--muted)">empty spacer, full height</text>
+    <text x="530" y="72" text-anchor="middle" style="fill:var(--muted)">(600 × 56 px)</text>
+    <g style="fill:var(--accent-soft);stroke:var(--accent)">
+      <rect x="430" y="84" width="200" height="10" rx="2" style="opacity:.5"/>
+      <rect x="430" y="98" width="200" height="10" rx="2"/><rect x="430" y="112" width="200" height="10" rx="2"/>
+      <rect x="430" y="126" width="200" height="10" rx="2"/><rect x="430" y="140" width="200" height="10" rx="2"/>
+      <rect x="430" y="154" width="200" height="10" rx="2"/>
+      <rect x="430" y="168" width="200" height="10" rx="2" style="opacity:.5"/>
+    </g>
+    <text x="530" y="200" text-anchor="middle" style="fill:var(--muted)">faded = overscan rows,</text>
+    <text x="530" y="216" text-anchor="middle" style="fill:var(--muted)">ready before you scroll to them</text>
+  </svg>
+  <p>TanStack Virtual is the common choice today (react-window is an older, smaller alternative). The shape of the code:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="StudentList.tsx (virtualized)">
+import { memo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+const ROW_HEIGHT = 56;
+
+export const StudentList = memo(function StudentList({ students }: { students: Student[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: students.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  const rows = virtualizer.getVirtualItems().map((item) => {
+    const student = students[item.index];
+    return (
+      <div
+        key={student.id}
+        className="student-row"
+        style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+      >
+        <StudentRow student={student} />
+      </div>
+    );
+  });
+
+  return (
+    <div ref={scrollRef} className="student-scroll">
+      <div className="student-spacer" style={{ height: virtualizer.getTotalSize() }}>
+        {rows}
+      </div>
+    </div>
+  );
+});
+// CSS: .student-scroll { height: 70vh; overflow-y: auto }
+//      .student-spacer { position: relative }
+//      .student-row { position: absolute; top: 0; left: 0; width: 100% }
+</script>
+  <p>Trade-offs to state: virtualization gives you constant render cost no matter the list size, at the cost of complexity. Browser find (Ctrl+F) can't see rows that aren't rendered, screen readers see a partial list unless you add ARIA row counts, and variable-height rows need measuring. Choose it when lists routinely exceed a few hundred items. For a few hundred simple rows, the CSS property <code>content-visibility: auto</code> (the browser skips layout and paint for off-screen rows) or plain pagination may be enough.</p>
+
+  <h2>7. Ship less JavaScript: code splitting and bundle size</h2>
+  <p>Every kilobyte of JavaScript has to be downloaded, parsed and run before the page can respond. On a school Chromebook, parsing and running is often the bigger cost. Two levers:</p>
+  <h3>Code splitting</h3>
+  <p><b>Route-level splitting</b> means each page's code is a separate file, loaded when you go to that page. Next.js does this automatically per route; with React Router you mark routes as lazy. It's the highest-value split because teachers who never open district reports never download them.</p>
+  <p><b>Component-level splitting</b> uses <code>lazy</code> and <code>Suspense</code> for heavy things that aren't needed immediately: a chart library behind a tab, a rich-text editor in a dialog, a PDF exporter.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="ReportsTab.tsx">
+import { lazy, Suspense } from 'react';
+
+// The chart library (~180 KB) is only downloaded when this tab first opens
+const ReadingGrowthReport = lazy(() => import('./ReadingGrowthReport'));
+
+export function ReportsTab({ isOpen }: { isOpen: boolean }) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <Suspense fallback={<ReportSkeleton />}>
+      <ReadingGrowthReport />
+    </Suspense>
+  );
+}
+</script>
+  <h3>Bundle size</h3>
+  <p>Run a bundle analyzer (<code>@next/bundle-analyzer</code>, or <code>rollup-plugin-visualizer</code> for Vite). It draws a map of every module in your bundle by size, and it almost always surprises someone. Usual findings in an app like Lexi: a whole date library for formatting three dates (the built-in <code>Intl</code> APIs do it for free), a full icon set imported through one barrel file, two versions of the same library, and server-only code accidentally pulled into a client component. Server Components (previous lesson) are the biggest structural lever: display-only components ship zero JavaScript.</p>
+
+  <h2>8. Images and fonts</h2>
+  <p>On most pages the largest thing on screen is an image (a book cover hero) or a big block of text, so images and fonts decide how fast the page <em>looks</em> loaded and whether it jumps around.</p>
+  <ul>
+    <li><b>Always reserve space</b>: <code>width</code> and <code>height</code> attributes (or CSS <code>aspect-ratio</code>) so the layout doesn't shift when the image arrives.</li>
+    <li><b>Prioritize the main image</b>: the hero cover gets <code>fetchpriority="high"</code> and is <em>not</em> lazy-loaded. Images below the fold get <code>loading="lazy"</code>.</li>
+    <li><b>Send the right size and format</b>: <code>srcset</code> and <code>sizes</code> so a phone doesn't download a 2400px cover, and AVIF or WebP instead of PNG. Next's <code>Image</code> component does these for you.</li>
+    <li><b>Fonts</b>: self-host and subset them, preload the one or two used above the fold, and use <code>font-display: swap</code> (text shows immediately in a fallback) with a fallback font adjusted to the same metrics so the swap doesn't shift the layout. <code>next/font</code> automates this.</li>
+  </ul>
+
+  <h2>9. Core Web Vitals: what moves each</h2>
+  <p>Google's <b>Core Web Vitals</b> are three numbers measured on real users, judged at the 75th percentile (so three-quarters of visits must meet the bar).</p>
+  <div class="table-wrap"><table>
+    <tr><th>Metric</th><th>Measures</th><th>Good</th><th>What moves it</th></tr>
+    <tr><td><b>LCP</b> Largest Contentful Paint</td><td>When the biggest image or text block in view finishes painting</td><td>≤ 2.5 s</td><td>Server response time, render-blocking CSS/JS, LCP image priority and size, client rendering (CSR delays it), font loading</td></tr>
+    <tr><td><b>INP</b> Interaction to Next Paint</td><td>How long after a click, tap or keypress until the screen updates, across the whole visit (roughly the worst one)</td><td>≤ 200 ms</td><td>Long tasks on the main thread, big re-renders, heavy event handlers, hydration still running, third-party scripts</td></tr>
+    <tr><td><b>CLS</b> Cumulative Layout Shift</td><td>How much visible content jumps around unexpectedly</td><td>≤ 0.1</td><td>Images without dimensions, late-loading banners and ads, font swaps, skeletons that don't match the real content's size</td></tr>
+  </table></div>
+  <p>INP replaced an older metric (First Input Delay) in 2024, and it's the one React apps most often fail, because it measures exactly what a big re-render hurts. It has three parts:</p>
+  <svg viewBox="0 0 680 140" width="100%" role="img" aria-label="INP is made of input delay, processing time and presentation delay, from the user's input to the next paint" style="font-family:var(--font-body);font-size:12px;margin:12px 0 20px">
+    <rect x="20" y="40" width="150" height="40" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="95" y="58" text-anchor="middle" style="fill:currentColor;font-weight:600">Input delay</text>
+    <text x="95" y="73" text-anchor="middle" style="fill:var(--muted)">main thread busy</text>
+    <rect x="170" y="40" width="300" height="40" rx="6" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="320" y="58" text-anchor="middle" style="fill:currentColor;font-weight:600">Processing</text>
+    <text x="320" y="73" text-anchor="middle" style="fill:var(--muted)">your handler + React render + commit</text>
+    <rect x="470" y="40" width="190" height="40" rx="6" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="565" y="58" text-anchor="middle" style="fill:currentColor;font-weight:600">Presentation</text>
+    <text x="565" y="73" text-anchor="middle" style="fill:var(--muted)">layout, paint</text>
+    <line x1="20" y1="28" x2="20" y2="92" style="stroke:var(--accent);stroke-width:2"/>
+    <text x="20" y="20" style="fill:var(--accent);font-weight:600">keypress</text>
+    <line x1="660" y1="28" x2="660" y2="92" style="stroke:var(--accent);stroke-width:2"/>
+    <text x="660" y="20" text-anchor="end" style="fill:var(--accent);font-weight:600">next paint</text>
+    <path d="M20 104 L20 112 L660 112 L660 104" style="fill:none;stroke:var(--muted)"/>
+    <text x="340" y="132" text-anchor="middle" style="fill:currentColor">INP for this interaction: goal under 200 ms</text>
+  </svg>
+  <p>Polling every 5 seconds and re-rendering 600 rows inflates <em>input delay</em> for whatever the teacher happens to click during it. A filter over 600 rows that re-renders all of them inflates <em>processing</em>. A huge DOM inflates <em>presentation</em>. Knowing which part is large tells you which fix to reach for.</p>
+
+  <h2>10. Worked investigation: "typing in the search box freezes"</h2>
+  <p>Here is the second complaint from section 1, walked through the way a staff engineer would. The numbers are illustrative but realistic for a mid-range Chromebook.</p>
+  <p>The code as it stood:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="DashboardPage.tsx (before)">
+export function DashboardPage({ teacher, students }: Props) {
+  const [query, setQuery] = useState('');
+  const liveSessions = useLiveSessions();   // polls every 5 s
+
+  const visible = students.filter((s) =>
+    s.name.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  return (
+    <DashboardContext.Provider value={{ teacher, liveSessions }}>
+      <Header />
+      <ClassSummaryCharts students={students} />
+      <SearchBox value={query} onChange={setQuery} />
+      <StudentList students={visible} />
+    </DashboardContext.Provider>
+  );
+}
+</script>
+  <div class="trace"><b>Step 1: reproduce it under realistic conditions</b>
+    <ol>
+      <li>Load a fixture school with 600 students (the dev database has 28, which is why nobody saw it).</li>
+      <li>Chrome Performance panel, CPU throttled 4×. Type "mar" into search.</li>
+      <li>Result: each keystroke produces a long task of about <b>420 ms</b>. INP in the panel's live metrics: <b class="no">~480 ms (poor)</b>.</li>
+    </ol>
+  </div>
+  <div class="trace"><b>Step 2: find which code, with the React Profiler</b>
+    <ol>
+      <li>Record one keystroke. The flame graph shows <code>DashboardPage</code> re-rendered, and under it <b>everything</b>: <code>Header</code>, <code>ClassSummaryCharts</code> (~90 ms, rebuilding chart geometry for 600 students), and 600 <code>StudentRow</code>s (~280 ms total, mostly sparklines).</li>
+      <li>"Why did this render?" for the rows: <i>parent rendered</i>. For the charts: <i>parent rendered</i>, even though their data didn't change.</li>
+      <li>A second recording, idle, shows every row also re-rendering every 5 seconds: <i>context changed</i>. That's what makes clicks feel randomly sluggish.</li>
+    </ol>
+  </div>
+  <div class="trace"><b>Step 3: list the causes, biggest first, and pick fixes that remove work</b>
+    <ol>
+      <li><code>query</code> lives too high, so the charts re-render on every keystroke. <b class="yes">Fix: move state down</b> into a <code>StudentPanel</code>.</li>
+      <li>600 rows render, but 12 are visible. <b class="yes">Fix: virtualize</b> the list.</li>
+      <li>The context value is a new object every render, and it mixes a 5-second value with a stable one. <b class="yes">Fix: split context</b> as in section 5.</li>
+      <li>Typing and list-updating compete. <b class="yes">Fix: mark the list update as non-urgent</b> with <code>useDeferredValue</code>, so the input updates first and React renders the filtered list in the background, abandoning it if another key arrives.</li>
+    </ol>
+  </div>
+  <script type="text/x-code" data-lang="tsx" data-title="StudentPanel.tsx (after)">
+import { useDeferredValue, useMemo, useState } from 'react';
+
+export function StudentPanel({ students }: { students: Student[] }) {
+  const [query, setQuery] = useState('');
+  // The input re-renders with `query` immediately; the list catches up with `deferredQuery`
+  const deferredQuery = useDeferredValue(query);
+
+  const visible = useMemo(
+    () => filterByName(students, deferredQuery),
+    [students, deferredQuery],
+  );
+
+  return (
+    <section>
+      <SearchBox value={query} onChange={setQuery} />
+      <StudentList students={visible} />   {/* memo + virtualized, from section 6 */}
+    </section>
+  );
+}
+</script>
+  <p>Here the <code>useMemo</code> earns its place: during the urgent render (just the input), <code>deferredQuery</code> hasn't changed, so <code>visible</code> is the same array, so the memoized <code>StudentList</code> skips. That's the pattern from the React docs for <code>useDeferredValue</code>; without a memoized child it does very little.</p>
+  <div class="trace"><b>Step 4: measure again, same setup</b>
+    <ol>
+      <li>Keystroke long task: 420 ms → <b class="yes">~25 ms</b> for the input, plus a ~40 ms background list render that's interruptible.</li>
+      <li>INP: <b class="yes">~480 ms → ~90 ms (good)</b>. Charts no longer appear in the keystroke profile at all.</li>
+      <li>Idle 5-second re-renders: from 600 rows to only the rows whose live dot changed.</li>
+    </ol>
+  </div>
+  <div class="trace"><b>Step 5: keep it fixed</b>
+    <ol>
+      <li>Add the 600-student fixture to the dev seed data so the next engineer sees the real scale.</li>
+      <li>Send INP from real users with <code>web-vitals</code>, broken down by page and class size, and alert if the dashboard's 75th percentile goes over 200 ms.</li>
+      <li>Write the reasoning in the PR so nobody "simplifies" the context back into one object.</li>
+    </ol>
+  </div>
+  <p>And the <em>other</em> complaint, slow loading? Different tools, different fix. Lighthouse showed an LCP of 4.1 s: the dashboard was client-rendered, so nothing appeared until a 900 KB bundle loaded and the roster API returned. The fix was the previous lesson's: server-render the roster, lazy-load the charts, and drop the date library. That's why the first move was to separate the two complaints.</p>
+
+  <h2>11. How a staff engineer approaches this</h2>
+  <p>The questions they ask, in order:</p>
+  <ul>
+    <li><b>Is it load or interaction?</b> Different metrics (LCP vs INP), different tools, different fixes.</li>
+    <li><b>Who is slow, and on what?</b> Which page, which users, which device, what data size. "Slow for district coaches on Chromebooks with 600 students" is a bug report; "the app feels slow" isn't yet.</li>
+    <li><b>What does the measurement say?</b> Not what they suspect. The profile names the component.</li>
+    <li><b>Can we remove the work instead of speeding it up?</b> Move state down, split context, virtualize, split code, render on the server. Memoization comes after these.</li>
+    <li><b>How will we know it stays fixed?</b> A field metric, a budget, a realistic fixture.</li>
+  </ul>
+  <p>Trade-offs, stated plainly:</p>
+  <ul>
+    <li><b>Moving state down</b> gives you fewer re-renders with no new concepts, at the cost of sometimes having to lift it again when a new feature needs it higher. Choose it first, almost always.</li>
+    <li><b>Memoization</b> gives you skipped renders of a slow subtree, at the cost of memory, comparison overhead and fragile code (one inline object breaks it). Choose it when the Profiler shows a slow component re-rendering with unchanged props, or let the React Compiler do it.</li>
+    <li><b>Virtualization</b> gives you constant cost for any list length, at the cost of complexity, find-in-page and accessibility work. Choose it when lists reach the hundreds and rows aren't trivial.</li>
+    <li><b>Code splitting</b> gives you a smaller first download, at the cost of a loading state when the split part is first needed. Choose it at route boundaries always, and for heavy, rarely used components.</li>
+    <li><b>Deferring updates</b> (<code>useDeferredValue</code>, <code>useTransition</code>) gives you a responsive input even when the result is slow to render, at the cost of briefly showing stale results. Choose it when the expensive part is a rendering consequence of typing or clicking.</li>
+  </ul>
+
+  <h2>12. Common mistakes</h2>
+  <div class="mistake"><b>Optimizing without a measurement</b><p>Wrapping everything in <code>useMemo</code> and <code>useCallback</code> "for performance." It adds noise, rarely helps, and hides the one change that would have mattered.</p></div>
+  <div class="mistake"><b>Testing on a fast laptop with tiny data</b><p>A developer MacBook with 28 students won't reproduce a Chromebook with 600. Throttle the CPU and use realistic fixtures.</p></div>
+  <div class="mistake"><b>A memoized child with inline props</b><p><code>memo</code> on the child, then <code>style={{…}}</code> or <code>onClick={() =&gt; …}</code> from the parent. The props are new every time, so the memo never skips and you pay for the comparison too.</p></div>
+  <div class="mistake"><b>One giant context</b><p>Fast-changing and slow-changing values in one provider means everything re-renders at the speed of the fastest value. Split by update frequency.</p></div>
+  <div class="mistake"><b>Lazy-loading the LCP image</b><p><code>loading="lazy"</code> on the hero image delays the very thing LCP measures. Lazy-load below the fold only.</p></div>
+  <div class="mistake"><b>Skeletons that don't match</b><p>A loading skeleton 200px tall replaced by content 480px tall pushes everything down: a CLS hit introduced by a performance fix.</p></div>
+  <div class="mistake"><b>Lab numbers as the goal</b><p>A Lighthouse score of 100 on your machine doesn't mean real users are fast. Ship field metrics and judge by the 75th percentile.</p></div>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"First I'd separate load from interaction, because they're different metrics and different fixes. For the slow search, I'd reproduce with 600 students and CPU throttling, then use the React Profiler to see what renders on a keystroke and why. In our case the search state lived at the top of the page, so the charts re-rendered on every key, and all 600 rows rendered when 12 were visible. I'd move the state down, virtualize the list, split the context that changed every 5 seconds, and defer the list update so typing stays instant. Then I'd measure again and track INP in the field so we'd notice a regression. I'd reach for memo only where the profile shows a slow component re-rendering with the same props; with the React Compiler on, mostly not at all."</p></div>
+
+  <h2>13. Recap</h2>
+  <ul>
+    <li>React works in <b>trigger → render → commit</b>. Renders are JS and usually cheap; commits touch the DOM only where something changed.</li>
+    <li>A component re-renders when its <b>state</b> changes, its <b>parent</b> re-renders, or a <b>context</b> it reads changes. Most re-renders are fine.</li>
+    <li><b>Measure first</b>: Profiler for which components, Performance panel for the main thread, Lighthouse for load, field data for what's real.</li>
+    <li><code>memo</code>/<code>useMemo</code>/<code>useCallback</code> help only with a slow component and stable props. The <b>React Compiler</b> automates most of it but doesn't fix architecture.</li>
+    <li><b>Remove work</b>: move state down, split context, virtualize long lists, code-split by route and by heavy component, shrink the bundle.</li>
+    <li>Images need dimensions and priority; fonts need preloading and matched fallbacks.</li>
+    <li><b>LCP</b> ≤ 2.5 s (load), <b>INP</b> ≤ 200 ms (responsiveness), <b>CLS</b> ≤ 0.1 (stability), at the 75th percentile of real users.</li>
+  </ul>
+
+  <details class="details"><summary>Check yourself</summary><div>
+    <p><b>1. A child component's props didn't change. Can it still re-render?</b><br>Yes. By default, when a parent re-renders all its children do. Props only matter if the child is wrapped in <code>memo</code> (or the React Compiler memoized it).</p>
+    <p><b>2. A teammate adds <code>useCallback</code> to every handler in a form. Does it help?</b><br>Only for handlers passed to memoized children or used in effect dependencies. Otherwise it's overhead and noise.</p>
+    <p><b>3. Lighthouse gives the dashboard a great score, but teachers say clicks feel laggy. Why the disagreement?</b><br>Lighthouse measures loading and doesn't interact with the page. Laggy clicks are an INP problem: record the interaction in the Performance panel and check field INP.</p>
+    <p><b>4. The district report imports a 180 KB charting library that's only used on one tab. What do you do?</b><br>Load that tab's component with <code>lazy</code> inside a <code>Suspense</code> boundary (or make sure it's on its own route) so the library downloads only when the tab opens.</p>
+    <p><b>5. After adding skeletons, CLS got worse. What happened?</b><br>The skeletons are a different height from the real content, so the page jumps when content arrives. Size skeletons to match the final layout.</p>
+  </div></details>
+</template>

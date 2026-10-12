@@ -1,0 +1,188 @@
+<template id="tpl-layout">
+  <h1>Grid, positioning, overflow, states</h1>
+  <p class="lede">The rest of the CSS a mockup needs: card grids and page layouts, things that sit on top of other things, regions that scroll, and how elements change on hover, focus and selection.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Choose between grid and flexbox, and build a responsive card grid without media queries</li>
+    <li>Place a badge, dropdown or modal exactly where the design shows it</li>
+    <li>Make a list scroll inside a fixed-height panel</li>
+    <li>Add hover, focus, active and disabled states, and use a codebase's CSS variables</li>
+  </ul></div>
+
+  <h2>1. Grid: rows and columns that line up</h2>
+  <p>Flexbox arranges items along one line, and each item's size comes mostly from its content. Grid is different: <b>you define the columns on the parent</b>, and the children drop into the cells in order, left to right, wrapping to a new row when a row is full. Because the columns are defined once, items in different rows line up with each other.</p>
+  <p>Use grid when columns should line up across rows: card grids, dashboards, a sidebar-plus-content page, label/value forms. Use flexbox for a single row or column of things sized by their content: headers, toolbars, list items, button groups. They nest happily: a grid of cards where each card's insides are flexbox is normal.</p>
+
+  <h3>The fr unit</h3>
+  <p><code>fr</code> means "a fraction of the leftover space". <code>grid-template-columns: 1fr 1fr 1fr</code> is three equal columns. <code>200px 1fr</code> is a fixed 200px sidebar and a main area that takes the rest. <code>1fr 2fr</code> makes the second column twice as wide as the first. <code>repeat(3, 1fr)</code> is shorthand for <code>1fr 1fr 1fr</code>.</p>
+
+  <h3>The responsive card grid, explained</h3>
+  <p><code>grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))</code> reads as: "make as many columns as will fit (<code>auto-fill</code>), where each column is at least 220px and at most an equal share of the space (<code>minmax(220px, 1fr)</code>)". As the container narrows, columns drop off and the rest stretch to fill. No media queries needed.</p>
+  <div data-explorer="grid"></div>
+  <div class="try"><b>Try this</b><ol>
+    <li>Try <code>200px 1fr</code>: a classic sidebar layout. Items keep filling cells in order, so item 3 lands in the sidebar column of row 2.</li>
+    <li>Set "Item 1 gets" to <code>grid-column: 1 / -1</code>. It spans from the first column line to the last, a full-width header row. <code>span 2</code> takes two columns from wherever it lands.</li>
+    <li>Pick the <code>auto-fill</code> option and resize your browser window.</li>
+    <li>Item 2 is taller than the rest. With <code>align-items: stretch</code> its whole row matches its height. Try <code>start</code>.</li>
+  </ol></div>
+
+  <h2>2. Positioning: taking things out of the flow</h2>
+  <p>Normally every element takes up space and pushes its neighbors. Positioning lets you place an element somewhere specific, often on top of others. <code>position</code> has five values:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Value</th><th>What it does</th><th>Typical use</th></tr>
+    <tr><td><code>static</code></td><td>The default. Normal flow. <code>top</code>/<code>left</code> are ignored.</td><td>Everything</td></tr>
+    <tr><td><code>relative</code></td><td>Stays in the flow, exactly where it was. But it becomes the <b>anchor</b> for absolutely positioned children.</td><td>The card that holds a badge</td></tr>
+    <tr><td><code>absolute</code></td><td>Removed from the flow (others act as if it isn't there). Placed with <code>top</code>/<code>right</code>/<code>bottom</code>/<code>left</code>, measured from its nearest <em>positioned</em> ancestor.</td><td>Badges, dropdown menus, icons inside inputs</td></tr>
+    <tr><td><code>fixed</code></td><td>Placed relative to the browser window. Stays put when the page scrolls.</td><td>Modal backdrops, toasts</td></tr>
+    <tr><td><code>sticky</code></td><td>Acts normal until you scroll it to a threshold (<code>top: 0</code>), then sticks there while its container scrolls.</td><td>Table headers, section headings</td></tr>
+  </table></div>
+  <p>The rule that trips everyone up: an <code>absolute</code> element positions itself against the nearest ancestor whose position is <em>anything except static</em>. If you forget <code>position: relative</code> on the card, the badge flies to the corner of the page instead of the card. So the pattern is always a pair: <b>parent relative, child absolute</b>.</p>
+  <p><code>z-index</code> controls which positioned element is on top when they overlap. Higher wins. It only works on positioned elements (not <code>static</code>). If a dropdown hides behind something, give it <code>position: absolute; z-index: 10</code>.</p>
+
+  <script type="text/x-play" data-title="Badge, input icon, dropdown" data-h="300" data-console="off">
+export default function App() {
+  return (
+    <div className="demo">
+      <div className="card">
+        <span className="badge">New</span>
+        <h3>Docs search</h3>
+        <p>Typeahead across the API reference.</p>
+      </div>
+
+      <label className="search">
+        <span className="icon">⌕</span>
+        <input placeholder="Search" />
+      </label>
+
+      <div className="menu-wrap">
+        <button>Options ▾</button>
+        <ul className="menu"><li>Rename</li><li>Duplicate</li><li>Delete</li></ul>
+      </div>
+      <p>Text below the menu. The menu covers it instead of pushing it down.</p>
+    </div>
+  );
+}
+/*** css ***/
+.demo { display: flex; flex-direction: column; gap: 16px; width: 300px; font-size: 14px; }
+.card { position: relative; padding: 16px; border: 1px solid #DADEE6; border-radius: 10px; }
+.card h3 { margin: 0 0 4px; }
+.card p { margin: 0; color: #6B7385; }
+.badge {
+  position: absolute; top: 10px; right: 10px;
+  padding: 2px 8px; border-radius: 999px;
+  background: #E3F5EA; color: #1C7A43; font-size: 11px; font-weight: 600;
+}
+
+.search { position: relative; display: block; }
+.icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6B7385; }
+.search input { width: 100%; height: 34px; padding: 0 10px 0 30px; border: 1px solid #DADEE6; border-radius: 8px; }
+
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 10;
+  margin: 0; padding: 4px; list-style: none; min-width: 140px;
+  background: white; border: 1px solid #DADEE6; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+}
+.menu li { padding: 6px 10px; border-radius: 6px; }
+.menu li:hover { background: #F2F4F8; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Remove <code>position: relative</code> from <code>.card</code>. The badge jumps to the corner of the preview, because that's now the nearest positioned ancestor.</li>
+    <li>The search icon is centered vertically with <code>top: 50%</code> (its top edge at the middle) plus <code>transform: translateY(-50%)</code> (moved up by half its own height). Change <code>left: 10px</code> to <code>right: 10px</code>.</li>
+    <li>Change the menu's <code>position: absolute</code> to <code>static</code>. Now it takes up space and pushes the paragraph down. That's the difference.</li>
+  </ol></div>
+
+  <h2>3. Overflow and scrolling</h2>
+  <p>When content is bigger than its box, <code>overflow</code> decides what happens: <code>visible</code> (default, spills out), <code>hidden</code> (clipped), <code>auto</code> (scrollbar appears only when needed), <code>scroll</code> (always a scrollbar).</p>
+  <p>The catch: <b>a box can only overflow if its size is limited</b>. A list with <code>overflow-y: auto</code> but no height limit will just grow taller forever and never scroll. You need a <code>height</code> or <code>max-height</code>, or a flex layout that constrains it.</p>
+
+  <h3>The sidebar scroll pattern</h3>
+  <p>The common case is an app shell: a sidebar the height of the screen, with a fixed top section and a list below it that scrolls on its own. Every element in the chain has to cooperate:</p>
+  <script type="text/x-code" data-lang="css" data-title="scroll inside a column">
+.app      { display: flex; height: 100vh; }               /* 1. a fixed height to work within */
+.sidebar  { display: flex; flex-direction: column; min-height: 0; }
+.top      { flex-shrink: 0; }                              /* 2. the top keeps its size */
+.list     { flex: 1; min-height: 0; overflow-y: auto; }    /* 3. list takes the rest and scrolls */
+</script>
+  <p><code>min-height: 0</code> is the vertical twin of the <code>min-width: 0</code> fix: flex items in a column refuse to be shorter than their content unless you allow it.</p>
+
+  <h3>Text truncation, explained</h3>
+  <p>The one-line ellipsis needs three properties because each solves a different part: <code>white-space: nowrap</code> stops the text wrapping onto a second line; <code>overflow: hidden</code> clips what sticks out; <code>text-overflow: ellipsis</code> replaces the clipped part with "…". It also needs a limited width, which inside flexbox means <code>min-width: 0</code>.</p>
+  <p>For two or more lines: <code>display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;</code>. The odd prefixes are historical. It works in all modern browsers. Copy it from MDN when you need it.</p>
+
+  <h2>4. Interactive states</h2>
+  <p>Designs show how things look when hovered, focused, selected or disabled. There are two kinds of state, and they're styled differently:</p>
+  <ul>
+    <li><b>Browser states</b> are selected with pseudo-classes, which the browser applies automatically: <code>:hover</code> (pointer over it), <code>:focus-visible</code> (focused via keyboard), <code>:active</code> (being pressed), <code>:disabled</code>, <code>:checked</code>.</li>
+    <li><b>App states</b> like "selected", "open", "starred" or "has error" come from your React state. You express them as a class: <code>className={isActive ? 'item is-active' : 'item'}</code>, then style <code>.item.is-active</code>.</li>
+  </ul>
+  <p>Use <code>:focus-visible</code> rather than <code>:focus</code> for outlines: it shows the ring for keyboard users but not after a mouse click. Never remove the focus outline without replacing it.</p>
+  <p><b>Showing a child on parent hover</b> (a star or delete button that appears when you hover a row) is a descendant selector: <code>.row:hover .star { opacity: 1; }</code>. Read it as "the <code>.star</code> inside a hovered <code>.row</code>".</p>
+  <p><b>Transitions</b> animate between states: <code>transition: background 0.15s</code> on the base rule makes hover color changes fade instead of snapping.</p>
+
+  <script type="text/x-play" data-title="States from CSS and from React" data-h="380" data-console="off">
+import { useState } from 'react';
+
+const ITEMS = ['Refactor webhook handler', 'Explain CSS grid', 'Draft launch email'];
+
+export default function App() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [starred, setStarred] = useState([false, true, false]);
+
+  function toggleStar(i) {
+    setStarred(starred.map((s, j) => (j === i ? !s : s)));
+  }
+
+  return (
+    <ul className="list">
+      {ITEMS.map((title, i) => {
+        let className = 'row';
+        if (i === activeIndex) className += ' is-active';
+        if (starred[i]) className += ' is-starred';
+        return (
+          <li key={title} className={className}>
+            <button className="title" onClick={() => setActiveIndex(i)}>{title}</button>
+            <button className="star" onClick={() => toggleStar(i)} aria-label="Star">★</button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+/*** css ***/
+.list { list-style: none; margin: 0; padding: 4px; width: 280px; background: #F4F5F7; border-radius: 10px; }
+.row { display: flex; align-items: center; border-radius: 8px; transition: background 0.15s; }
+.row:hover { background: #E9EBEF; }            /* browser state */
+.row.is-active { background: #DEE3F0; }       /* app state, from React */
+.title { flex: 1; padding: 8px; border: 0; background: none; text-align: left; cursor: pointer; }
+.row.is-active .title { font-weight: 600; }
+.title:focus-visible, .star:focus-visible { outline: 2px solid #3451D1; outline-offset: -2px; border-radius: 6px; }
+.star { border: 0; background: none; padding: 6px 8px; cursor: pointer; color: #98A0AE; opacity: 0; }
+.row:hover .star,
+.row.is-starred .star,
+.star:focus-visible { opacity: 1; }           /* show on row hover, when starred, or when focused */
+.row.is-starred .star { color: #D4920B; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Hover rows to see the star appear, click titles to change the active row, star a few.</li>
+    <li>Press <span class="kbd">Tab</span> to move through the buttons with the keyboard. The outline only appears for keyboard focus.</li>
+    <li>Change <code>transition: background 0.15s</code> to <code>0.6s</code> to see it clearly, then remove it to see the snap.</li>
+  </ol></div>
+
+  <h2>5. CSS variables</h2>
+  <p>A CSS variable (officially a "custom property") is a named value you define once and reuse: define <code>--color-muted: #6B7385;</code> inside <code>:root { }</code> (the top of the page, so everything can see it), then use it with <code>color: var(--color-muted);</code>.</p>
+  <p>Codebases use them as design tokens: the palette, spacing scale and radii live in one place. In the interview, if you see a <code>:root</code> block full of variables, the design colors almost certainly map onto them. Using <code>var(--color-muted)</code> instead of the hex code shows you read the codebase, and it keeps the feature consistent if the theme changes.</p>
+
+  <h2>6. Responsive with media queries</h2>
+  <p>A media query wraps rules that only apply when a condition is true, usually the viewport width: <code>@media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }</code> means "when the window is 640px wide or narrower, stack the stats". Write the normal layout first, then override only what changes. Only do this if the design shows a mobile version or the interviewer asks.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Badge or menu appears in the wrong corner of the page</b><p>No <code>position: relative</code> on the intended parent.</p></div>
+  <div class="mistake"><b>List won't scroll, it just grows</b><p>No height limit somewhere up the chain. Add <code>max-height</code>, or the flex column pattern with <code>min-height: 0</code>.</p></div>
+  <div class="mistake"><b>Dropdown is cut off</b><p>An ancestor has <code>overflow: hidden</code>, which clips absolutely positioned children too. Move the overflow, or render the menu in a portal.</p></div>
+  <div class="mistake"><b>Sticky header doesn't stick</b><p>It needs <code>top: 0</code>, and its scrolling container must be the element with <code>overflow: auto</code>. An ancestor with <code>overflow: hidden</code> breaks it.</p></div>
+
+  <p>Practice: <b>Project cards</b> uses grid, absolute positioning and both kinds of truncation.</p>
+  <div data-exs="d2"></div>
+  <div data-quiz="layout"></div>
+</template>

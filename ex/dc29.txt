@@ -1,0 +1,399 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Photo = {
+  id: string;
+  caption: string;
+  // No real images offline: each "photo" is a gradient + a big glyph.
+  from: string;
+  to: string;
+  glyph: string;
+};
+
+export type Listing = {
+  id: string;
+  title: string;
+  location: string;
+  rating: number;
+  reviews: number;
+  nightly: number; // in dollars
+  host: string;
+  amenities: string[];
+  photos: Photo[];
+};
+
+const LISTING: Listing = {
+  id: 'l1',
+  title: 'Cliffside cabin with a cedar hot tub',
+  location: 'Big Sur, California',
+  rating: 4.93,
+  reviews: 212,
+  nightly: 286,
+  host: 'Elena',
+  amenities: ['Ocean view', 'Hot tub', 'Wood stove', 'Fast wifi', 'Free parking'],
+  photos: [
+    { id: 'ph1', caption: 'Sunset from the deck', from: '#F97316', to: '#7C3AED', glyph: '🌅' },
+    { id: 'ph2', caption: 'Living room with wood stove', from: '#B45309', to: '#78350F', glyph: '🛋️' },
+    { id: 'ph3', caption: 'Cedar hot tub', from: '#0EA5E9', to: '#0F766E', glyph: '♨️' },
+    { id: 'ph4', caption: 'Bedroom loft', from: '#A78BFA', to: '#4C1D95', glyph: '🛏️' },
+    { id: 'ph5', caption: 'Kitchen', from: '#FDE68A', to: '#D97706', glyph: '🍳' },
+    { id: 'ph6', caption: 'Trail to the cove', from: '#4ADE80', to: '#166534', glyph: '🌲' },
+    { id: 'ph7', caption: 'Stars over the ridge', from: '#1E3A8A', to: '#020617', glyph: '✨' },
+  ],
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /listings/l1 -> Listing
+export async function getListing(): Promise<Listing> {
+  await randomDelay(400, 900);
+  return { ...LISTING, amenities: [...LISTING.amenities], photos: LISTING.photos.map((p) => ({ ...p })) };
+}
+@@@ shared src/utils/format.ts
+// formatPrice(286) -> "$286"
+export function formatPrice(dollars: number): string {
+  return '$' + dollars.toLocaleString('en-US');
+}
+@@@ shared src/components/PhotoSlide.tsx
+import React from 'react';
+import type { Photo } from '../api';
+
+// Renders one photo filling its parent. Reuse it for every slide.
+export default function PhotoSlide({ photo }: { photo: Photo }) {
+  const style = { background: 'linear-gradient(135deg, ' + photo.from + ', ' + photo.to + ')' };
+  return (
+    <figure className="photo" style={style}>
+      <span className="photo-glyph" aria-hidden="true">{photo.glyph}</span>
+      <figcaption className="photo-caption">{photo.caption}</figcaption>
+    </figure>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getListing } from './api';
+import type { Listing, Photo } from './api';
+import PhotoSlide from './components/PhotoSlide';
+import { formatPrice } from './utils/format';
+
+// TODO: turn this into a carousel: prev/next (wrapping), dots,
+// a "3 / 7" counter, and autoplay every 4s that pauses on hover.
+function Gallery({ photos }: { photos: Photo[] }) {
+  return (
+    <div className="gallery">
+      <PhotoSlide photo={photos[0]} />
+    </div>
+  );
+}
+
+function BookingCard({ nightly }: { nightly: number }) {
+  return (
+    <aside className="booking">
+      <p className="price"><b>{formatPrice(nightly)}</b> night</p>
+      <div className="dates">
+        <div><span>Check-in</span>Nov 14</div>
+        <div><span>Checkout</span>Nov 17</div>
+      </div>
+      <button type="button" className="reserve">Reserve</button>
+      <p className="fine">You won't be charged yet</p>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [listing, setListing] = useState<Listing | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getListing().then((data) => {
+      if (!cancelled) {
+        setListing(data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!listing) {
+    return <div className="app"><p className="loading">Loading stay…</p></div>;
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar"><span className="logo">wanderstay</span></header>
+      <main className="page">
+        <h1>{listing.title}</h1>
+        <p className="sub">★ {listing.rating} · {listing.reviews} reviews · {listing.location}</p>
+        <Gallery photos={listing.photos} />
+        <div className="details">
+          <section className="about">
+            <h2>Hosted by {listing.host}</h2>
+            <ul className="amenities">
+              {listing.amenities.map((a) => {
+                return <li key={a}>{a}</li>;
+              })}
+            </ul>
+          </section>
+          <BookingCard nightly={listing.nightly} />
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --text: #222222;
+  --muted: #6A6A6A;
+  --border: #EBEBEB;
+  --coral: #E8505B;
+  --coral-dark: #D03A47;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Circular', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.loading { padding: 60px; text-align: center; color: var(--muted); }
+.topbar { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; font-size: 20px; color: var(--coral); letter-spacing: -0.03em; }
+
+.page { max-width: 860px; margin: 0 auto; padding: 22px 20px 48px; }
+.page h1 { margin: 0 0 4px; font-size: 26px; }
+.sub { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+
+.gallery { position: relative; height: 340px; border-radius: var(--radius); overflow: hidden; }
+.photo { margin: 0; width: 100%; height: 100%; display: grid; place-items: center; position: relative; }
+.photo-glyph { font-size: 96px; filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.25)); }
+.photo-caption { position: absolute; left: 16px; bottom: 14px; padding: 5px 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 13px; font-weight: 600; }
+
+.details { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 24px; }
+.about { flex: 1 1 300px; }
+.about h2 { margin: 0 0 12px; font-size: 20px; }
+.amenities { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; font-size: 15px; }
+.amenities li::before { content: '✓ '; color: var(--coral); font-weight: 700; }
+
+.booking { flex: 0 1 280px; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 12px; }
+.price { margin: 0; font-size: 15px; }
+.price b { font-size: 22px; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #B0B0B0; border-radius: 10px; font-size: 14px; }
+.dates div { padding: 8px 12px; }
+.dates div + div { border-left: 1px solid #B0B0B0; }
+.dates span { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.reserve { height: 46px; border: 0; border-radius: 10px; background: linear-gradient(90deg, var(--coral), var(--coral-dark)); color: #fff; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.fine { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getListing } from './api';
+import type { Listing, Photo } from './api';
+import PhotoSlide from './components/PhotoSlide';
+import { formatPrice } from './utils/format';
+
+const AUTOPLAY_MS = 4000;
+
+function Gallery({ photos }: { photos: Photo[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const count = photos.length;
+
+  // Autoplay. `index` is a dependency on purpose: any manual move restarts
+  // the 4s countdown, so the slide never jumps right after a click.
+  useEffect(() => {
+    if (paused || count < 2) {
+      return;
+    }
+    const id = setInterval(() => {
+      setIndex((i) => {
+        return (i + 1) % count;
+      });
+    }, AUTOPLAY_MS);
+    return () => {
+      clearInterval(id);
+    };
+  }, [paused, count, index]);
+
+  function goNext() {
+    setIndex((i) => {
+      return (i + 1) % count;
+    });
+  }
+
+  function goPrev() {
+    // + count keeps it positive: (0 - 1 + 7) % 7 = 6
+    setIndex((i) => {
+      return (i - 1 + count) % count;
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goNext();
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goPrev();
+    }
+  }
+
+  const photo = photos[index];
+  const position = index + 1; // derived: humans count from 1
+
+  return (
+    <div
+      className="gallery"
+      tabIndex={0}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Listing photos"
+      onMouseEnter={() => { setPaused(true); }}
+      onMouseLeave={() => { setPaused(false); }}
+      onKeyDown={handleKeyDown}
+    >
+      <PhotoSlide photo={photo} />
+      <button type="button" className="nav-btn nav-prev" aria-label="Previous photo" onClick={() => { goPrev(); }}>‹</button>
+      <button type="button" className="nav-btn nav-next" aria-label="Next photo" onClick={() => { goNext(); }}>›</button>
+      <span className="counter" aria-live="polite">{position} / {count}</span>
+      <div className="dots">
+        {photos.map((p, i) => {
+          let cls = 'dot';
+          if (i === index) {
+            cls = 'dot is-active';
+          }
+          const label = 'Show photo ' + (i + 1);
+          return (
+            <button key={p.id} type="button" className={cls} aria-label={label} onClick={() => { setIndex(i); }} />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BookingCard({ nightly }: { nightly: number }) {
+  return (
+    <aside className="booking">
+      <p className="price"><b>{formatPrice(nightly)}</b> night</p>
+      <div className="dates">
+        <div><span>Check-in</span>Nov 14</div>
+        <div><span>Checkout</span>Nov 17</div>
+      </div>
+      <button type="button" className="reserve">Reserve</button>
+      <p className="fine">You won't be charged yet</p>
+    </aside>
+  );
+}
+
+export default function App() {
+  const [listing, setListing] = useState<Listing | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getListing().then((data) => {
+      if (!cancelled) {
+        setListing(data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!listing) {
+    return <div className="app"><p className="loading">Loading stay…</p></div>;
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar"><span className="logo">wanderstay</span></header>
+      <main className="page">
+        <h1>{listing.title}</h1>
+        <p className="sub">★ {listing.rating} · {listing.reviews} reviews · {listing.location}</p>
+        <Gallery photos={listing.photos} />
+        <div className="details">
+          <section className="about">
+            <h2>Hosted by {listing.host}</h2>
+            <ul className="amenities">
+              {listing.amenities.map((a) => {
+                return <li key={a}>{a}</li>;
+              })}
+            </ul>
+          </section>
+          <BookingCard nightly={listing.nightly} />
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --text: #222222;
+  --muted: #6A6A6A;
+  --border: #EBEBEB;
+  --coral: #E8505B;
+  --coral-dark: #D03A47;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Circular', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.loading { padding: 60px; text-align: center; color: var(--muted); }
+.topbar { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; font-size: 20px; color: var(--coral); letter-spacing: -0.03em; }
+
+.page { max-width: 860px; margin: 0 auto; padding: 22px 20px 48px; }
+.page h1 { margin: 0 0 4px; font-size: 26px; }
+.sub { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+
+.gallery { position: relative; height: 340px; border-radius: var(--radius); overflow: hidden; }
+.photo { margin: 0; width: 100%; height: 100%; display: grid; place-items: center; position: relative; }
+.photo-glyph { font-size: 96px; filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.25)); }
+.photo-caption { position: absolute; left: 16px; bottom: 14px; padding: 5px 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 13px; font-weight: 600; }
+
+.details { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 24px; }
+.about { flex: 1 1 300px; }
+.about h2 { margin: 0 0 12px; font-size: 20px; }
+.amenities { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; font-size: 15px; }
+.amenities li::before { content: '✓ '; color: var(--coral); font-weight: 700; }
+
+.booking { flex: 0 1 280px; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 12px; }
+.price { margin: 0; font-size: 15px; }
+.price b { font-size: 22px; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #B0B0B0; border-radius: 10px; font-size: 14px; }
+.dates div { padding: 8px 12px; }
+.dates div + div { border-left: 1px solid #B0B0B0; }
+.dates span { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.reserve { height: 46px; border: 0; border-radius: 10px; background: linear-gradient(90deg, var(--coral), var(--coral-dark)); color: #fff; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.fine { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+/* ---- Added: carousel controls ---- */
+.gallery:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+.nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.nav-btn:hover { background: #fff; transform: translateY(-50%) scale(1.06); }
+.nav-prev { left: 14px; }
+.nav-next { right: 14px; }
+.counter { position: absolute; right: 14px; bottom: 14px; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dots { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; }
+.dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.55); cursor: pointer; }
+.dot.is-active { background: #fff; transform: scale(1.25); }

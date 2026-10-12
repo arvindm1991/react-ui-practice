@@ -1,0 +1,348 @@
+<template id="tpl-st-test">
+  <h1>Testing strategy: what to test and why</h1>
+  <p class="lede">Tests aren't there to prove code works today; you can click around for that. They're there so you can change code next month without fear. This lesson takes one Lexi feature, "assign a reading to a class", and tests it at every level, then shows how a staff engineer decides how much of each kind a team should write.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain the testing pyramid and testing trophy, and which kind of test to write for a given piece of code</li>
+    <li>Read and write React Testing Library tests that behave like a user, including async UI</li>
+    <li>Choose between mocking the network (MSW) and mocking modules, and know what not to test</li>
+    <li>Describe how e2e, visual and accessibility checks fit in, how to kill flaky tests, and how to set a team's testing strategy</li>
+  </ul></div>
+
+  <h2>1. Why tests exist: confidence to change code</h2>
+  <p>Picture Lexi, the reading app for schools, two years in. The Teacher squad wants to rewrite the "Assign reading" dialog to support assigning to several classes at once. The dialog touches the book picker, due dates, the class list and the API. Nobody who wrote the original is still on the team.</p>
+  <p>Without tests, the honest plan is: change it, click through every case you can think of, ship, and wait for teachers to report what broke. With good tests, the plan is: change it, run the suite in two minutes, fix what's red, ship. That difference is what tests buy. Keep that frame for every decision in this lesson: <b>a test is worth writing if it would catch a real break, and not fail when nothing real broke.</b></p>
+  <p>That second half matters as much as the first. A test that fails every time you rename a variable is a cost, not a safety net. People learn to ignore it, or delete it.</p>
+
+  <h2>2. The feature we'll test</h2>
+  <p>A teacher opens their class, clicks <b>Assign reading</b>, picks a book, picks a due date, and clicks <b>Assign</b>. The dialog closes and the assignment appears in the class's list with a label like "Due tomorrow". Students in that class see it on their home screen.</p>
+  <p>The pieces of code involved:</p>
+  <ul>
+    <li><code>formatDueLabel(due, now)</code>: a pure function that turns a date into "Due today", "Due tomorrow", "Due Fri" or "Overdue".</li>
+    <li><code>AssignReadingDialog</code>: the form, built from design-system components, which calls <code>POST /api/classes/:id/assignments</code> using TanStack Query.</li>
+    <li><code>ClassAssignments</code>: the list that shows assignments for a class.</li>
+    <li>The real backend and database, plus the student home screen.</li>
+  </ul>
+
+  <h2>3. Unit, integration, end-to-end: one feature, three sizes</h2>
+  <p>Tests are usually grouped by <b>how much of the real system they run</b>:</p>
+  <ul>
+    <li><b>Unit test:</b> one function or tiny component, alone. Fast (milliseconds), precise about what broke, but it can't tell you the pieces work together.</li>
+    <li><b>Integration test:</b> several pieces together, with the slow or external edges (the network, the clock) faked. For frontend, this usually means "render a real component tree in a fake browser (jsdom), interact with it, fake the API".</li>
+    <li><b>End-to-end (e2e) test:</b> the real app in a real browser against a real (test) backend. Slowest and most realistic.</li>
+  </ul>
+
+  <svg viewBox="0 0 720 300" width="100%" role="img" aria-label="Three nested scopes: unit covers formatDueLabel; integration covers the dialog and list with a mocked network; e2e covers browser, frontend, API and database." style="font-family:inherit;margin:16px 0">
+    <rect x="10" y="10" width="700" height="240" rx="12" style="fill:none;stroke:var(--accent);stroke-width:1.5"/>
+    <text x="26" y="34" style="fill:var(--accent);font-size:13px;font-weight:600">E2E (Playwright): real browser → real frontend → real API → test database</text>
+    <rect x="30" y="50" width="450" height="180" rx="10" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="46" y="74" style="fill:var(--ink);font-size:13px;font-weight:600">INTEGRATION (Vitest + RTL, jsdom)</text>
+    <rect x="50" y="90" width="170" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="135" y="110" text-anchor="middle" style="fill:var(--ink);font-size:12px;font-weight:600">UNIT</text>
+    <text x="135" y="126" text-anchor="middle" style="fill:var(--ink);font-size:12px">formatDueLabel()</text>
+    <rect x="240" y="90" width="220" height="44" rx="8" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="350" y="117" text-anchor="middle" style="fill:var(--ink);font-size:13px">AssignReadingDialog</text>
+    <rect x="50" y="150" width="410" height="40" rx="8" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="255" y="175" text-anchor="middle" style="fill:var(--ink);font-size:13px">ClassAssignments list + QueryClient + design system</text>
+    <text x="255" y="215" text-anchor="middle" style="fill:var(--muted);font-size:12px">network calls answered by MSW, not a server</text>
+    <rect x="510" y="60" width="180" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="600" y="85" text-anchor="middle" style="fill:var(--ink);font-size:13px">API server</text>
+    <rect x="510" y="120" width="180" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="600" y="145" text-anchor="middle" style="fill:var(--ink);font-size:13px">Test database</text>
+    <rect x="510" y="180" width="180" height="40" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="600" y="205" text-anchor="middle" style="fill:var(--ink);font-size:13px">Student home screen</text>
+    <text x="360" y="280" text-anchor="middle" style="fill:var(--muted);font-size:12px">Bigger box = more real, more confidence per test, slower, harder to debug when it fails.</text>
+  </svg>
+
+  <h3>The pyramid and the trophy</h3>
+  <p>The classic <b>testing pyramid</b> says: lots of unit tests at the bottom, fewer integration tests, very few e2e tests at the top, because lower tests are cheap and fast.</p>
+  <p>For frontend, Kent C. Dodds proposed the <b>testing trophy</b>: a base of <b>static checks</b> (TypeScript and ESLint, which catch typos and wrong types without running anything), a small layer of unit tests, the <em>biggest</em> layer of integration tests, and a small cap of e2e tests. His reasoning: in UI code, most bugs live in how pieces connect (the form sends the wrong field, the list doesn't refresh after saving), not inside one pure function. Integration tests catch those and, with modern tools, are almost as fast as unit tests.</p>
+
+  <svg viewBox="0 0 720 280" width="100%" role="img" aria-label="Pyramid: wide unit base, narrower integration, small e2e top. Trophy: static base, small unit, wide integration, small e2e top." style="font-family:inherit;margin:16px 0">
+    <text x="170" y="22" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">PYRAMID</text>
+    <polygon points="140,40 200,40 220,90 120,90" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="170" y="70" text-anchor="middle" style="fill:var(--ink);font-size:12px">E2E</text>
+    <polygon points="120,94 220,94 250,160 90,160" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="170" y="132" text-anchor="middle" style="fill:var(--ink);font-size:12px">Integration</text>
+    <polygon points="90,164 250,164 290,240 50,240" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="170" y="207" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">Unit (most)</text>
+    <text x="530" y="22" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">TROPHY</text>
+    <rect x="490" y="36" width="80" height="34" rx="6" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="530" y="58" text-anchor="middle" style="fill:var(--ink);font-size:12px">E2E</text>
+    <rect x="430" y="74" width="200" height="88" rx="10" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="530" y="122" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">Integration (most)</text>
+    <rect x="480" y="166" width="100" height="32" rx="6" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="530" y="187" text-anchor="middle" style="fill:var(--ink);font-size:12px">Unit</text>
+    <rect x="440" y="202" width="180" height="38" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="530" y="226" text-anchor="middle" style="fill:var(--ink);font-size:12px">Static: TypeScript, ESLint</text>
+    <text x="360" y="268" text-anchor="middle" style="fill:var(--muted);font-size:12px">Both agree e2e should be few. They disagree on where the bulk goes.</text>
+  </svg>
+
+  <p>Neither shape is a law. The useful takeaway: <b>write the bulk of your tests at the level where your bugs actually happen, and where a test survives refactors.</b> For a React app that's usually integration. For a library of date and pricing logic, it's unit.</p>
+
+  <h2>4. A unit test: the pure function</h2>
+  <p><code>formatDueLabel</code> is a perfect unit test target: pure (same input, same output), lots of edge cases (midnight, time zones, past dates), and no UI. Note we pass <code>now</code> in instead of reading the clock inside, so the test doesn't depend on what day it runs.</p>
+  <script type="text/x-code" data-lang="ts" data-title="formatDueLabel.test.ts">
+import { describe, expect, it } from 'vitest';
+import { formatDueLabel } from './formatDueLabel';
+
+const now = new Date('2026-03-10T09:00:00');     // a Tuesday morning
+
+describe('formatDueLabel', () => {
+  it.each([
+    ['2026-03-10T23:59:00', 'Due today'],
+    ['2026-03-11T08:00:00', 'Due tomorrow'],
+    ['2026-03-13T08:00:00', 'Due Fri'],
+    ['2026-03-09T23:59:00', 'Overdue'],
+  ])('%s → %s', (due, expected) => {
+    expect(formatDueLabel(new Date(due), now)).toBe(expected);
+  });
+});
+</script>
+  <p>Table-driven tests like <code>it.each</code> are ideal here: adding a new edge case is one line.</p>
+
+  <h2>5. React Testing Library: test like a user</h2>
+  <p><b>React Testing Library</b> (RTL) renders components into a fake DOM and gives you tools to find elements and interact with them. Its guiding principle, in its author's words: <em>the more your tests resemble the way your software is used, the more confidence they can give you.</em></p>
+  <p>In practice that means:</p>
+  <ul>
+    <li><b>Find elements the way a user (or screen reader) would.</b> In order of preference: <code>getByRole</code> ("the button named Assign"), <code>getByLabelText</code> ("the field labelled Due date"), <code>getByText</code>. Use <code>getByTestId</code> only as a last resort.</li>
+    <li><b>Interact the way a user would</b> with <code>userEvent</code>, which simulates real sequences (focus, key down, key up, input, click) rather than firing one synthetic event.</li>
+    <li><b>Assert on what the user sees</b>, not on component state, props, or which internal function was called.</li>
+  </ul>
+  <p>A nice side effect: if you can't find your button by role and name, a screen-reader user can't either. Querying by role nudges you towards accessible markup.</p>
+
+  <div class="ba"><div><span>Implementation details</span><pre>// breaks if you rename state or the class
+expect(wrapper.state('isOpen')).toBe(true);
+container.querySelector('.btn-primary')
+expect(handleSubmit).toHaveBeenCalled();</pre></div><i>→</i><div><span>What the user sees</span><pre>// survives refactors
+screen.getByRole('dialog', { name: 'Assign reading' })
+screen.getByRole('button', { name: 'Assign' })
+await screen.findByText('Due tomorrow')</pre></div></div>
+
+  <h3>The integration test for the dialog</h3>
+  <p>This renders the real <code>ClassAssignments</code> list with the real dialog, real design-system components and a real QueryClient. Only the network is faked (next section explains how).</p>
+  <script type="text/x-code" data-lang="tsx" data-title="ClassAssignments.test.tsx">
+import type { ReactElement } from 'react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, expect, it } from 'vitest';
+import { ClassAssignments } from './ClassAssignments';
+
+function renderWithProviders(ui: ReactElement) {
+  // a fresh client per test so cached data can't leak between tests
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+describe('Assigning a reading', () => {
+  it('adds the assignment to the class list', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ClassAssignments classId="room-12" />);
+
+    // wait for the initial list to load
+    const list = await screen.findByRole('list', { name: 'Assignments' });
+    expect(within(list).queryByText('Charlotte’s Web')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Assign reading' }));
+    const dialog = screen.getByRole('dialog', { name: 'Assign reading' });
+
+    await user.selectOptions(within(dialog).getByLabelText('Book'), 'Charlotte’s Web');
+    await user.type(within(dialog).getByLabelText('Due date'), '2026-03-11');
+    await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
+
+    // the dialog closes and the new item appears after the request resolves
+    expect(await within(list).findByText('Charlotte’s Web')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+</script>
+  <p>Read the test aloud and it's the user story. If the Teacher squad rewrites the dialog with a different state shape, a reducer, a new form library, this test keeps passing as long as a teacher can still do the job. That's what "confidence to change code" looks like.</p>
+
+  <h2>6. Faking the network: MSW vs mocking modules</h2>
+  <p>The test above needs the API to answer. Two ways to fake it:</p>
+  <p><b>Mocking a module</b> means telling the test runner "when code imports <code>./api</code>, give it this fake instead" (<code>vi.mock</code> in Vitest, <code>jest.mock</code> in Jest). It's quick, but the fake replaces your own code. If the real <code>api.ts</code> builds the wrong URL or forgets a header, the test can't notice, because that code never ran. And the test now knows the name and shape of an internal module, which is an implementation detail.</p>
+  <p><b>Mocking the network</b> means letting all your code run, including the <code>fetch</code> call, and intercepting the request at the very edge. <b>MSW</b> (Mock Service Worker) is the standard tool: you describe fake endpoints, and it answers matching requests in tests (via a Node interceptor) and even in the browser during development (via a service worker).</p>
+
+  <svg viewBox="0 0 720 210" width="100%" role="img" aria-label="Module mock cuts out your api code. MSW lets component, query hook and fetch run, intercepting only at the network edge." style="font-family:inherit;margin:16px 0">
+    <defs><marker id="st6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+    <text x="10" y="24" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">MODULE MOCK</text>
+    <rect x="10" y="36" width="140" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="80" y="61" text-anchor="middle" style="fill:var(--ink);font-size:13px">Component</text>
+    <rect x="190" y="36" width="140" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="260" y="61" text-anchor="middle" style="fill:var(--ink);font-size:13px">useMutation</text>
+    <rect x="370" y="36" width="160" height="40" rx="8" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:5 3"/><text x="450" y="61" text-anchor="middle" style="fill:var(--ink);font-size:13px">FAKE api.ts</text>
+    <rect x="570" y="36" width="140" height="40" rx="8" style="fill:none;stroke:var(--line);stroke-dasharray:3 3"/><text x="640" y="61" text-anchor="middle" style="fill:var(--muted);font-size:12px">fetch never runs</text>
+    <line x1="150" y1="56" x2="188" y2="56" style="stroke:var(--muted)" marker-end="url(#st6-arr)"/>
+    <line x1="330" y1="56" x2="368" y2="56" style="stroke:var(--muted)" marker-end="url(#st6-arr)"/>
+    <text x="10" y="124" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">NETWORK MOCK (MSW)</text>
+    <rect x="10" y="136" width="140" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="80" y="161" text-anchor="middle" style="fill:var(--ink);font-size:13px">Component</text>
+    <rect x="190" y="136" width="140" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="260" y="161" text-anchor="middle" style="fill:var(--ink);font-size:13px">useMutation</text>
+    <rect x="370" y="136" width="160" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="450" y="161" text-anchor="middle" style="fill:var(--ink);font-size:13px">real api.ts + fetch</text>
+    <rect x="570" y="136" width="140" height="40" rx="8" style="fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:5 3"/><text x="640" y="161" text-anchor="middle" style="fill:var(--ink);font-size:13px">MSW handler</text>
+    <line x1="150" y1="156" x2="188" y2="156" style="stroke:var(--muted)" marker-end="url(#st6-arr)"/>
+    <line x1="330" y1="156" x2="368" y2="156" style="stroke:var(--muted)" marker-end="url(#st6-arr)"/>
+    <line x1="530" y1="156" x2="568" y2="156" style="stroke:var(--muted)" marker-end="url(#st6-arr)"/>
+    <text x="360" y="202" text-anchor="middle" style="fill:var(--muted);font-size:12px">Dashed box = the fake. The further right it sits, the more of your real code the test exercises.</text>
+  </svg>
+
+  <script type="text/x-code" data-lang="ts" data-title="test/handlers.ts (MSW v2 style)">
+import { http, HttpResponse } from 'msw';
+
+let assignments = [{ id: 'a1', title: 'Frog and Toad', due: '2026-03-12' }];
+
+export const handlers = [
+  http.get('/api/classes/:classId/assignments', () => {
+    return HttpResponse.json(assignments);
+  }),
+  http.post('/api/classes/:classId/assignments', async ({ request }) => {
+    const body = (await request.json()) as { title: string; due: string };
+    const created = { id: `a${assignments.length + 1}`, ...body };
+    assignments = [...assignments, created];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+];
+</script>
+  <script type="text/x-code" data-lang="ts" data-title="test/setup.ts">
+import { afterAll, afterEach, beforeAll } from 'vitest';
+import { setupServer } from 'msw/node';
+import { handlers } from './handlers';
+
+export const server = setupServer(...handlers);
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));  // fail on surprise requests
+afterEach(() => server.resetHandlers());                           // undo per-test overrides
+afterAll(() => server.close());
+</script>
+  <p>(A real setup would also reset the in-memory <code>assignments</code> between tests, for example by building handlers from a fresh data factory each time.) For one test, you can override a handler to simulate a failure, which is how you test the error state:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="testing the error path">
+it('shows an error and keeps the dialog open if saving fails', async () => {
+  server.use(
+    http.post('/api/classes/:classId/assignments', () => {
+      return HttpResponse.json({ message: 'Class is archived' }, { status: 409 });
+    }),
+  );
+  // ...same steps as before, then:
+  expect(await screen.findByRole('alert')).toHaveTextContent('Class is archived');
+  expect(screen.getByRole('dialog', { name: 'Assign reading' })).toBeInTheDocument();
+});
+</script>
+  <p>Module mocks still have a place: for things that aren't the network and are awkward in tests, like an analytics SDK, a feature-flag client, or a heavy chart library. Rule of thumb: <b>mock at the boundary of your system, not in the middle of it.</b></p>
+
+  <h2>7. Async UI: findBy and waitFor</h2>
+  <p>Most UI bugs in tests come from timing. The click happens, the request goes out, and the list updates <em>a few milliseconds later</em>. If you check immediately, the text isn't there yet. RTL gives you three families of queries:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Query</th><th>If not found</th><th>Use it for</th></tr>
+    <tr><td><code>getBy…</code></td><td>Throws immediately</td><td>Things that should already be on screen</td></tr>
+    <tr><td><code>queryBy…</code></td><td>Returns <code>null</code></td><td>Asserting something is <em>absent</em></td></tr>
+    <tr><td><code>findBy…</code></td><td>Retries until found or timeout (1s by default), returns a promise</td><td>Things that appear after async work</td></tr>
+  </table></div>
+  <p><code>waitFor(() =&gt; …)</code> is the general version: it re-runs a callback until it stops throwing. Use it for assertions that aren't "find an element", for example waiting for a button to become enabled.</p>
+  <div class="ba"><div><span>Flaky</span><pre>await user.click(assign);
+await new Promise(r =&gt; setTimeout(r, 500));
+expect(screen.getByText('Due tomorrow'))</pre></div><i>→</i><div><span>Reliable</span><pre>await user.click(assign);
+expect(await screen.findByText('Due tomorrow'))
+  .toBeInTheDocument();</pre></div></div>
+  <p>Don't put side effects (like clicks) inside <code>waitFor</code>, since it may run them many times. And when you see the "not wrapped in act(...)" warning, it almost always means something updated after your test stopped waiting. The fix is to <code>await</code> the thing that causes it, not to sprinkle <code>act</code>.</p>
+
+  <h2>8. What NOT to test</h2>
+  <p>Knowing what to skip is half of a good strategy. Don't write tests for:</p>
+  <ul>
+    <li><b>Implementation details:</b> internal state values, which hook was called, a component's private helper functions, CSS class names.</li>
+    <li><b>Libraries you didn't write:</b> that TanStack Query caches, that React re-renders, that Radix's dialog traps focus. Trust them; test your use of them.</li>
+    <li><b>Things TypeScript already guarantees:</b> "it accepts a string prop".</li>
+    <li><b>Snapshot tests of large component trees.</b> A 400-line snapshot changes with every markup tweak, people approve the diff without reading it, and it ends up proving nothing. Small, targeted snapshots (a serialised config object, an error message) are fine.</li>
+    <li><b>Trivial code:</b> a component that just renders its children with a class name.</li>
+  </ul>
+
+  <h2>9. End-to-end with Playwright, for critical flows only</h2>
+  <p>Integration tests fake the server. Something still has to prove the real pieces connect: auth cookies, the real API's validation, the database, the student's screen updating. That's e2e. <b>Playwright</b> drives real Chromium, Firefox and WebKit browsers. Its locators mirror RTL's philosophy (<code>getByRole</code>, <code>getByLabel</code>), and its assertions <b>auto-wait and retry</b>, which removes most timing problems.</p>
+  <script type="text/x-code" data-lang="ts" data-title="e2e/assign-reading.spec.ts">
+import { expect, test } from '@playwright/test';
+
+test('teacher assigns a reading and the student sees it', async ({ browser }) => {
+  // two separate logged-in sessions, saved by a setup step
+  const teacher = await browser.newPage({ storageState: 'e2e/.auth/teacher.json' });
+  const student = await browser.newPage({ storageState: 'e2e/.auth/student.json' });
+
+  await teacher.goto('/classes/room-12');
+  await teacher.getByRole('button', { name: 'Assign reading' }).click();
+  const dialog = teacher.getByRole('dialog', { name: 'Assign reading' });
+  await dialog.getByLabel('Book').selectOption('Charlotte’s Web');
+  await dialog.getByLabel('Due date').fill('2026-03-11');
+  await dialog.getByRole('button', { name: 'Assign' }).click();
+  await expect(teacher.getByRole('list', { name: 'Assignments' })).toContainText('Charlotte’s Web');
+
+  await student.goto('/home');
+  await expect(student.getByText('Charlotte’s Web')).toBeVisible();
+});
+</script>
+  <p>Keep e2e tests few and focused on the flows that would be a disaster if broken: sign in, start a reading session, save a session's results, assign reading, generate a district report. Each one is slow (seconds) and has many reasons to fail, so a suite of 30 well-chosen e2e tests is worth more than 300 that nobody trusts. Give each test its own data (a fresh class seeded by an API call) so tests don't step on each other.</p>
+
+  <h2>10. Visual regression and accessibility checks</h2>
+  <p><b>Visual regression testing</b> takes a screenshot of a component or page and compares it pixel by pixel with an approved "baseline" image. It catches what functional tests can't: a token change that makes every button 2px taller, a z-index bug that hides the dialog's footer. Playwright can do this with screenshot assertions; hosted services such as Chromatic run it on every Storybook story. It's most valuable for a design system, where one change affects hundreds of screens. Cost: you must render consistently (fonts, animations off, fixed data), and someone has to review diffs.</p>
+  <p><b>Automated accessibility checks</b> run a rules engine (almost always <b>axe-core</b>) over rendered HTML to find missing labels, bad contrast, invalid ARIA and so on. You can run it inside component tests or in Playwright on key pages, and fail the build on new violations. Be clear about its limits: automated tools catch a meaningful share of issues, but not all. They can't tell you if focus order makes sense or if a screen-reader announcement is understandable. For a schools product with accessibility obligations, pair automated checks with periodic manual keyboard and screen-reader passes.</p>
+
+  <h2>11. Flaky tests and how to kill them</h2>
+  <p>A <b>flaky test</b> passes and fails on the same code. It's worse than no test: each failure costs someone 20 minutes of "is this real?", and once a team learns to hit "re-run", real failures get re-run too.</p>
+  <p>The usual causes, and the fix for each:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Cause</th><th>Symptom</th><th>Fix</th></tr>
+    <tr><td>Fixed sleeps / not waiting</td><td>Fails on slow CI machines</td><td><code>findBy</code>, <code>waitFor</code>, Playwright's auto-waiting <code>expect</code></td></tr>
+    <tr><td>Shared state between tests</td><td>Passes alone, fails in the full run (or in a different order)</td><td>Fresh QueryClient, reset MSW handlers and data, unique seeded data per e2e test</td></tr>
+    <tr><td>Real time and dates</td><td>Fails at midnight, on the 31st, in another time zone</td><td>Pass <code>now</code> in, use fake timers, pin the test time zone</td></tr>
+    <tr><td>Real network / third parties</td><td>Fails when a service is slow</td><td>MSW in integration tests; stub third parties in e2e</td></tr>
+    <tr><td>Animations and random data</td><td>Clicks land mid-transition; screenshots differ</td><td>Disable animations in test mode; seed random generators</td></tr>
+  </table></div>
+  <p>The team policy matters as much as the fixes: <b>track flaky tests, quarantine them quickly</b> (skip them with a ticket and an owner, so they stop blocking everyone), <b>and fix or delete them within a set time</b>. Most CI systems and Playwright's reports can flag tests that passed only on retry. Retries in CI are a reasonable safety valve, but only if "passed on retry" is reported and reviewed, not hidden.</p>
+
+  <h2>12. How a staff engineer approaches this</h2>
+  <p>A staff engineer doesn't ask "what's our coverage number?" first. They ask:</p>
+  <ul>
+    <li><b>Where do our bugs actually come from?</b> Look at the last 20 production incidents. If most were "form sent the wrong payload" or "list didn't refresh", invest in integration tests. If most were "deploy broke login", invest in a few e2e smoke tests. If most were "the API changed shape", invest in typed API contracts.</li>
+    <li><b>What would be a disaster?</b> List the five or so critical user journeys. Those get e2e coverage, and they run on every merge.</li>
+    <li><b>What's slowing people down?</b> If the suite takes 25 minutes or flakes daily, people stop trusting it. Speed and reliability of the suite are features.</li>
+    <li><b>What do we write by default?</b> A team needs a default so every PR doesn't relitigate it. For Lexi: "New UI features ship with RTL integration tests for the main path and the main error path, using MSW. Pure logic with edge cases gets unit tests. New critical journeys get one Playwright test."</li>
+  </ul>
+  <p>Trade-offs, stated plainly:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Choice</th><th>Gives you</th><th>At the cost of</th><th>Choose it when</th></tr>
+    <tr><td>Unit tests</td><td>Speed, precise failures</td><td>No proof pieces work together; can lock in internals</td><td>Pure logic with many edge cases (dates, scoring, permissions)</td></tr>
+    <tr><td>Integration (RTL + MSW)</td><td>High confidence per test, survives refactors</td><td>Slower than unit; fake server can drift from real API</td><td>Most UI features; the default</td></tr>
+    <tr><td>E2E (Playwright)</td><td>Proof the real system works end to end</td><td>Slow, more flake risk, harder to debug</td><td>A handful of critical journeys</td></tr>
+    <tr><td>Visual regression</td><td>Catches styling regressions nothing else sees</td><td>Baseline upkeep and diff review</td><td>Design systems and brand-critical pages</td></tr>
+    <tr><td>Coverage gate (e.g. 80%)</td><td>A floor that stops untested code creeping in</td><td>Encourages shallow tests written to hit the number</td><td>As a ratchet ("don't go down"), not a target</td></tr>
+  </table></div>
+  <p><b>On coverage:</b> line coverage tells you which code ran during tests, not whether anything checked the result. It's useful for finding <em>untested areas</em> (the reports module is at 12%, why?), and as a ratchet so it doesn't fall. It's harmful as a target, because people then write tests that execute code without asserting anything meaningful. A staff engineer sets coverage expectations by risk: billing, permissions, and the scoring that decides a student's reading level deserve close to full coverage of their branches; a marketing page deserves little.</p>
+  <p>Finally, the drift problem: MSW handlers are hand-written guesses about the API. If the API is described by a schema (OpenAPI, or shared TypeScript types from the backend), generate the handlers' types from it, so a backend change that breaks the frontend shows up as a type error in the tests.</p>
+
+  <h2>13. Common mistakes</h2>
+  <ul>
+    <li><b>Testing implementation details</b>, so every refactor turns the suite red without any real bug.</li>
+    <li><b>Mocking everything</b>, including your own API layer and child components, until the test only proves the mocks agree with each other.</li>
+    <li><b>Using <code>getByTestId</code> for everything</b>, missing the free accessibility check that role queries give you.</li>
+    <li><b>Fixed sleeps</b> instead of <code>findBy</code>/<code>waitFor</code>/auto-waiting assertions.</li>
+    <li><b>Hundreds of e2e tests</b> covering every form validation message, which belong in integration tests.</li>
+    <li><b>Chasing a coverage percentage</b> instead of covering the risky paths and the error states.</li>
+    <li><b>Living with flaky tests</b> and normalising "just re-run it".</li>
+    <li><b>Only testing the happy path.</b> The error state, the empty state and the loading state are where real users get stuck.</li>
+  </ul>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"I'd put most of our effort into integration tests with React Testing Library, querying by role and label so the tests read like the user story and survive refactors. I'd mock the network with MSW rather than mocking our own modules, so the real data layer runs. Pure logic like due-date formatting gets table-driven unit tests. Then a small set of Playwright tests for the critical journeys, assign reading and complete a session, against a seeded backend. I'd add axe checks on key pages and visual regression on the design system. I'd treat coverage as a ratchet, not a target, and have a quarantine-and-fix policy for flaky tests so the suite stays trusted."</p></div>
+
+  <h2>14. Recap</h2>
+  <ul>
+    <li>Tests buy confidence to change code. A good test fails when something real breaks and only then.</li>
+    <li>Pyramid: mostly unit. Trophy: static checks plus mostly integration. Put the bulk where your bugs live.</li>
+    <li>RTL: find by role, label, text; act with <code>userEvent</code>; assert on what the user sees.</li>
+    <li>Mock at the edge (MSW for the network), not in the middle (your own modules).</li>
+    <li>Async: <code>findBy</code> and <code>waitFor</code>, never sleeps. <code>queryBy</code> for "is not there".</li>
+    <li>Few Playwright e2e tests, for critical journeys only. Add visual and axe checks where they pay off.</li>
+    <li>Kill flakes fast: isolate state, control time, quarantine with an owner. Coverage is a ratchet, set by risk.</li>
+  </ul>
+
+  <details class="details"><summary>Check yourself</summary><div>
+    <p><b>1. The "Due Fri" label shows "Due Sat" for teachers in Hawaii. Which test catches it?</b><br>A unit test of <code>formatDueLabel</code> with the time zone pinned, plus a case near midnight. That's pure logic with edge cases.</p>
+    <p><b>2. Why is <code>expect(handleSubmit).toHaveBeenCalled()</code> weaker than checking the list?</b><br>It proves an internal function ran, not that the user sees the result. It also breaks if you rename or restructure the handler.</p>
+    <p><b>3. A test passes alone but fails in the full suite. First suspect?</b><br>Shared state: a QueryClient, MSW data or a database row reused between tests.</p>
+    <p><b>4. Should "Book is required" validation get an e2e test?</b><br>No. It's an integration-level behaviour; cover it with RTL. Save e2e for journeys that cross the real system.</p>
+  </div></details>
+</template>

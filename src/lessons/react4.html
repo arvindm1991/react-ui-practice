@@ -1,0 +1,230 @@
+<template id="tpl-effects">
+  <h1>Effects and loading data</h1>
+  <p class="lede">Everything so far happens inside React: render, respond to events, render again. Effects are for the moments you need to reach <em>outside</em> React: load data from a server, start a timer, listen to the keyboard, measure an element. They're also the most misused hook, so this lesson is as much about when <em>not</em> to use one.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Say exactly when an effect runs, and control it with the dependency array</li>
+    <li>Write cleanup, and explain what happens without it</li>
+    <li>Load data with loading, error and empty states, without race conditions</li>
+    <li>Spot an effect that shouldn't exist</li>
+  </ul></div>
+
+  <h2>1. What an effect is for</h2>
+  <p>Your component function should be pure: given the same props and state, it returns the same JSX and does nothing else. No network calls, no timers, no touching the page. React may call it many times.</p>
+  <p>But apps need side effects. <code>useEffect</code> is the designated place for them: "after you've rendered and updated the screen, run this code". Use an effect to <b>synchronize your component with something outside React</b>:</p>
+  <ul>
+    <li>A server: fetch data when the component appears, or when a filter changes</li>
+    <li>A timer: <code>setInterval</code>, <code>setTimeout</code></li>
+    <li>A browser API: a <code>keydown</code> listener on <code>window</code>, an IntersectionObserver, <code>localStorage</code>, focusing an element</li>
+  </ul>
+
+  <h2>2. When an effect runs</h2>
+  <script type="text/x-code" data-lang="jsx" data-title="anatomy">
+useEffect(() => {
+  // runs AFTER the render is on screen
+  return () => {
+    // optional cleanup: runs before the effect runs again, and when the component goes away
+  };
+}, [dependencies]);
+</script>
+  <p>The second argument, the <b>dependency array</b>, decides when it runs again:</p>
+  <div class="table-wrap"><table>
+    <tr><th>You write</th><th>It runs</th><th>Use it for</th></tr>
+    <tr><td><code>useEffect(fn, [])</code></td><td>Once, after the first render</td><td>Load data on page load, set up a global listener</td></tr>
+    <tr><td><code>useEffect(fn, [range, query])</code></td><td>After the first render, then again after any render where <code>range</code> or <code>query</code> changed</td><td>Refetch when a filter changes</td></tr>
+    <tr><td><code>useEffect(fn)</code> (no array)</td><td>After every single render</td><td>Rarely what you want</td></tr>
+  </table></div>
+  <p>React decides "changed" by comparing each dependency with its value from the previous render using <code>===</code>. Watch the order of events here:</p>
+  <script type="text/x-play" data-title="Render, then effect" data-h="330">
+import { useEffect, useState } from 'react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  const [other, setOther] = useState(0);
+  console.log('render: count =', count, 'other =', other);
+
+  useEffect(() => {
+    console.log('  effect [] ran (only once)');
+  }, []);
+
+  useEffect(() => {
+    console.log('  effect [count] ran, count =', count);
+  }, [count]);
+
+  return (
+    <div>
+      <button onClick={() => setCount((c) => c + 1)}>count: {count}</button>{' '}
+      <button onClick={() => setOther((o) => o + 1)}>other: {other}</button>
+    </div>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Read the first lines of the console: render first, then both effects.</li>
+    <li>Click "count": render, then only the <code>[count]</code> effect. Click "other": render, and no effects at all, because neither dependency changed.</li>
+    <li>Add <code>other</code> to the second effect's array: <code>[count, other]</code>. Now it runs for both buttons.</li>
+  </ol></div>
+
+  <h2>3. Cleanup</h2>
+  <p>If your effect starts something that keeps going (a timer, a listener, a subscription, a request), you need to stop it. Return a function from the effect, and React calls it at two moments: <b>before the effect runs again</b>, and <b>when the component is removed</b>. Without cleanup, things pile up: two timers, then three; listeners firing for components that no longer exist.</p>
+  <script type="text/x-play" data-title="A timer with and without cleanup" data-h="380">
+import { useEffect, useState } from 'react';
+
+function Clock() {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    console.log('start timer');
+    const id = setInterval(() => {
+      console.log('tick');
+      setSeconds((s) => s + 1);
+    }, 1000);
+
+    return () => {
+      console.log('cleanup: stop timer');
+      clearInterval(id);
+    };
+  }, []);
+
+  return <p>Open for {seconds}s</p>;
+}
+
+export default function App() {
+  const [show, setShow] = useState(true);
+  return (
+    <div>
+      <button onClick={() => setShow((s) => !s)}>{show ? 'Hide' : 'Show'} clock</button>
+      {show && <Clock />}
+    </div>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Watch it tick, then click "Hide clock". The cleanup logs and the ticks stop.</li>
+    <li>Delete the whole <code>return () =&gt; {…}</code> block. Now hide the clock: "tick" keeps logging forever for a component that's gone. Show and hide a few times and the ticks multiply. That's a leak.</li>
+  </ol></div>
+  <p>Note <code>setSeconds(s =&gt; s + 1)</code>: the updater form. With <code>setSeconds(seconds + 1)</code>, the interval would forever see the <code>seconds</code> from the first render (0), and the clock would be stuck at 1. That's a <b>stale closure</b>, explained in section 6.</p>
+
+  <h2>4. Loading data, step by step</h2>
+  <p>This is the effect you'll write in every interview. Build it up in this order:</p>
+  <ol>
+    <li><b>State for each thing the UI can show</b>: the data, whether it's loading, and an error. A single <code>status</code> string (<code>'loading' | 'error' | 'success'</code>) is cleaner than several booleans, because it can't be "loading and error at the same time".</li>
+    <li><b>An effect that starts the request.</b> The effect function itself can't be <code>async</code>: an async function returns a Promise, and React expects either nothing or a cleanup function. So either use <code>.then()</code>, or define an async function inside the effect and call it.</li>
+    <li><b>Handle failure</b> with <code>.catch()</code> or <code>try/catch</code>.</li>
+    <li><b>Guard against stale responses</b> with a cleanup flag (next section).</li>
+    <li><b>Render each status</b>: skeleton, error with retry, empty, and the data.</li>
+  </ol>
+  <script type="text/x-play" data-title="The data-loading pattern" data-h="560" data-ph="200">
+import { useEffect, useState } from 'react';
+
+// Pretend server: slow, and fails sometimes
+function fetchProjects() {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (Math.random() < 0.3) reject(new Error('503 Service Unavailable'));
+      else resolve([{ id: 1, name: 'Docs search' }, { id: 2, name: 'Billing' }]);
+    }, 800);
+  });
+}
+
+export default function App() {
+  const [status, setStatus] = useState('loading');
+  const [projects, setProjects] = useState([]);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);   // bump this to refetch
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('loading');
+
+    async function load() {
+      try {
+        const data = await fetchProjects();
+        if (cancelled) return;
+        setProjects(data);
+        setStatus('success');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.message);
+        setStatus('error');
+      }
+    }
+    load();
+
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  if (status === 'loading') return <p>Loading projects…</p>;
+  if (status === 'error') {
+    return (
+      <div>
+        <p className="err">{error}</p>
+        <button onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+      </div>
+    );
+  }
+  if (projects.length === 0) return <p>No projects yet.</p>;
+  return <ul>{projects.map((p) => <li key={p.id}>{p.name}</li>)}</ul>;
+}
+/*** css ***/
+.err { color: #B42318; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click <b>Run again</b> in the bar until you get the error state (30% chance), then click "Try again". Retry works by changing a dependency, so the effect runs again.</li>
+    <li>Change <code>0.3</code> to <code>1</code> to force errors while building the error UI, and change the resolved array to <code>[]</code> to see the empty state. Forcing each state like this is a good habit in the interview.</li>
+  </ol></div>
+
+  <h2>5. Race conditions, and why the cancelled flag exists</h2>
+  <p>Imagine a search box where each keystroke changes <code>query</code>, and an effect with <code>[query]</code> fetches results. You type "s", then "sa". Two requests are now in flight. If the request for "s" is slower and finishes <em>last</em>, it overwrites the results for "sa". The screen shows the wrong results for what's in the box.</p>
+  <p>The cleanup fixes it. When <code>query</code> changes, React runs the previous effect's cleanup <em>before</em> starting the new one, which sets that old effect's <code>cancelled = true</code>. When the slow "s" response finally arrives, it checks its own <code>cancelled</code> flag, sees <code>true</code>, and does nothing. Each effect run has its own variable, which is what makes this work.</p>
+  <p>With the real <code>fetch</code>, you can go one step further and actually cancel the network request with an <code>AbortController</code>:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="fetch with AbortController">
+useEffect(() => {
+  const controller = new AbortController();
+  fetch(`/api/search?q=${query}`, { signal: controller.signal })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);   // fetch doesn't throw on 404/500
+      return res.json();
+    })
+    .then(setResults)
+    .catch((err) => {
+      if (err.name !== 'AbortError') setError(err.message);  // aborting is not a real error
+    });
+  return () => controller.abort();
+}, [query]);
+</script>
+  <p>Note that <code>fetch</code> only rejects on network failures. A 404 or 500 still resolves, so check <code>res.ok</code> yourself.</p>
+
+  <h2>6. Dependencies and stale closures</h2>
+  <p>A function "closes over" the variables around it when it's created: it remembers the values from that render. An effect created during the render where <code>count</code> was 0 sees 0 forever, unless it's re-created. Listing <code>count</code> in the dependency array is how you tell React "re-create and re-run this effect when <code>count</code> changes, so it sees the new value".</p>
+  <p>So the rule is: <b>every value from the component that the effect uses (props, state, functions defined in the component) goes in the dependency array.</b> Leaving one out doesn't save work; it creates a bug where the effect uses old data. Setter functions from <code>useState</code> never change, so they can be left out.</p>
+  <h3>Infinite loops</h3>
+  <p>Two common causes. An effect that sets a state variable that's also in its own dependency array: it runs, changes the dependency, so it runs again, forever. Or an object or array created during render in the dependency array (<code>[{ page: 1 }]</code>): it's a new object every render, so <code>===</code> always says "changed". Depend on the primitive values instead (<code>[page]</code>).</p>
+
+  <h2>7. You might not need an effect</h2>
+  <p>The single most common misuse is using an effect to keep one piece of state in sync with another:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="don't, then do">
+// ✗ Extra state + effect: renders twice, and briefly shows stale data
+const [filtered, setFiltered] = useState([]);
+useEffect(() => {
+  setFiltered(items.filter((i) => i.name.includes(query)));
+}, [items, query]);
+
+// ✓ Just calculate it during render
+const filtered = items.filter((i) => i.name.includes(query));
+</script>
+  <p>The other misuse is reacting to a user action in an effect. If something should happen <em>because the user clicked</em>, do it in the click handler. Effects are for "because the component is showing", not "because the user did X".</p>
+  <p>Quick test: if you can describe the effect as "when A changes, set B", B should almost certainly be calculated, not stored.</p>
+
+  <h2>8. Why does my effect run twice?</h2>
+  <p>If the codebase wraps the app in <code>&lt;React.StrictMode&gt;</code> (common in the generated <code>index.js</code>), React deliberately mounts every component, unmounts it, and mounts it again in development. Effects run, clean up, and run again. It's a stress test for missing cleanup, it doesn't happen in production, and with correct cleanup it's harmless. If you see two "fetching" logs in the interview, that's probably why, and saying so is a good signal.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Effect runs in a loop</b><p>It sets state that's in its own dependencies, or depends on an object/array created during render.</p></div>
+  <div class="mistake"><b>Effect sees old values</b><p>A dependency is missing from the array, or a timer uses state directly instead of the updater form.</p></div>
+  <div class="mistake"><b><code>useEffect(async () =&gt; …)</code></b><p>Not allowed. Define an async function inside and call it.</p></div>
+  <div class="mistake"><b>Old results overwrite new ones</b><p>No cancelled flag or AbortController.</p></div>
+
+  <p>Practice: <b>Orders with loading states</b>.</p>
+  <div data-exs="d5"></div>
+  <div data-quiz="r4"></div>
+</template>

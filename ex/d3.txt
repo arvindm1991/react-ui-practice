@@ -1,0 +1,177 @@
+@@@ shared src/data.js
+export const people = [
+  { id: 'u1', name: 'Ada Lovelace', email: 'ada@example.com', team: 'Research' },
+  { id: 'u2', name: 'Grace Hopper', email: 'grace@example.com', team: 'Platform' },
+  { id: 'u3', name: 'Alan Turing', email: 'alan@example.com', team: 'Research' },
+  { id: 'u4', name: 'Katherine Johnson', email: 'katherine@example.com', team: 'Applied' },
+  { id: 'u5', name: 'Linus Pauling', email: 'linus@example.com', team: 'Platform' },
+  { id: 'u6', name: 'Margaret Hamilton', email: 'margaret@example.com', team: 'Applied' },
+  { id: 'u7', name: 'Claude Shannon', email: 'shannon@example.com', team: 'Research' },
+];
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 560px; padding: 24px; }
+h1 { margin: 0 0 16px; font-size: 22px; }
+
+.controls { display: flex; gap: 8px; }
+.search, .select {
+  height: 36px;
+  border: 1px solid #D5D9E0;
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+}
+.search { flex: 1; min-width: 0; }
+.search:focus, .select:focus { outline: 2px solid #3451D1; outline-offset: -1px; }
+
+.count { margin: 12px 0 8px; font-size: 13px; color: #5A6273; }
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #E2E5EA;
+  border-radius: 10px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 10px 14px;
+}
+.row + .row { border-top: 1px solid #EEF0F3; }
+.name { font-size: 14px; font-weight: 600; }
+.email { grid-column: 1; font-size: 13px; color: #5A6273; }
+.team {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #EEF1FA;
+  color: #3451D1;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #D5D9E0;
+  border-radius: 10px;
+  color: #5A6273;
+}
+.empty p { margin: 0 0 12px; }
+.empty button {
+  border: 1px solid #D5D9E0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+import { people } from './data';
+
+export default function App() {
+  // TODO: make the search box filter the list.
+  // TODO: add the team dropdown, the "Showing X of Y" count and the empty state.
+  return (
+    <div className="page">
+      <h1>Directory</h1>
+      <div className="controls">
+        <input className="search" placeholder="Search by name or email" />
+      </div>
+      <ul className="list">
+        {people.map((p) => (
+          <li key={p.id} className="row">
+            <div className="name">{p.name}</div>
+            <div className="email">{p.email}</div>
+            <span className="team">{p.team}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+@@@ solution src/App.jsx
+import React, { useState } from 'react';
+import { people } from './data';
+
+const TEAMS = ['All', 'Research', 'Platform', 'Applied'];
+
+export default function App() {
+  // State holds only what the user controls.
+  const [query, setQuery] = useState('');
+  const [team, setTeam] = useState('All');
+
+  // Derived data: computed on every render, never stored in state.
+  const q = query.trim().toLowerCase();
+  const visible = people.filter((p) => {
+    const matchesQuery =
+      q === '' ||
+      p.name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q);
+    const matchesTeam = team === 'All' || p.team === team;
+    return matchesQuery && matchesTeam;
+  });
+
+  function clearFilters() {
+    setQuery('');
+    setTeam('All');
+  }
+
+  return (
+    <div className="page">
+      <h1>Directory</h1>
+
+      <div className="controls">
+        <input
+          className="search"
+          placeholder="Search by name or email"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select className="select" value={team} onChange={(e) => setTeam(e.target.value)}>
+          {TEAMS.map((t) => (
+            <option key={t} value={t}>
+              {t === 'All' ? 'All teams' : t}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <p className="count">
+        Showing {visible.length} of {people.length}
+      </p>
+
+      {visible.length === 0 ? (
+        <div className="empty">
+          <p>No people match your filters.</p>
+          <button onClick={clearFilters}>Clear filters</button>
+        </div>
+      ) : (
+        <ul className="list">
+          {visible.map((p) => (
+            <li key={p.id} className="row">
+              <div className="name">{p.name}</div>
+              <div className="email">{p.email}</div>
+              <span className="team">{p.team}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

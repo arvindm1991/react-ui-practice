@@ -1,0 +1,619 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Country = {
+  code: string;  // ISO code, unique
+  name: string;
+  flag: string;  // emoji
+};
+
+const COUNTRIES: Country[] = [
+  { code: 'AR', name: 'Argentina', flag: '🇦🇷' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'AT', name: 'Austria', flag: '🇦🇹' },
+  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'CL', name: 'Chile', flag: '🇨🇱' },
+  { code: 'CN', name: 'China', flag: '🇨🇳' },
+  { code: 'CO', name: 'Colombia', flag: '🇨🇴' },
+  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
+  { code: 'EG', name: 'Egypt', flag: '🇪🇬' },
+  { code: 'FI', name: 'Finland', flag: '🇫🇮' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'GR', name: 'Greece', flag: '🇬🇷' },
+  { code: 'IS', name: 'Iceland', flag: '🇮🇸' },
+  { code: 'IN', name: 'India', flag: '🇮🇳' },
+  { code: 'ID', name: 'Indonesia', flag: '🇮🇩' },
+  { code: 'IE', name: 'Ireland', flag: '🇮🇪' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: 'KE', name: 'Kenya', flag: '🇰🇪' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  { code: 'MA', name: 'Morocco', flag: '🇲🇦' },
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
+  { code: 'PE', name: 'Peru', flag: '🇵🇪' },
+  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'ZA', name: 'South Africa', flag: '🇿🇦' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
+  { code: 'TH', name: 'Thailand', flag: '🇹🇭' },
+  { code: 'TR', name: 'Turkey', flag: '🇹🇷' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'VN', name: 'Vietnam', flag: '🇻🇳' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /countries -> Country[] (sorted by name)
+export async function getCountries(): Promise<Country[]> {
+  await randomDelay(400, 1000);
+  return COUNTRIES.map((c) => ({ ...c }));
+}
+@@@ shared src/components/FormField.tsx
+import React from 'react';
+
+type FormFieldProps = {
+  id: string;          // the id of the control, so the label points at it
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+};
+
+// Label + optional hint + control. The label element has id `${id}-label`.
+export default function FormField({ id, label, hint, children }: FormFieldProps) {
+  let hintEl = null;
+  if (hint) {
+    hintEl = <p className="field-hint" id={id + '-hint'}>{hint}</p>;
+  }
+  return (
+    <div className="field">
+      <label className="field-label" id={id + '-label'} htmlFor={id}>{label}</label>
+      {hintEl}
+      {children}
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCountries } from './api';
+import type { Country } from './api';
+import FormField from './components/FormField';
+
+function Steps() {
+  const steps = ['Applicant', 'Travel history', 'Documents', 'Review'];
+  return (
+    <ol className="steps">
+      {steps.map((s, i) => {
+        let cls = 'step';
+        if (i === 1) {
+          cls = 'step is-current';
+        } else if (i < 1) {
+          cls = 'step is-done';
+        }
+        return <li key={s} className={cls}><span className="step-num">{i + 1}</span>{s}</li>;
+      })}
+    </ol>
+  );
+}
+
+export default function App() {
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [purpose, setPurpose] = useState('Tourism');
+  // TODO: replace the native <select> with an accessible combobox
+  const [visited, setVisited] = useState('');
+  const [submitted, setSubmitted] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getCountries().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setCountries(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitted('Saved. Purpose: ' + purpose + '. Countries: ' + (visited || 'none'));
+  }
+
+  let placeholder = 'Select a country';
+  if (loading) {
+    placeholder = 'Loading countries…';
+  }
+
+  let savedEl = null;
+  if (submitted) {
+    savedEl = <p className="saved" role="status">{submitted}</p>;
+  }
+
+  return (
+    <div className="app">
+      <header className="brand-bar"><span className="logo">✈ passage</span><span className="app-sub">Visa application · UK Standard Visitor</span></header>
+      <main className="card">
+        <Steps />
+        <h1>Travel history</h1>
+        <p className="lede">Tell us where you have been in the last 2 years. This helps us process your application faster.</p>
+        <form onSubmit={handleSubmit}>
+          <FormField id="purpose" label="Purpose of visit">
+            <select id="purpose" className="input" value={purpose} onChange={(e) => { setPurpose(e.target.value); }}>
+              <option>Tourism</option>
+              <option>Business</option>
+              <option>Visiting family</option>
+            </select>
+          </FormField>
+          <FormField id="visited" label="Countries visited" hint="Start typing to search.">
+            <select id="visited" className="input" disabled={loading} value={visited} onChange={(e) => { setVisited(e.target.value); }}>
+              <option value="">{placeholder}</option>
+              {countries.map((c) => {
+                return <option key={c.code} value={c.name}>{c.flag} {c.name}</option>;
+              })}
+            </select>
+          </FormField>
+          <div className="actions">
+            <button type="button" className="btn-secondary">Back</button>
+            <button type="submit" className="btn-primary">Save and continue</button>
+          </div>
+          {savedEl}
+        </form>
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #EEF5F7;
+  --surface: #FFFFFF;
+  --line: #D6E3E8;
+  --text: #0F2A36;
+  --muted: #5A7380;
+  --primary: #0B7A8C;
+  --primary-dark: #075E6C;
+  --primary-soft: #E2F3F5;
+  --focus: #F2A900;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { min-height: 100vh; padding-bottom: 40px; }
+.brand-bar { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 24px; background: var(--primary-dark); color: #fff; }
+.logo { font-weight: 800; font-size: 18px; letter-spacing: 0.01em; }
+.app-sub { font-size: 13px; opacity: 0.8; }
+
+.card { max-width: 620px; margin: 28px auto 0; padding: 28px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(15, 42, 54, 0.06); }
+.card h1 { margin: 18px 0 6px; font-size: 24px; }
+.lede { margin: 0 0 22px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+
+.steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.step { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--bg); }
+.step-num { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #fff; font-weight: 700; }
+.step.is-done .step-num { background: var(--primary); color: #fff; }
+.step.is-current { background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; }
+.step.is-current .step-num { background: var(--primary-dark); color: #fff; }
+
+.field { margin-bottom: 20px; }
+.field-label { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; }
+.field-hint { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.input { width: 100%; height: 44px; padding: 0 12px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; font: inherit; font-size: 15px; color: var(--text); }
+.input:focus { outline: 3px solid var(--focus); outline-offset: 0; border-color: var(--text); }
+
+.actions { display: flex; justify-content: space-between; margin-top: 28px; }
+.btn-primary, .btn-secondary { height: 44px; padding: 0 20px; border-radius: var(--radius); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-primary { border: 0; background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { border: 2px solid var(--line); background: #fff; color: var(--text); }
+.btn-primary:focus-visible, .btn-secondary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.saved { margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; background: var(--primary-soft); color: var(--primary-dark); font-size: 14px; }
+@@@ solution src/components/CountryCombobox.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import type { Country } from '../api';
+
+type Props = {
+  id: string;               // id of the input; the label from FormField points at it
+  countries: Country[];
+  loading: boolean;
+  selected: Country[];
+  onChange: (next: Country[]) => void;
+};
+
+// WAI-ARIA combobox pattern (search: "aria apg combobox listbox").
+// Focus stays on the input the whole time; aria-activedescendant tells
+// screen readers which option is "active".
+export default function CountryCombobox({ id, countries, loading, selected, onChange }: Props) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const listId = id + '-listbox';
+
+  // derived
+  const q = query.trim().toLowerCase();
+  const options = countries.filter((c) => {
+    return c.name.toLowerCase().includes(q);
+  });
+  const activeIndex = Math.min(active, options.length - 1); // -1 when nothing matches
+
+  // Keep the active option visible while arrowing through a long list.
+  useEffect(() => {
+    if (!open || activeIndex < 0 || !listRef.current) {
+      return;
+    }
+    const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
+    if (el) {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [open, activeIndex]);
+
+  function isSelected(c: Country): boolean {
+    return selected.some((s) => {
+      return s.code === c.code;
+    });
+  }
+
+  function toggle(c: Country) {
+    if (isSelected(c)) {
+      onChange(selected.filter((s) => {
+        return s.code !== c.code;
+      }));
+    } else {
+      onChange([...selected, c]);
+    }
+    setQuery('');
+    setActive(0);
+  }
+
+  function removeChip(c: Country) {
+    onChange(selected.filter((s) => {
+      return s.code !== c.code;
+    }));
+    if (inputRef.current) {
+      inputRef.current.focus(); // the chip button is about to disappear
+    }
+  }
+
+  // Clicking anywhere in the box (around the chips) focuses the input.
+  function focusInput() {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }
+
+  function clearAll() {
+    onChange([]);
+    setQuery('');
+    setOpen(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }
+
+  function handleInput(value: string) {
+    setQuery(value);
+    setOpen(true);
+    setActive(0);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const last = options.length - 1;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        setActive(0);
+      } else {
+        setActive(Math.min(activeIndex + 1, last));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        setActive(last);
+      } else {
+        setActive(Math.max(activeIndex - 1, 0));
+      }
+    } else if (e.key === 'Home' && open) {
+      e.preventDefault();
+      setActive(0);
+    } else if (e.key === 'End' && open) {
+      e.preventDefault();
+      setActive(last);
+    } else if (e.key === 'Enter') {
+      if (open && activeIndex >= 0) {
+        e.preventDefault(); // don't submit the form
+        toggle(options[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      if (open) {
+        e.preventDefault();
+        setOpen(false);
+      } else if (query) {
+        setQuery('');
+      }
+    } else if (e.key === 'Tab') {
+      setOpen(false); // let focus move on normally
+    } else if (e.key === 'Backspace') {
+      if (query === '' && selected.length > 0) {
+        onChange(selected.slice(0, -1));
+      }
+    }
+  }
+
+  // decisions
+  let activeId: string | undefined = undefined;
+  if (open && activeIndex >= 0) {
+    activeId = id + '-opt-' + options[activeIndex].code;
+  }
+
+  let placeholder = 'Search countries';
+  if (loading) {
+    placeholder = 'Loading countries…';
+  }
+
+  let clearBtn = null;
+  if (selected.length > 0 || query) {
+    clearBtn = (
+      <button type="button" className="cb-clear" aria-label="Clear all countries" onClick={() => { clearAll(); }}>✕</button>
+    );
+  }
+
+  let items;
+  if (options.length === 0) {
+    items = <li className="cb-empty" role="option" aria-disabled="true" aria-selected="false">No countries match "{query}"</li>;
+  } else {
+    items = options.map((c, i) => {
+      const sel = isSelected(c);
+      let cls = 'cb-option';
+      if (i === activeIndex) {
+        cls = cls + ' is-active';
+      }
+      if (sel) {
+        cls = cls + ' is-selected';
+      }
+      return (
+        <li
+          key={c.code}
+          id={id + '-opt-' + c.code}
+          role="option"
+          aria-selected={sel}
+          className={cls}
+          onMouseDown={(e) => { e.preventDefault(); }}
+          onMouseMove={() => { setActive(i); }}
+          onClick={() => { toggle(c); }}
+        >
+          <span className="cb-flag" aria-hidden="true">{c.flag}</span>
+          <span className="cb-name">{c.name}</span>
+          <span className="cb-check" aria-hidden="true">✓</span>
+        </li>
+      );
+    });
+  }
+
+  let wrapCls = 'cb';
+  if (open) {
+    wrapCls = 'cb is-open';
+  }
+
+  return (
+    <div className={wrapCls}>
+      <div className="cb-control" onClick={() => { focusInput(); }}>
+        <ul className="cb-chips" aria-label="Selected countries">
+          {selected.map((c) => {
+            return (
+              <li key={c.code} className="cb-chip">
+                <span aria-hidden="true">{c.flag}</span> {c.name}
+                <button type="button" className="cb-chip-remove" aria-label={'Remove ' + c.name} onClick={(e) => { e.stopPropagation(); removeChip(c); }}>×</button>
+              </li>
+            );
+          })}
+        </ul>
+        <input
+          ref={inputRef}
+          id={id}
+          className="cb-input"
+          type="text"
+          role="combobox"
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-activedescendant={activeId}
+          aria-describedby={id + '-hint'}
+          disabled={loading}
+          placeholder={placeholder}
+          value={query}
+          onChange={(e) => { handleInput(e.target.value); }}
+          onKeyDown={handleKeyDown}
+          onClick={() => { setOpen(true); }}
+          onBlur={() => { setOpen(false); }}
+        />
+        {clearBtn}
+        <span className="cb-caret" aria-hidden="true">▾</span>
+      </div>
+      <ul ref={listRef} id={listId} role="listbox" aria-multiselectable="true" aria-label="Countries" className="cb-list" hidden={!open}>
+        {items}
+      </ul>
+      <p className="sr-only" aria-live="polite">{selected.length} countries selected</p>
+    </div>
+  );
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCountries } from './api';
+import type { Country } from './api';
+import FormField from './components/FormField';
+import CountryCombobox from './components/CountryCombobox';
+
+function Steps() {
+  const steps = ['Applicant', 'Travel history', 'Documents', 'Review'];
+  return (
+    <ol className="steps">
+      {steps.map((s, i) => {
+        let cls = 'step';
+        if (i === 1) {
+          cls = 'step is-current';
+        } else if (i < 1) {
+          cls = 'step is-done';
+        }
+        return <li key={s} className={cls}><span className="step-num">{i + 1}</span>{s}</li>;
+      })}
+    </ol>
+  );
+}
+
+export default function App() {
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [purpose, setPurpose] = useState('Tourism');
+  const [visited, setVisited] = useState<Country[]>([]);
+  const [submitted, setSubmitted] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getCountries().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setCountries(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    let names = 'none';
+    if (visited.length > 0) {
+      names = visited.map((c) => {
+        return c.name;
+      }).join(', ');
+    }
+    setSubmitted('Saved. Purpose: ' + purpose + '. Countries: ' + names);
+  }
+
+  let savedEl = null;
+  if (submitted) {
+    savedEl = <p className="saved" role="status">{submitted}</p>;
+  }
+
+  return (
+    <div className="app">
+      <header className="brand-bar"><span className="logo">✈ passage</span><span className="app-sub">Visa application · UK Standard Visitor</span></header>
+      <main className="card">
+        <Steps />
+        <h1>Travel history</h1>
+        <p className="lede">Tell us where you have been in the last 2 years. This helps us process your application faster.</p>
+        <form onSubmit={handleSubmit}>
+          <FormField id="purpose" label="Purpose of visit">
+            <select id="purpose" className="input" value={purpose} onChange={(e) => { setPurpose(e.target.value); }}>
+              <option>Tourism</option>
+              <option>Business</option>
+              <option>Visiting family</option>
+            </select>
+          </FormField>
+          <FormField id="visited" label="Countries visited" hint="Start typing to search. Pick as many as apply.">
+            <CountryCombobox id="visited" countries={countries} loading={loading} selected={visited} onChange={setVisited} />
+          </FormField>
+          <div className="actions">
+            <button type="button" className="btn-secondary">Back</button>
+            <button type="submit" className="btn-primary">Save and continue</button>
+          </div>
+          {savedEl}
+        </form>
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #EEF5F7;
+  --surface: #FFFFFF;
+  --line: #D6E3E8;
+  --text: #0F2A36;
+  --muted: #5A7380;
+  --primary: #0B7A8C;
+  --primary-dark: #075E6C;
+  --primary-soft: #E2F3F5;
+  --focus: #F2A900;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { min-height: 100vh; padding-bottom: 40px; }
+.brand-bar { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 24px; background: var(--primary-dark); color: #fff; }
+.logo { font-weight: 800; font-size: 18px; letter-spacing: 0.01em; }
+.app-sub { font-size: 13px; opacity: 0.8; }
+
+.card { max-width: 620px; margin: 28px auto 0; padding: 28px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(15, 42, 54, 0.06); }
+.card h1 { margin: 18px 0 6px; font-size: 24px; }
+.lede { margin: 0 0 22px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+
+.steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.step { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--bg); }
+.step-num { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #fff; font-weight: 700; }
+.step.is-done .step-num { background: var(--primary); color: #fff; }
+.step.is-current { background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; }
+.step.is-current .step-num { background: var(--primary-dark); color: #fff; }
+
+.field { margin-bottom: 20px; }
+.field-label { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; }
+.field-hint { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.input { width: 100%; height: 44px; padding: 0 12px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; font: inherit; font-size: 15px; color: var(--text); }
+.input:focus { outline: 3px solid var(--focus); outline-offset: 0; border-color: var(--text); }
+
+.actions { display: flex; justify-content: space-between; margin-top: 28px; }
+.btn-primary, .btn-secondary { height: 44px; padding: 0 20px; border-radius: var(--radius); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-primary { border: 0; background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { border: 2px solid var(--line); background: #fff; color: var(--text); }
+.btn-primary:focus-visible, .btn-secondary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.saved { margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; background: var(--primary-soft); color: var(--primary-dark); font-size: 14px; }
+
+/* ---- Added: country combobox ---- */
+.cb { position: relative; }
+.cb-control { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 44px; padding: 5px 64px 5px 8px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; cursor: text; }
+.cb-control:focus-within { outline: 3px solid var(--focus); border-color: var(--text); }
+.cb-chips { display: contents; list-style: none; }
+.cb-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: 13px; font-weight: 600; }
+.cb-chip-remove { width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: var(--primary-dark); font-size: 15px; line-height: 1; cursor: pointer; }
+.cb-chip-remove:hover { background: rgba(7, 94, 108, 0.12); }
+.cb-chip-remove:focus-visible, .cb-clear:focus-visible { outline: 2px solid var(--focus); }
+.cb-input { flex: 1; min-width: 140px; height: 30px; border: 0; padding: 0 4px; font: inherit; font-size: 15px; color: var(--text); background: transparent; }
+.cb-input:focus { outline: none; }
+.cb-input:disabled { background: transparent; }
+.cb-clear { position: absolute; right: 34px; top: 10px; width: 24px; height: 24px; border: 0; border-radius: 50%; background: var(--bg); color: var(--muted); font-size: 12px; cursor: pointer; }
+.cb-caret { position: absolute; right: 12px; top: 12px; color: var(--muted); pointer-events: none; }
+.cb-list { position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 6px); max-height: 240px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 30px rgba(15, 42, 54, 0.14); }
+.cb-option { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.cb-option.is-active { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+.cb-name { flex: 1; }
+.cb-check { visibility: hidden; color: var(--primary); font-weight: 700; }
+.cb-option.is-selected .cb-check { visibility: visible; }
+.cb-option.is-selected .cb-name { font-weight: 600; }
+.cb-empty { padding: 10px; color: var(--muted); font-size: 14px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

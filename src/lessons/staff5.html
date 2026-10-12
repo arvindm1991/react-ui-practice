@@ -1,0 +1,522 @@
+<template id="tpl-st-ds">
+  <h1>Design systems and component API design</h1>
+  <p class="lede">A design system is the set of shared building blocks (colours, spacing, buttons, modals) that every screen in a product is made from. This lesson follows one app, Lexi, from "every team builds its own button" to a small system with clean component APIs, and shows how a staff engineer decides what goes in it and how its components should be called.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain why teams build a design system, and what design tokens and theming are</li>
+    <li>Judge a component's API: spot "prop soup" and redesign it with variants, composition and compound components</li>
+    <li>Explain controlled vs uncontrolled components, polymorphic <code>as</code> props, and ref/rest-prop forwarding</li>
+    <li>Talk about accessibility, documentation and versioning as part of the system, not an afterthought</li>
+  </ul></div>
+
+  <h2>1. The running example: Lexi at 50 components</h2>
+  <p><b>Lexi</b> is a reading app for schools. Teachers have a dashboard of their classes, students do timed reading sessions, and district admins see reports across schools. Three squads build it: Teacher, Student and Reports.</p>
+  <p>In year one, each squad wrote its own UI. Nobody planned it; it was faster to copy a button than to find the "real" one. Two years later, someone counts:</p>
+  <ul>
+    <li><b>7 button components</b>: <code>Button</code>, <code>PrimaryButton</code>, <code>TeacherButton</code>, <code>ReportsCTA</code>, and three called <code>Btn</code>.</li>
+    <li><b>4 modals</b>. One traps keyboard focus. One closes on Escape. One does both. One does neither, so keyboard users get stuck behind it.</li>
+    <li><b>23 different blues</b> in the CSS, most within a few shades of each other.</li>
+  </ul>
+  <p>Then a district asks for a dark mode and a high-contrast mode for students with low vision. That is a change to every colour in the product, and there is no single place to make it. This is the moment teams decide to build a design system.</p>
+
+  <div class="callout is-key"><span class="callout-label">Three reasons, in order of how they're felt</span>
+    <p><b>Consistency:</b> the product looks and behaves like one product. <b>Speed:</b> a squad builds a new screen from parts instead of from scratch, and design and engineering speak the same names. <b>Accessibility:</b> keyboard handling, focus and screen-reader labels are solved once, correctly, and every screen inherits the fix. The third one is the one that's hardest to get any other way.</p></div>
+
+  <h2>2. Design tokens: naming the decisions</h2>
+  <p>A <b>design token</b> is a named value for a design decision: a colour, a spacing step, a font size, a corner radius. Instead of writing <code>#2F5BD3</code> in 40 files, you write <code>var(--color-action)</code> and define it once.</p>
+  <p>Mature systems use two layers of tokens:</p>
+  <ul>
+    <li><b>Primitive tokens</b> say what the value <em>is</em>: <code>--blue-600</code>, <code>--space-4</code>. They're the palette.</li>
+    <li><b>Semantic tokens</b> say what the value is <em>for</em>: <code>--color-action</code>, <code>--color-text-muted</code>, <code>--space-card-padding</code>. Components only ever use these.</li>
+  </ul>
+  <p>The second layer is what makes theming possible. "Dark mode" doesn't change what a button is; it changes which primitive the semantic name points at.</p>
+
+  <svg viewBox="0 0 720 270" width="100%" role="img" aria-label="Primitive tokens feed semantic tokens, which components use. Switching theme re-points semantic tokens." style="font-family:inherit;margin:16px 0">
+    <defs><marker id="st5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+    <text x="100" y="22" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">PRIMITIVES</text>
+    <text x="360" y="22" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">SEMANTIC (per theme)</text>
+    <text x="620" y="22" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600;letter-spacing:.06em">COMPONENTS</text>
+    <rect x="20" y="40" width="160" height="34" rx="6" style="fill:var(--surface);stroke:var(--line)"/><text x="100" y="62" text-anchor="middle" style="fill:var(--ink);font-size:13px">--blue-600</text>
+    <rect x="20" y="86" width="160" height="34" rx="6" style="fill:var(--surface);stroke:var(--line)"/><text x="100" y="108" text-anchor="middle" style="fill:var(--ink);font-size:13px">--blue-300</text>
+    <rect x="20" y="132" width="160" height="34" rx="6" style="fill:var(--surface);stroke:var(--line)"/><text x="100" y="154" text-anchor="middle" style="fill:var(--ink);font-size:13px">--gray-900</text>
+    <rect x="20" y="178" width="160" height="34" rx="6" style="fill:var(--surface);stroke:var(--line)"/><text x="100" y="200" text-anchor="middle" style="fill:var(--ink);font-size:13px">--white</text>
+    <rect x="260" y="40" width="200" height="80" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="360" y="62" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">--color-action</text>
+    <text x="360" y="82" text-anchor="middle" style="fill:var(--ink);font-size:12px">light: blue-600</text>
+    <text x="360" y="100" text-anchor="middle" style="fill:var(--ink);font-size:12px">dark: blue-300</text>
+    <rect x="260" y="132" width="200" height="80" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="360" y="154" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">--color-surface</text>
+    <text x="360" y="174" text-anchor="middle" style="fill:var(--ink);font-size:12px">light: white</text>
+    <text x="360" y="192" text-anchor="middle" style="fill:var(--ink);font-size:12px">dark: gray-900</text>
+    <rect x="540" y="60" width="160" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="620" y="85" text-anchor="middle" style="fill:var(--ink);font-size:13px">&lt;Button&gt;</text>
+    <rect x="540" y="150" width="160" height="40" rx="8" style="fill:var(--surface);stroke:currentColor"/><text x="620" y="175" text-anchor="middle" style="fill:var(--ink);font-size:13px">&lt;Modal&gt;</text>
+    <line x1="180" y1="57" x2="258" y2="72" style="stroke:var(--muted)" marker-end="url(#st5-arr)"/>
+    <line x1="180" y1="103" x2="258" y2="92" style="stroke:var(--muted);stroke-dasharray:4 3" marker-end="url(#st5-arr)"/>
+    <line x1="180" y1="195" x2="258" y2="176" style="stroke:var(--muted)" marker-end="url(#st5-arr)"/>
+    <line x1="180" y1="149" x2="258" y2="186" style="stroke:var(--muted);stroke-dasharray:4 3" marker-end="url(#st5-arr)"/>
+    <line x1="460" y1="80" x2="538" y2="80" style="stroke:var(--muted)" marker-end="url(#st5-arr)"/>
+    <line x1="460" y1="172" x2="538" y2="170" style="stroke:var(--muted)" marker-end="url(#st5-arr)"/>
+    <text x="360" y="244" text-anchor="middle" style="fill:var(--muted);font-size:12px">Solid arrows: light theme. Dashed: dark theme. Components never change; only the middle column re-points.</text>
+  </svg>
+
+  <p>In code, the simplest and most common way to do this today is CSS custom properties (CSS variables), because they're resolved by the browser at runtime and cascade, so a theme is just a different set of values on an ancestor element:</p>
+  <script type="text/x-code" data-lang="css" data-title="tokens.css">
+/* Layer 1: primitives. The palette. Components never read these. */
+:root {
+  --blue-300: #8FB0FF;
+  --blue-600: #2F5BD3;
+  --gray-900: #121722;
+  --white: #FFFFFF;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-4: 16px;
+  --font-size-body: 16px;
+}
+
+/* Layer 2: semantic tokens. What components use. */
+:root,
+[data-theme="light"] {
+  --color-action: var(--blue-600);
+  --color-action-text: var(--white);
+  --color-surface: var(--white);
+  --color-text: var(--gray-900);
+}
+
+[data-theme="dark"] {
+  --color-action: var(--blue-300);
+  --color-action-text: var(--gray-900);
+  --color-surface: var(--gray-900);
+  --color-text: var(--white);
+}
+
+/* A component only knows semantic names */
+.lexi-button {
+  background: var(--color-action);
+  color: var(--color-action-text);
+  padding: var(--space-2) var(--space-4);
+}
+</script>
+  <p>Switching theme is now one attribute on <code>&lt;html&gt;</code>. The high-contrast mode the district wanted is a third block. Teams often keep tokens in a JSON file that designers and engineers share, and generate the CSS (and iOS/Android values) from it with a build tool, so the Figma file and the code can't drift apart. The format matters less than the rule: <b>components read semantic tokens only</b>.</p>
+
+  <h2>3. What makes a component API good</h2>
+  <p>A component's <b>API</b> is how other engineers call it: its props, what it renders as children, and what it does by default. A design system's users are other engineers, so its API is its user interface. The test of a good API is simple: <b>is the obvious way to use it also the correct way?</b></p>
+  <p>Here's the Lexi <code>Button</code> after two years of squads adding "just one more prop":</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Button.tsx, before: prop soup">
+type ButtonProps = {
+  text: string;
+  onClick: () => void;
+  primary?: boolean;
+  secondary?: boolean;
+  danger?: boolean;
+  ghost?: boolean;
+  small?: boolean;
+  large?: boolean;
+  isLink?: boolean;
+  href?: string;
+  icon?: string;
+  iconRight?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
+  fullWidth?: boolean;
+  teacherStyle?: boolean;   // added by Teacher squad, nobody knows what it does now
+  marginTop?: number;
+  className?: string;
+};
+</script>
+  <p>This is called <b>boolean-prop explosion</b>, or "prop soup". Look at what it allows:</p>
+  <ul>
+    <li><code>&lt;Button primary danger ghost /&gt;</code>: what colour is that? The answer depends on the order of <code>if</code>s inside the component, which callers can't see.</li>
+    <li><code>&lt;Button small large /&gt;</code>: compiles fine. Means nothing.</li>
+    <li><code>&lt;Button isLink onClick={…} /&gt;</code> with no <code>href</code>: renders an <code>&lt;a&gt;</code> that a keyboard can't reach.</li>
+    <li><code>text</code> is a string, so you can't put an icon and bold text inside it. That's why <code>icon</code> and <code>iconRight</code> were bolted on.</li>
+    <li><code>marginTop</code>: layout around a component is the parent's job. Once the button controls its own margin, every page fights it.</li>
+  </ul>
+  <p>Every prop was reasonable on the day it was added. The problem is the combinations: 4 style booleans and 2 size booleans give 64 combinations, and maybe 8 are valid.</p>
+
+  <h3>Fix 1: variants instead of booleans</h3>
+  <p>When several booleans are really one choice ("which style?"), make them one prop with a fixed list of values. TypeScript's union types enforce it: you can't pass two at once.</p>
+  <div class="ba"><div><span>Before: 6 booleans, 64 combos</span><pre>&lt;Button primary small /&gt;
+&lt;Button danger ghost large /&gt;  // ??</pre></div><i>→</i><div><span>After: 2 choices, all valid</span><pre>&lt;Button variant="primary" size="sm" /&gt;
+&lt;Button variant="danger" size="lg" /&gt;</pre></div></div>
+  <p>A rule of thumb: a boolean prop is fine when it is truly independent of every other prop (<code>disabled</code>, <code>fullWidth</code>). If turning it on only makes sense when another prop is off, it's a variant in disguise.</p>
+
+  <h3>Fix 2: composition with children instead of content props</h3>
+  <p><b>Composition</b> means the caller passes in the content as <code>children</code>, and the component arranges it. Instead of <code>text</code>, <code>icon</code> and <code>iconRight</code>, the button accepts whatever you put between its tags. The design system can still give you slots with a fixed look, such as a small <code>Icon</code> component, so the spacing is right without a prop for every case.</p>
+  <div class="ba"><div><span>Content props</span><pre>&lt;Button text="Assign" icon="book"
+  iconRight /&gt;</pre></div><i>→</i><div><span>Children</span><pre>&lt;Button variant="primary"&gt;
+  Assign &lt;Icon name="book" /&gt;
+&lt;/Button&gt;</pre></div></div>
+
+  <h3>Fix 3: forward the ref and the rest of the props</h3>
+  <p>A design-system button replaces <code>&lt;button&gt;</code>, so it must accept everything <code>&lt;button&gt;</code> accepts: <code>type</code>, <code>aria-label</code>, <code>data-testid</code>, <code>onKeyDown</code>, and so on. You don't list them by hand. You type the props as "the native button's props, plus mine", collect the ones you don't use into <code>rest</code>, and spread them onto the element. This is called <b>rest-prop forwarding</b>.</p>
+  <p>A <b>ref</b> is how a parent gets the real DOM node, for example to focus the button after a dialog closes. In React 19, <code>ref</code> is an ordinary prop for function components, so you just accept it and pass it down. (Before React 19 you had to wrap the component in <code>forwardRef</code>; you'll still see that in most existing libraries.)</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Button.tsx, after">
+import type { ComponentProps } from 'react';
+import { Spinner } from './Spinner';
+import styles from './Button.module.css';
+
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type Size = 'sm' | 'md' | 'lg';
+
+type ButtonProps = ComponentProps<'button'> & {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+};
+
+export function Button({
+  variant = 'secondary',     // safe default: not the loud one
+  size = 'md',
+  loading = false,
+  disabled,
+  type = 'button',           // native default is "submit", a classic form bug
+  className,
+  children,
+  ref,                       // React 19: ref is just a prop
+  ...rest                    // aria-*, data-*, onClick, onKeyDown...
+}: ButtonProps) {
+  const classes = [styles.button, styles[variant], styles[size], className]
+    .filter(Boolean)
+    .join(' ');
+
+  let content = children;
+  if (loading) {
+    content = <Spinner label="Loading" />;
+  }
+
+  return (
+    <button
+      ref={ref}
+      type={type}
+      className={classes}
+      disabled={disabled || loading}
+      aria-busy={loading}
+      {...rest}
+    >
+      {content}
+    </button>
+  );
+}
+</script>
+  <p>Notice the defaults. <code>type="button"</code> prevents the bug where a button inside a form submits it. <code>variant="secondary"</code> means a squad has to opt in to the loud style. A good API makes the safe thing the default and the risky thing explicit.</p>
+  <p>And where did <code>isLink</code>/<code>href</code> go? A link and a button are different elements with different keyboard behaviour (Enter vs Enter and Space) and different meaning to a screen reader. That's the next idea.</p>
+
+  <h2>4. Polymorphic components: "render as something else"</h2>
+  <p>Sometimes you want a component's <em>look</em> on a different <em>element</em>: a link that looks like a primary button ("Start reading session"), or a <code>Text</code> component that's an <code>&lt;h2&gt;</code> here and a <code>&lt;p&gt;</code> there. A component that can render as different elements is called <b>polymorphic</b>.</p>
+  <p>Two common shapes, at the concept level:</p>
+  <ul>
+    <li><b>An <code>as</code> prop:</b> <code>&lt;Text as="h2"&gt;</code>. The component renders whatever element you name. Getting the TypeScript types right (so <code>as="a"</code> allows <code>href</code> but <code>as="button"</code> doesn't) is genuinely fiddly, which is why many teams use a library's helper types instead of writing their own.</li>
+    <li><b>An <code>asChild</code> prop</b> (the Radix pattern): <code>&lt;Button asChild&gt;&lt;Link href="/session"&gt;Start&lt;/Link&gt;&lt;/Button&gt;</code>. The button doesn't render its own element; it merges its classes and behaviour onto the single child you give it. This works nicely with router <code>Link</code> components.</li>
+  </ul>
+  <p>The staff-level point: polymorphism is powerful and easy to overuse. Offer it on components whose job is mostly visual (text, box, button styling), not on ones with complex behaviour like a modal, where rendering as the wrong element breaks accessibility.</p>
+
+  <h2>5. Compound components: Tabs that share state</h2>
+  <p>The teacher dashboard has tabs: Overview, Students, Assignments. The first version of <code>Tabs</code> looked like this:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="config-object API (before)">
+<Tabs
+  tabs={[
+    { id: 'overview', label: 'Overview', content: <Overview /> },
+    { id: 'students', label: 'Students', content: <StudentList />, badge: 3 },
+  ]}
+  tabListClassName="..."
+  renderTabLabel={(tab) => ...}   // added when someone needed an icon
+  disabledTabs={['assignments']}
+/>
+</script>
+  <p>It works until someone needs something the config didn't plan for: a badge, an icon, a tooltip on one tab, a button at the end of the tab row. Each need adds a prop. This is prop soup again, in a different costume.</p>
+  <p>A <b>compound component</b> is a set of components that are designed to be used together and share hidden state. The caller writes the structure in JSX, so they can put anything anywhere, and the parts coordinate behind the scenes:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="compound API (after)">
+<Tabs.Root defaultValue="overview">
+  <Tabs.List aria-label="Class views">
+    <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+    <Tabs.Trigger value="students">
+      Students <Badge>3</Badge>
+    </Tabs.Trigger>
+    <Tabs.Trigger value="assignments" disabled>Assignments</Tabs.Trigger>
+  </Tabs.List>
+
+  <Tabs.Panel value="overview"><Overview /></Tabs.Panel>
+  <Tabs.Panel value="students"><StudentList /></Tabs.Panel>
+  <Tabs.Panel value="assignments"><AssignmentList /></Tabs.Panel>
+</Tabs.Root>
+</script>
+  <p>How does a <code>Trigger</code> know which tab is active, when nobody passes it that prop? <b>Context.</b> <code>Root</code> owns the state and puts it in a React context; every <code>Trigger</code> and <code>Panel</code> below it reads from that context.</p>
+
+  <svg viewBox="0 0 720 260" width="100%" role="img" aria-label="Tabs.Root holds active value in context; Trigger reads it and calls setActive; Panel reads it to decide whether to show." style="font-family:inherit;margin:16px 0">
+    <defs><marker id="st5-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+    <rect x="200" y="14" width="320" height="76" rx="10" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="360" y="38" text-anchor="middle" style="fill:var(--ink);font-size:14px;font-weight:600">Tabs.Root</text>
+    <text x="360" y="58" text-anchor="middle" style="fill:var(--ink);font-size:12px">state: active = "students"</text>
+    <text x="360" y="76" text-anchor="middle" style="fill:var(--ink);font-size:12px">provides TabsContext { active, setActive, baseId }</text>
+    <rect x="30" y="140" width="190" height="56" rx="8" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="125" y="164" text-anchor="middle" style="fill:var(--ink);font-size:13px">Tabs.Trigger "students"</text>
+    <text x="125" y="183" text-anchor="middle" style="fill:var(--muted);font-size:12px">aria-selected = true</text>
+    <rect x="265" y="140" width="190" height="56" rx="8" style="fill:var(--surface);stroke:currentColor"/>
+    <text x="360" y="164" text-anchor="middle" style="fill:var(--ink);font-size:13px">Tabs.Panel "students"</text>
+    <text x="360" y="183" text-anchor="middle" style="fill:var(--muted);font-size:12px">shown</text>
+    <rect x="500" y="140" width="190" height="56" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="595" y="164" text-anchor="middle" style="fill:var(--ink);font-size:13px">Tabs.Panel "overview"</text>
+    <text x="595" y="183" text-anchor="middle" style="fill:var(--muted);font-size:12px">hidden</text>
+    <line x1="300" y1="90" x2="160" y2="138" style="stroke:var(--accent)" marker-end="url(#st5-arr2)"/>
+    <line x1="360" y1="90" x2="360" y2="138" style="stroke:var(--accent)" marker-end="url(#st5-arr2)"/>
+    <line x1="420" y1="90" x2="580" y2="138" style="stroke:var(--accent)" marker-end="url(#st5-arr2)"/>
+    <path d="M70 140 C 60 100, 150 70, 198 56" style="fill:none;stroke:var(--muted);stroke-dasharray:4 3" marker-end="url(#st5-arr2)"/>
+    <text x="30" y="96" style="fill:var(--muted);font-size:12px">click → setActive()</text>
+    <text x="360" y="236" text-anchor="middle" style="fill:var(--muted);font-size:12px">Solid: every part reads context. Dashed: a Trigger writes back. No props are threaded by the caller.</text>
+  </svg>
+
+  <script type="text/x-code" data-lang="tsx" data-title="Tabs.tsx (simplified)">
+import { createContext, use, useId, useState, type ReactNode } from 'react';
+
+type TabsContextValue = {
+  active: string;
+  setActive: (value: string) => void;
+  baseId: string;
+};
+
+const TabsContext = createContext<TabsContextValue | null>(null);
+
+function useTabs() {
+  const ctx = use(TabsContext);            // React 19; useContext works too
+  if (!ctx) {
+    throw new Error('Tabs parts must be inside <Tabs.Root>');
+  }
+  return ctx;
+}
+
+function Root({ defaultValue, children }: { defaultValue: string; children: ReactNode }) {
+  const [active, setActive] = useState(defaultValue);
+  const baseId = useId();                  // stable ids for aria wiring
+  return (
+    <TabsContext value={{ active, setActive, baseId }}>
+      <div>{children}</div>
+    </TabsContext>
+  );
+}
+
+function Trigger({ value, children }: { value: string; children: ReactNode }) {
+  const { active, setActive, baseId } = useTabs();
+  const selected = active === value;
+  let tabIndex = -1;                       // only the active tab is in the Tab order
+  if (selected) {
+    tabIndex = 0;
+  }
+  return (
+    <button
+      role="tab"
+      id={`${baseId}-tab-${value}`}
+      aria-selected={selected}
+      aria-controls={`${baseId}-panel-${value}`}
+      tabIndex={tabIndex}
+      onClick={() => setActive(value)}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Panel({ value, children }: { value: string; children: ReactNode }) {
+  const { active, baseId } = useTabs();
+  if (active !== value) {
+    return null;
+  }
+  return (
+    <div role="tabpanel" id={`${baseId}-panel-${value}`} aria-labelledby={`${baseId}-tab-${value}`}>
+      {children}
+    </div>
+  );
+}
+
+// List omitted: it renders role="tablist" and handles arrow-key movement.
+export const Tabs = { Root, Trigger, Panel /*, List */ };
+</script>
+  <p>Two details worth noticing. The <code>useTabs</code> hook throws a helpful error if someone uses a <code>Trigger</code> outside a <code>Root</code>, so misuse fails loudly in development instead of silently rendering nothing. And all the ARIA wiring (<code>role</code>, <code>aria-selected</code>, <code>aria-controls</code>, ids) lives inside the parts, so callers get it for free and can't forget it. (In React 19 you can render <code>&lt;TabsContext&gt;</code> directly as the provider; older code writes <code>&lt;TabsContext.Provider&gt;</code>.)</p>
+
+  <h2>6. Controlled vs uncontrolled, and supporting both</h2>
+  <p>The Tabs above keep their own state. That's called <b>uncontrolled</b>: you give a starting value (<code>defaultValue</code>) and the component manages it from there. It's the easy mode for callers.</p>
+  <p>But the Reports squad needs the active tab in the URL (<code>?tab=students</code>) so a district admin can share a link. Now the <em>parent</em> must own the value. That's <b>controlled</b>: the caller passes <code>value</code> and <code>onValueChange</code>, and the component just displays what it's told and reports clicks. This is the same idea as <code>&lt;input value onChange&gt;</code> versus <code>&lt;input defaultValue&gt;</code>.</p>
+  <p>A good system component supports both, the way native inputs do. The trick is a small hook: if the caller passed <code>value</code>, use it; otherwise use internal state.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="useControllableState.ts">
+import { useState } from 'react';
+
+export function useControllableState<T>(opts: {
+  value?: T;                       // controlled value, if the parent owns it
+  defaultValue: T;                 // starting value, if we own it
+  onChange?: (next: T) => void;
+}) {
+  const [internal, setInternal] = useState(opts.defaultValue);
+  const isControlled = opts.value !== undefined;
+
+  let current = internal;
+  if (isControlled) {
+    current = opts.value as T;
+  }
+
+  function setValue(next: T) {
+    if (!isControlled) {
+      setInternal(next);           // we own it: update ourselves
+    }
+    opts.onChange?.(next);         // always tell the parent
+  }
+
+  return [current, setValue] as const;
+}
+</script>
+  <script type="text/x-code" data-lang="tsx" data-title="Reports page: controlled via the URL">
+function ClassReport() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') ?? 'overview';
+
+  return (
+    <Tabs.Root value={tab} onValueChange={(next) => setSearchParams({ tab: next })}>
+      {/* ...same List / Trigger / Panel as before */}
+    </Tabs.Root>
+  );
+}
+</script>
+  <p>Rule to state: <b>don't switch a component between controlled and uncontrolled during its life</b> (passing <code>value</code> sometimes and <code>undefined</code> other times). React warns about this for inputs for the same reason: who owns the value becomes ambiguous.</p>
+
+  <h2>7. Accessibility baked in: headless libraries</h2>
+  <p>The tabs code above is "simplified" because real accessible tabs also need arrow-key movement between tabs, Home/End keys, a choice between activating on focus or on Enter, and correct behaviour with right-to-left languages. A modal needs focus trapping, focus return to the opening button, Escape to close, making the rest of the page inert, and scroll locking. A combobox (autocomplete) is harder than both put together.</p>
+  <p>This is where <b>headless</b> component libraries come in. "Headless" means the library provides <em>behaviour and accessibility</em> (state, keyboard handling, ARIA attributes, focus management) but <em>no styling</em>. You add your own tokens and CSS on top. The well-known ones:</p>
+  <ul>
+    <li><b>Radix Primitives</b>: unstyled compound components (<code>Dialog.Root</code>, <code>Tabs.Trigger</code>…), the base for shadcn/ui.</li>
+    <li><b>React Aria</b> (Adobe): hooks and components with especially thorough accessibility and internationalisation work.</li>
+    <li>Others in the same family include Headless UI and Ariakit.</li>
+  </ul>
+  <p>The staff call here is usually: <b>build the look, buy the behaviour.</b> Your design system's value is Lexi's tokens, visual style and API conventions. Writing a focus trap that works with every screen reader is a large, specialist job that these libraries have already done and tested. Wrap them; don't re-derive them.</p>
+
+  <h2>8. The worked redesign: Modal</h2>
+  <p>Here is Lexi's most-used modal, as found:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Modal, before">
+<Modal
+  show={isOpen}
+  title="Assign reading"
+  subtitle="Grade 3 · Room 12"
+  body={<AssignForm />}
+  showFooter
+  okText="Assign"
+  cancelText="Cancel"
+  onOk={handleAssign}
+  onCancel={() => setOpen(false)}
+  hideCloseButton={false}
+  dangerOk={false}
+  okLoading={saving}
+  width={560}
+  closeOnOverlayClick
+  zIndex={9999}
+/>
+</script>
+  <p>Diagnose it the way you did the button:</p>
+  <ul>
+    <li><b>The footer is a fixed shape.</b> "Two buttons, OK and Cancel" was true for the first screen. The "Delete class" dialog needs a typed confirmation; the session summary needs three buttons. Each one added a prop (<code>dangerOk</code>, <code>okLoading</code>) or forked the modal.</li>
+    <li><b>Content props everywhere:</b> <code>title</code>, <code>subtitle</code>, <code>body</code>. Same problem as <code>text</code> on the button.</li>
+    <li><b>Leaky internals:</b> <code>zIndex</code> and <code>width={560}</code> let each caller pick numbers, which is how you get 23 blues, but for layering.</li>
+    <li><b>Accessibility is optional:</b> <code>hideCloseButton</code> lets a squad ship a dialog with no visible way out, and there's no guarantee the title is wired to the dialog for screen readers.</li>
+  </ul>
+  <p>The redesign is a compound component built on a headless dialog, with a size variant instead of a number:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Modal, after: the caller's view">
+function AssignReadingDialog({ open, onOpenChange }: DialogProps) {
+  const assign = useAssignReading();
+
+  let submitLabel = 'Assign';
+  if (assign.isPending) {
+    submitLabel = 'Assigning…';
+  }
+
+  return (
+    <Modal.Root open={open} onOpenChange={onOpenChange}>
+      <Modal.Content size="md">
+        <Modal.Header>
+          <Modal.Title>Assign reading</Modal.Title>
+          <Modal.Description>Grade 3 · Room 12</Modal.Description>
+        </Modal.Header>
+
+        <AssignForm id="assign-form" onSubmit={assign.mutate} />
+
+        <Modal.Footer>
+          <Modal.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Modal.Close>
+          <Button variant="primary" type="submit" form="assign-form" loading={assign.isPending}>
+            {submitLabel}
+          </Button>
+        </Modal.Footer>
+      </Modal.Content>
+    </Modal.Root>
+  );
+}
+</script>
+  <p>What changed and why:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Before</th><th>After</th><th>Why it's better</th></tr>
+    <tr><td><code>show</code> + <code>onCancel</code></td><td><code>open</code> + <code>onOpenChange</code></td><td>Same controlled shape as Tabs. Escape, overlay click and the X all call one handler.</td></tr>
+    <tr><td><code>title</code>, <code>subtitle</code>, <code>body</code></td><td><code>Modal.Title</code>, <code>Modal.Description</code>, children</td><td>Any content. Title and description are automatically wired with <code>aria-labelledby</code>/<code>aria-describedby</code>.</td></tr>
+    <tr><td><code>okText</code>, <code>dangerOk</code>, <code>okLoading</code>, <code>showFooter</code></td><td><code>Modal.Footer</code> with real <code>Button</code>s</td><td>Footer is composition. Danger, loading and three-button footers need zero new props.</td></tr>
+    <tr><td><code>width={560}</code>, <code>zIndex={9999}</code></td><td><code>size="md"</code>; layering owned by the system</td><td>Values come from tokens. The modal renders in a portal on a known layer.</td></tr>
+    <tr><td><code>hideCloseButton</code></td><td>Removed</td><td>Focus trap, Escape and a close control are not optional.</td></tr>
+  </table></div>
+  <p>Inside, <code>Modal.Root</code>, <code>Modal.Content</code> and <code>Modal.Close</code> are thin wrappers over a headless dialog (Radix <code>Dialog</code> or React Aria's equivalent) with Lexi's tokens applied. The design system team wrote maybe 150 lines; the hard parts are borrowed.</p>
+  <div class="callout"><span class="callout-label">Keep an escape hatch, but make it explicit</span>
+    <p>For the rare case the system can't handle, still forward <code>className</code> and rest props on each part. Callers can customise without forking, and when you see the same override in five places, that's your signal for a new variant.</p></div>
+
+  <h2>9. Documentation and versioning</h2>
+  <p>A design system nobody can find is a design system nobody uses; squads will go back to copying. Two things make it real:</p>
+  <p><b>Documentation where engineers look.</b> Usually a Storybook (or similar) site with every component, every variant rendered live, the props table generated from the TypeScript types, and short "do / don't" notes: "Use <code>variant='danger'</code> only for destructive actions. Don't use two primary buttons in one footer." Good docs also say <em>when not</em> to use a component.</p>
+  <p><b>Versioning that respects consumers.</b> The system is published as a package with <b>semantic versioning</b> (semver): <code>MAJOR.MINOR.PATCH</code>. Patch = bug fix, minor = new feature that doesn't break anyone, major = something callers must change. Practices that keep upgrades cheap:</p>
+  <ul>
+    <li><b>Deprecate before removing.</b> Keep the old prop working for a version, log a development-only warning naming the replacement, then remove it in the next major.</li>
+    <li><b>Ship codemods</b> (scripts that rewrite callers' code) for mechanical renames like <code>primary</code> → <code>variant="primary"</code>. This turns a 300-file migration into one command.</li>
+    <li><b>Changelogs per release</b>, often generated from tooling like Changesets, so squads know what they're getting.</li>
+    <li><b>Visual regression tests</b> on the component stories, so a token change can't silently restyle every button (more on this in the testing lesson).</li>
+  </ul>
+
+  <h2>10. How a staff engineer approaches this</h2>
+  <p>A staff engineer doesn't start with "let's build a design system". They start with questions:</p>
+  <ul>
+    <li><b>What's the actual pain?</b> Inconsistency customers notice? Slow feature delivery? Accessibility complaints or legal exposure? The answer decides what to build first. For Lexi, the dark/high-contrast request makes tokens the first deliverable, and the stuck-behind-a-modal bug makes Modal the first component.</li>
+    <li><b>Who are the users, and how many?</b> Three squads in one repo can share a folder of components. Ten teams across three apps need a versioned package, docs and an owner.</li>
+    <li><b>What do we build vs adopt?</b> Tokens, visual style and API conventions: build. Behaviour and accessibility: adopt a headless library. A whole styled library (MUI, Chakra, Mantine): fastest start, at the cost of looking like everyone else and fighting its theming at the edges.</li>
+    <li><b>What's the API's contract?</b> Before writing a component, write three or four real call sites from real screens. If the calls are awkward, the API is wrong.</li>
+  </ul>
+  <p>The trade-offs, stated plainly:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Choice</th><th>Gives you</th><th>At the cost of</th><th>Choose it when</th></tr>
+    <tr><td>Config-object / props API</td><td>Very short call sites, strict consistency</td><td>Every new need is a new prop; drifts into prop soup</td><td>The component is truly fixed in shape (a status pill)</td></tr>
+    <tr><td>Compound components</td><td>Flexible layout, no prop explosion, behaviour shared via context</td><td>Longer call sites; more ways to arrange things</td><td>The component has several regions (tabs, modal, menu, form field)</td></tr>
+    <tr><td>Uncontrolled only</td><td>Easiest to use</td><td>Parent can't sync to URL, store or other components</td><td>Rarely; support controlled too</td></tr>
+    <tr><td>Polymorphic <code>as</code>/<code>asChild</code></td><td>One look on many elements</td><td>Harder types; can render semantically wrong elements</td><td>Visual primitives: text, box, button styling</td></tr>
+    <tr><td>Strict API, no <code>className</code></td><td>Guaranteed consistency</td><td>Squads fork the component when blocked</td><td>Very mature system with a fast request process</td></tr>
+  </table></div>
+  <p>And one people question: <b>adoption is a product problem.</b> Treat squads as customers. Migrate one high-traffic screen yourself to prove it works, measure something (number of button components, accessibility issues found by automated checks), and make the system the path of least resistance.</p>
+
+  <h2>11. Common mistakes</h2>
+  <ul>
+    <li><b>Building the system before the product needs it.</b> Extract components after you've seen a pattern three times, not before you've seen it once.</li>
+    <li><b>Tokens named for values</b> (<code>--blue</code>) used directly in components. The first theme change turns "blue" into a lie.</li>
+    <li><b>Adding a boolean for every request.</b> Ask "is this a variant, or should it be composition?" before adding any prop.</li>
+    <li><b>Not forwarding refs and rest props.</b> Callers can't focus the button, can't add <code>aria-label</code>, can't attach test ids, so they wrap it in a <code>div</code> or fork it.</li>
+    <li><b>Hand-rolling modal, menu and combobox behaviour.</b> These are the places accessibility bugs live.</li>
+    <li><b>Breaking changes in a minor version</b>, which teaches squads to pin old versions forever.</li>
+    <li><b>Layout props on leaf components</b> (<code>marginTop</code>). Spacing between things belongs to the parent layout (a <code>Stack</code> with a <code>gap</code> token).</li>
+  </ul>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"Before adding this prop, I'd check whether it's really a variant of an existing choice or whether the caller should compose it. We have four style booleans that can conflict, so I'd collapse them into a <code>variant</code> union so invalid states can't compile. For the modal, I'd go compound, <code>Modal.Root</code>/<code>Title</code>/<code>Footer</code>, built on a headless dialog so focus trapping and Escape are guaranteed, support both controlled and uncontrolled open state, forward refs and rest props on every part, and ship the rename with a deprecation warning and a codemod rather than a hard break."</p></div>
+
+  <h2>12. Recap</h2>
+  <ul>
+    <li>A design system buys consistency, speed and, most of all, accessibility solved once.</li>
+    <li>Tokens come in two layers: primitives (what the value is) and semantic (what it's for). Components read semantic tokens; themes re-point them via CSS variables.</li>
+    <li>Prop soup comes from booleans that are secretly one choice. Use variants for choices, children for content, compound components for multi-part UI.</li>
+    <li>Compound components share state through context. Support controlled and uncontrolled with one small hook.</li>
+    <li>Forward refs (a plain prop in React 19) and rest props so your component is a drop-in for the native element.</li>
+    <li>Build the look, borrow the behaviour from a headless library. Document with live examples; version with semver, deprecations and codemods.</li>
+  </ul>
+
+  <details class="details"><summary>Check yourself</summary><div>
+    <p><b>1. A squad asks for <code>&lt;Button outline /&gt;</code>. What do you ask first?</b><br>Can it combine with <code>variant="danger"</code>? If outline is a style choice alongside primary/ghost, it's a new <code>variant</code> value, not a boolean.</p>
+    <p><b>2. Why does dark mode only touch the semantic layer?</b><br>Components reference semantic names like <code>--color-action</code>. A theme re-points those names to different primitives; no component code changes.</p>
+    <p><b>3. How does <code>Tabs.Panel</code> know if it's active?</b><br>It reads <code>active</code> from the context that <code>Tabs.Root</code> provides, and compares it to its own <code>value</code>.</p>
+    <p><b>4. When must <code>Tabs</code> be controlled?</b><br>When something outside it owns the value: the URL, a global store, or another component that needs to react to or set the tab.</p>
+  </div></details>
+</template>

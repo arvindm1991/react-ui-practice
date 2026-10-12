@@ -1,0 +1,516 @@
+<title>React Interview Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column of numbered pattern cards under a sticky jump bar; built for a second tab during a live coding call. */
+:root {
+  --bg: #F4F5F8;
+  --surface: #FFFFFF;
+  --ink: #161B26;
+  --muted: #5B6377;
+  --line: #DCE0E8;
+  --accent: #CC2F5A;
+  --accent-soft: #FBE8EE;
+  --ok: #1E7F4A;
+  --code-bg: #121A2C;
+  --code-ink: #D9E0EE;
+  --code-dim: #7C89A6;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1118; --surface: #161A24; --ink: #E7EAF1; --muted: #9AA2B4; --line: #2A3040;
+    --accent: #FF5E8A; --accent-soft: #3A1824; --ok: #4CC487; --code-bg: #0B1120; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1118; --surface: #161A24; --ink: #E7EAF1; --muted: #9AA2B4; --line: #2A3040;
+  --accent: #FF5E8A; --accent-soft: #3A1824; --ok: #4CC487; --code-bg: #0B1120; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 16px; padding-block: 0 64px; }
+header.top { padding-block: 22px 10px; }
+h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+nav.jump {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0; margin-bottom: 8px;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+nav.jump a { font-size: 13px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; white-space: nowrap; }
+nav.jump a:hover { border-color: var(--muted); }
+h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 28px 0 10px; scroll-margin-top: 64px; }
+.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rules li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.rules li > span { font-family: var(--font-mono); font-size: 12px; color: var(--accent); padding-top: 2px; }
+.rules b { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--accent-soft); color: var(--ink); padding: 0 4px; border-radius: 4px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin: 10px 0; overflow: hidden; scroll-margin-top: 64px; }
+.card-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; }
+.card-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.card-head p { margin: 0; font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
+.copy { margin-left: auto; flex-shrink: 0; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px; padding: 3px 10px; font: 500 12px var(--font-body); cursor: pointer; }
+.copy:hover { border-color: var(--muted); }
+.copy:focus-visible, nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+pre { margin: 0; padding: 12px 14px; background: var(--code-bg); color: var(--code-ink); font: 12.5px/1.6 var(--font-mono); overflow-x: auto; tab-size: 2; }
+pre .c { color: var(--code-dim); font-style: italic; }
+.say { margin: 0; padding: 8px 14px; font-size: 13px; border-top: 1px solid var(--line); color: var(--muted); }
+.say b { color: var(--ink); font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 13px; }
+@media (max-width: 560px) { .card-head { flex-wrap: wrap; } .card-head p { flex-basis: 100%; order: 3; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>React interview notes</h1>
+    <p class="sub">My mistakes first, then copy-ready patterns. Press Ctrl/⌘ + F to find anything.</p>
+  </header>
+
+  <nav class="jump" aria-label="Sections">
+    <a href="#standard">JSX standard</a><a href="#plan">5 steps</a><a href="#stuck">When stuck</a><a href="#mistakes">My mistakes</a><a href="#props">Props wiring</a><a href="#errors">Error decoder</a><a href="#shapes">Data shapes</a><a href="#p-filter">Filter list</a><a href="#p-inputs">Inputs</a>
+    <a href="#p-update">Update lists</a><a href="#p-select">Select by id</a><a href="#p-form">Form</a><a href="#p-fetch">Fetch</a>
+    <a href="#p-cond">Conditionals</a><a href="#p-data">Data</a><a href="#p-timer">Timers</a><a href="#p-listen">Esc / outside</a><a href="#p-css">CSS</a>
+  </nav>
+
+  <h2 id="standard">My JSX standard (always, no exceptions)</h2>
+  <ul class="rules">
+    <li><span>1</span><div><b>Every arrow function: braces + return.</b> <code>items.map((item) =&gt; { return &lt;li key={item.id}&gt;…&lt;/li&gt;; })</code></div></li>
+    <li><span>2</span><div><b>Decisions happen above the return with plain if</b>, stored in variables. No <code>&amp;&amp;</code> or <code>? :</code> in JSX. <code>let empty = null; if (list.length === 0) { empty = &lt;p&gt;None&lt;/p&gt;; }</code></div></li>
+    <li><span>3</span><div><b>Skip inside a map:</b> <code>if (!items) return null;</code></div></li>
+    <li><span>4</span><div><b>Class names built above:</b> <code>let cls = 'row'; if (active) cls += ' is-active';</code></div></li>
+    <li><span>5</span><div><b>Handlers: named function above, arrow in JSX.</b> <code>onClick={() =&gt; { handleSelect(id); }}</code></div></li>
+    <li><span>6</span><div><b>Inputs: value + onChange, always.</b> <code>onChange={(e) =&gt; { setQuery(e.target.value); }}</code></div></li>
+    <li><span>7</span><div><b>Inside JSX only:</b> tags, text, <code>{variable}</code>. Any JS → <code>{ }</code>. No if / const / semicolons.</div></li>
+  </ul>
+  <section class="card">
+    <div class="card-head"><h3>Component order</h3><p>state → derived → handlers → decisions → JSX</p><button class="copy">Copy</button></div>
+<pre>export default function List({ items, activeId, onSelect }) {
+  <span class="c">// 1. state</span>
+
+  <span class="c">// 2. derived data (filter, sort, group)</span>
+
+  <span class="c">// 3. handlers</span>
+  function handleSelect(id) { onSelect(id); }
+
+  <span class="c">// 4. decisions (if → variables)</span>
+  let emptyMessage = null;
+  if (items.length === 0) {
+    emptyMessage = &lt;p&gt;Nothing here.&lt;/p&gt;;
+  }
+
+  <span class="c">// 5. JSX: only tags, text, {variables}</span>
+  return (
+    &lt;div&gt;
+      {emptyMessage}
+      &lt;ul&gt;
+        {items.map((item) =&gt; {
+          let rowClass = 'row';
+          if (item.id === activeId) rowClass += ' is-active';
+          return (
+            &lt;li key={item.id} className={rowClass}&gt;
+              &lt;button onClick={() =&gt; { handleSelect(item.id); }}&gt;{item.title}&lt;/button&gt;
+            &lt;/li&gt;
+          );
+        })}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+  </section>
+
+  <h2 id="plan">Plan any feature in 5 steps</h2>
+  <ul class="rules">
+    <li><span>1</span><div><b>Draw boxes on the design.</b> Anything that repeats (a row, a card) is its own box. Name them. <i>"A list, a repeating row, a detail panel."</i></div></li>
+    <li><span>2</span><div><b>Build it without interaction.</b> Real data on screen, no clicking or typing yet. Hardcode what changes. <i>"Static first, so I know the layout works."</i></div></li>
+    <li><span>3</span><div><b>List what can change.</b> Cross off what never changes, what's passed in, and what you can work out from something else. What's left is state, usually 2–3 things. <i>"The list and the selected id change; the count I calculate."</i></div></li>
+    <li><span>4</span><div><b>Decide where each changing thing lives.</b> In the nearest box that contains every box that needs it. Used by one box only? Keep it there. <i>"Both need the selected id, so it goes in the parent."</i></div></li>
+    <li><span>5</span><div><b>Let children report back.</b> The owner passes down <code>onSelect</code>; the child calls it; only the owner changes state. <i>"The row calls onSelect(id), the parent updates."</i></div></li>
+  </ul>
+  <p class="sub" style="margin:8px 2px 0"><b>Boxes → static → what changes → where it lives → report back.</b></p>
+
+  <h2 id="stuck">When stuck or blank</h2>
+  <ul class="rules">
+    <li><span>1</span><div>Say: <b>"Let me step back. What state do I need, and what should be on screen?"</b> Then do the smallest next step, even if it's hardcoding one row.</div></li>
+    <li><span>2</span><div>Read the <b>first line</b> of the error and the file/line it names.</div></li>
+    <li><span>3</span><div><code>console.log('visible', visible)</code> right before the <code>return</code>, then open the <b>Console</b> tab. Is it the shape I think it is?</div></li>
+    <li><span>4</span><div><b>Where to log:</b> above the <code>return</code> (best). Inside a map: switch <code>=&gt; (</code> to <code>=&gt; {</code>, log, then <code>return &lt;li/&gt;</code>. In JSX: <code>{console.log(x)}</code> renders nothing, so it's safe.</div></li>
+    <li><span>5</span><div>Still lost? Comment out half the new code and see which half breaks.</div></li>
+    <li><span>6</span><div>Order of work: <b>render it → make it work → empty/loading states → style</b>. Say it out loud at the start.</div></li>
+  </ul>
+
+  <h2 id="mistakes">Mistakes I keep making</h2>
+  <ul class="rules">
+    <li><span>1</span><div><b>map vs filter.</b> Keeping some items? <code>filter</code>. <code>map</code> with a true/false return gives <code>[true, false…]</code>.</div></li>
+    <li><span>2</span><div><b>A derived value is a plain value</b>, recalculated every render. Don't call it, don't put it in state, don't pass it to <code>onChange</code>. If it's stale, its <i>source</i> isn't state.</div></li>
+    <li><span>3</span><div><b>Pass, don't call:</b> <code>onClick={save}</code> or <code>onClick={() =&gt; remove(id)}</code>, never <code>onClick={remove(id)}</code>.</div></li>
+    <li><span>4</span><div><b>Every input gets value + onChange.</b> Checkbox: <code>checked</code> + <code>e.target.checked</code>. Otherwise reset/clear won't show on screen.</div></li>
+    <li><span>5</span><div><b>Key on everything I map</b>, including <code>&lt;option key={t}&gt;</code>. Stable id, not index.</div></li>
+    <li><span>6</span><div><b>Braces after =&gt; need return.</b> <code>x =&gt; { &lt;li/&gt; }</code> returns nothing.</div></li>
+    <li><span>7</span><div><b>State is a snapshot.</b> After <code>setX(v)</code>, <code>x</code> is still old on this line. Use <code>v</code>.</div></li>
+    <li><span>8</span><div><b>Never mutate:</b> no <code>push</code>, <code>sort</code>, <code>obj.x =</code> on state. Spread / map / filter, and <code>[...arr].sort()</code>.</div></li>
+    <li><span>9</span><div><b><code>{n &amp;&amp; …}</code> prints 0.</b> Write <code>{n &gt; 0 &amp;&amp; …}</code>.</div></li>
+    <li><span>10</span><div><b>Lists start as <code>[]</code></b>, never undefined. Inputs give strings: <code>Number(e.target.value)</code>.</div></li>
+    <li><span>11</span><div><b>In a form:</b> <code>e.preventDefault()</code> first; other buttons need <code>type="button"</code>.</div></li>
+    <li><span>12</span><div><b>Imports:</b> <code>export default</code> → no braces. Named → braces, exact name.</div></li>
+  </ul>
+
+
+  <h2 id="props">Props wiring (the panic mistakes)</h2>
+  <section class="card">
+    <div class="card-head"><h3>Two ends, different braces</h3><p>passing = like HTML attributes · receiving = ONE pair of braces</p><button class="copy">Copy</button></div>
+<pre><span class="c">// PARENT: passing. One name={value} per prop. Never grouped.</span>
+&lt;CustomerTable
+  customers={visible}
+  sortKey={sortKey}
+  onSort={handleSort}
+  onSelect={(id) =&gt; { setSelectedId(id); }}
+/&gt;
+
+<span class="c">// CHILD: receiving. ONE pair of braces inside the parentheses.</span>
+export default function CustomerTable({ customers, sortKey, onSort, onSelect }) {
+  console.log('table props', customers, sortKey); <span class="c">// first thing to check</span>
+  ...
+  &lt;tr onClick={() =&gt; { onSelect(c.id); }}&gt;
+}</pre>
+  </section>
+  <ul class="rules">
+    <li><span>P1</span><div><b>Grouped when passing:</b> <code>&lt;Table {customers, sortKey} /&gt;</code> → syntax error pointing at the brace. <b>Fix:</b> <code>customers={customers} sortKey={sortKey}</code>.</div></li>
+    <li><span>P2</span><div><b>No braces when receiving:</b> <code>function Table(customers)</code> → <code>customers.map is not a function</code> (it's the whole props object). <b>Fix:</b> <code>function Table({ customers })</code>.</div></li>
+    <li><span>P3</span><div><b>Two sets of braces:</b> <code>function Table({ customers }, { sortKey })</code> → <code>sortKey</code> always undefined. <b>Fix:</b> one set: <code>({ customers, sortKey })</code>.</div></li>
+    <li><span>P4</span><div><b>Received but never passed</b> (or a typo: <code>onselect</code> vs <code>onSelect</code>) → <code>onSelect is not a function</code> on click, or undefined. <b>Fix:</b> the name must match exactly at both ends. Check the parent's JSX.</div></li>
+    <li><span>P5</span><div><b>Using the parent's setter in the child:</b> <code>setSelectedId(id)</code> inside the table → <code>setSelectedId is not defined</code>. The child can't see the parent's variables. <b>Fix:</b> pass a callback (<code>onSelect</code>) and call that.</div></li>
+    <li><span>P6</span><div><b>Calling instead of passing:</b> <code>onClose={setOpen(false)}</code> → "Too many re-renders". <b>Fix:</b> <code>onClose={() =&gt; { setOpen(false); }}</code>.</div></li>
+    <li><span>P7</span><div><b>Passing the whole thing when the child needs one piece</b> is fine; <b>passing nothing because "it's in the parent"</b> is not. If the child uses it, it's in the child's braces.</div></li>
+    <li><span>P9</span><div><b>New component looks like it's not there:</b> an <b>empty div has zero height</b>, so it's invisible even though it rendered. A component that <b>returns null or undefined</b> (a stub, <code>if (!open) return null</code> with no <code>open</code> passed, or braces with no <code>return</code>) renders nothing, with <b>no error</b>. <b>Habit:</b> start every new component with visible placeholder text and <code>style={{ background: 'red' }}</code>, plus <code>console.log('X rendered')</code>. Style it properly once you can see it.</div></li>
+    <li><span>P8</span><div><b>New component, nothing shows:</b> forgot to render it in the parent's JSX, or forgot to import it. Check both before anything else.</div></li>
+  </ul>
+
+  <h2 id="errors">Error decoder: what it says → what it usually means</h2>
+  <ul class="rules">
+    <li><span>!</span><div><code>X is not a function</code> → X isn't what I think. Usually a prop not passed or misnamed (P4), or the props object without braces (P2). Log X.</div></li>
+    <li><span>!</span><div><code>Cannot read properties of undefined (reading 'name')</code> → the thing <i>before</i> <code>.name</code> is undefined. A <code>find</code> found nothing, data hasn't loaded, or a prop is missing. Guard it with <code>if (!x) return null;</code>.</div></li>
+    <li><span>!</span><div><code>X is not defined</code> → X doesn't exist in <i>this</i> file or function. Not imported, or it lives in another component (P5).</div></li>
+    <li><span>!</span><div><code>Unexpected token</code> → a typo in syntax: a brace, paren or comma. Look at the line it names <b>and the line above</b>. In JSX it's often an <code>if</code> or grouped props (P1).</div></li>
+    <li><span>!</span><div><code>Too many re-renders</code> → a setter is being <b>called</b> during render. Find <code>onClick={setX(…)}</code> and wrap it in an arrow (P6).</div></li>
+    <li><span>!</span><div><code>Element type is invalid … got: undefined</code> → bad import. Default export ↔ no braces; named export ↔ braces with the exact name.</div></li>
+    <li><span>!</span><div><code>Objects are not valid as a React child</code> → I put an object in JSX: <code>{customer}</code> instead of <code>{customer.name}</code>, or a groupBy result.</div></li>
+    <li><span>!</span><div><code>Each child in a list should have a unique "key"</code> → add <code>key={item.id}</code> to the <b>outermost</b> tag returned from the map.</div></li>
+    <li><span>!</span><div><b>No error, it just doesn't appear</b> (modal, drawer, new component) → in this order: (1) is <code>{modal}</code> actually in the JSX? (2) <code>console.log('open', open)</code>: does it flip to true on click? Flips back immediately → a backdrop/outside-click handler or a form submit is closing it. (3) Red-box test: <code>style={{ background: 'red', padding: 40 }}</code>. Red shows → CSS problem. (4) In DevTools, the preview is in a shadow root / iframe, so search won't find it. Trust the console log instead.</div></li>
+    <li><span>!</span><div><b>No error, wrong screen</b> → the logic runs on the wrong value. <code>console.log</code> the input and output of the step right before it (filter, sort, find).</div></li>
+  </ul>
+
+  <h2 id="panic">When it breaks and I'm panicking (2 minutes, not 10)</h2>
+  <ul class="rules">
+    <li><span>1</span><div><b>Say it out loud:</b> "Something's off in the wiring. Let me check what the child is actually getting."</div></li>
+    <li><span>2</span><div><b>Log the props</b> on the first line of the child. A whole object or undefined → wiring problem (P1–P5), not logic.</div></li>
+    <li><span>3</span><div><b>Shrink to one prop.</b> Pass only the list. Once it renders, add the next prop. Test after each one.</div></li>
+    <li><span>4</span><div><b>Still stuck → Ctrl+Z</b> back to the last working state and add one thing at a time. That's a professional move, not a failure.</div></li>
+    <li><span>5</span><div><b>Prevention:</b> change one thing, see it work, then the next. Never type five things and then test.</div></li>
+  </ul>
+
+  <h2 id="shapes">Data: words → tool → what comes back</h2>
+  <ul class="rules">
+    <li><span>→</span><div>"search / filter / tabs" → <code>filter</code> → <b>array</b> (maybe empty)</div></li>
+    <li><span>→</span><div>"newest first / A–Z" → <code>[...arr].sort</code> → <b>array</b></div></li>
+    <li><span>→</span><div>"show as / just the names" → <code>map</code> → <b>array, same length</b></div></li>
+    <li><span>→</span><div>"the selected one" → <code>find</code> → <b>one item</b> or undefined</div></li>
+    <li><span>→</span><div>"3 unread / X of Y" → <code>filter().length</code> → <b>number</b>. "total" → <code>reduce(…, 0)</code></div></li>
+    <li><span>→</span><div>"any / all" → <code>some</code> / <code>every</code> → <b>true/false</b></div></li>
+    <li><span>→</span><div>"grouped under" → <code>Object.groupBy</code> → <b>OBJECT</b> (no .map!) → <code>Object.entries</code> or loop over an ORDER array</div></li>
+    <li><span>→</span><div>"per status counts" → <code>reduce(…, {})</code> → <b>object</b>. "unique teams" → <code>[...new Set(arr)]</code> → <b>array</b></div></li>
+    <li><span>→</span><div>"author name from users" → <code>Object.fromEntries(users.map(u =&gt; [u.id, u]))</code> → lookup <b>object</b>, then <code>map</code></div></li>
+    <li><span>!</span><div><b>Arrays are for showing, objects are for looking up.</b> Order: filter → sort → group → render. Grouped list = map inside a map.</div></li>
+  </ul>
+
+  <h2>Patterns</h2>
+
+  <section class="card" id="p-filter">
+    <div class="card-head"><h3>Search + filter list</h3><p>state = what the user controls; everything else derived</p><button class="copy">Copy</button></div>
+<pre>const [query, setQuery] = useState('');
+const [team, setTeam] = useState('All');
+
+<span class="c">// derived: plain values, recalculated each render</span>
+const q = query.trim().toLowerCase();
+const visible = people.filter((p) =&gt; {
+  const matchesQuery = q === '' || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+  const matchesTeam = team === 'All' || p.team === team;
+  return matchesQuery &amp;&amp; matchesTeam;
+});
+const teams = ['All', ...new Set(people.map((p) =&gt; p.team))];
+
+&lt;p&gt;Showing {visible.length} of {people.length}&lt;/p&gt;
+{visible.length === 0 ? (
+  &lt;div className="empty"&gt;
+    No matches. &lt;button onClick={() =&gt; { setQuery(''); setTeam('All'); }}&gt;Clear filters&lt;/button&gt;
+  &lt;/div&gt;
+) : (
+  &lt;ul&gt;{visible.map((p) =&gt; &lt;li key={p.id}&gt;{p.name}&lt;/li&gt;)}&lt;/ul&gt;
+)}</pre>
+  </section>
+
+  <section class="card" id="p-inputs">
+    <div class="card-head"><h3>Controlled inputs</h3><p>value + onChange, every time</p><button class="copy">Copy</button></div>
+<pre>&lt;input value={query} onChange={(e) =&gt; setQuery(e.target.value)} placeholder="Search" /&gt;
+
+&lt;select value={team} onChange={(e) =&gt; setTeam(e.target.value)}&gt;
+  {teams.map((t) =&gt; &lt;option key={t} value={t}&gt;{t}&lt;/option&gt;)}
+&lt;/select&gt;
+
+&lt;input type="checkbox" checked={done} onChange={(e) =&gt; setDone(e.target.checked)} /&gt;
+
+&lt;input type="number" value={qty} onChange={(e) =&gt; setQty(Number(e.target.value))} /&gt;</pre>
+  </section>
+
+  <section class="card" id="p-update">
+    <div class="card-head"><h3>Update a list in state</h3><p>always a new array</p><button class="copy">Copy</button></div>
+<pre>setItems((prev) =&gt; [newItem, ...prev]);                                   <span class="c">// add to top</span>
+setItems((prev) =&gt; [...prev, newItem]);                                   <span class="c">// add to end</span>
+setItems((prev) =&gt; prev.filter((i) =&gt; i.id !== id));                      <span class="c">// remove</span>
+setItems((prev) =&gt; prev.map((i) =&gt; (i.id === id ? { ...i, done: !i.done } : i)));  <span class="c">// toggle one</span>
+setItems((prev) =&gt; prev.map((i) =&gt; (i.id === id ? { ...i, ...changes } : i)));    <span class="c">// edit one</span>
+setItems((prev) =&gt; prev.filter((i) =&gt; !i.done));                          <span class="c">// clear completed</span>
+setUser((prev) =&gt; ({ ...prev, name: 'New' }));                            <span class="c">// object field</span>
+
+let nextId = 100;   <span class="c">// outside the component, for new ids: id: nextId++</span></pre>
+  </section>
+
+  <section class="card" id="p-select">
+    <div class="card-head"><h3>Select by id + lift state</h3><p>state in the common parent; children call callbacks</p><button class="copy">Copy</button></div>
+<pre>function App() {
+  const [items, setItems] = useState(INITIAL);
+  const [selectedId, setSelectedId] = useState(null);
+  const selected = items.find((i) =&gt; i.id === selectedId);   <span class="c">// derived, never a copy</span>
+
+  return (
+    &lt;&gt;
+      &lt;List items={items} selectedId={selectedId} onSelect={setSelectedId} /&gt;
+      &lt;Detail item={selected} /&gt;
+    &lt;/&gt;
+  );
+}
+
+function List({ items, selectedId, onSelect }) {
+  return items.map((i) =&gt; (
+    &lt;button key={i.id} className={i.id === selectedId ? 'row is-active' : 'row'} onClick={() =&gt; onSelect(i.id)}&gt;
+      {i.title}
+    &lt;/button&gt;
+  ));
+}
+
+function Detail({ item }) {
+  if (!item) return &lt;p&gt;Select something.&lt;/p&gt;;
+  return &lt;h2&gt;{item.title}&lt;/h2&gt;;
+}</pre>
+  </section>
+
+  <section class="card" id="p-form">
+    <div class="card-head"><h3>Form with validation + async submit</h3><p>preventDefault, error state, try/catch/finally</p><button class="copy">Copy</button></div>
+<pre>const [email, setEmail] = useState('');
+const [error, setError] = useState('');
+const [submitting, setSubmitting] = useState(false);
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  const value = email.trim();
+  if (!value.includes('@')) { setError('Enter a valid email address.'); return; }
+  setSubmitting(true);
+  try {
+    const result = await invite(value);
+    onInvited(result);
+    setEmail('');
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+&lt;form onSubmit={handleSubmit} noValidate&gt;
+  &lt;input
+    className={error ? 'input has-error' : 'input'}
+    value={email}
+    onChange={(e) =&gt; { setEmail(e.target.value); setError(''); }}
+  /&gt;
+  {error &amp;&amp; &lt;p className="error"&gt;{error}&lt;/p&gt;}
+  &lt;button type="submit" disabled={submitting}&gt;{submitting ? 'Saving…' : 'Save'}&lt;/button&gt;
+  &lt;button type="button" onClick={onCancel}&gt;Cancel&lt;/button&gt;
+&lt;/form&gt;</pre>
+  </section>
+
+  <section class="card" id="p-fetch">
+    <div class="card-head"><h3>Fetch with the cancelled flag</h3><p>loading / error / empty / success, refetch, retry</p><button class="copy">Copy</button></div>
+<pre>const [status, setStatus] = useState('loading');   <span class="c">// 'loading' | 'error' | 'success'</span>
+const [data, setData] = useState([]);
+const [error, setError] = useState('');
+const [attempt, setAttempt] = useState(0);          <span class="c">// bump to retry</span>
+
+useEffect(() =&gt; {
+  let cancelled = false;
+  setStatus('loading');
+  getOrders(range)                                  <span class="c">// the codebase's API function</span>
+    .then((result) =&gt; {
+      if (cancelled) return;                        <span class="c">// a newer request replaced this one</span>
+      setData(result);
+      setStatus('success');
+    })
+    .catch((err) =&gt; {
+      if (cancelled) return;
+      setError(err.message);
+      setStatus('error');
+    });
+  return () =&gt; { cancelled = true; };               <span class="c">// runs before the next fetch and on unmount</span>
+}, [range, attempt]);                               <span class="c">// refetch when these change</span>
+
+if (status === 'loading') return &lt;p&gt;Loading…&lt;/p&gt;;
+if (status === 'error') return &lt;div&gt;{error} &lt;button onClick={() =&gt; setAttempt((n) =&gt; n + 1)}&gt;Try again&lt;/button&gt;&lt;/div&gt;;
+if (data.length === 0) return &lt;p&gt;Nothing here yet.&lt;/p&gt;;
+return &lt;ul&gt;{data.map((d) =&gt; &lt;li key={d.id}&gt;{d.name}&lt;/li&gt;)}&lt;/ul&gt;;</pre>
+    <p class="say"><b>Real fetch:</b> <code>const ctrl = new AbortController(); fetch(url, { signal: ctrl.signal })</code>, check <code>res.ok</code>, ignore <code>err.name === 'AbortError'</code>, cleanup <code>ctrl.abort()</code>. <b>Say:</b> "The flag stops a slow old response from overwriting newer data."</p>
+  </section>
+
+  <section class="card" id="p-cond">
+    <div class="card-head"><h3>Conditional rendering</h3><p>expressions only inside JSX braces</p><button class="copy">Copy</button></div>
+<pre>{isOpen &amp;&amp; &lt;Menu /&gt;}                          <span class="c">// something or nothing</span>
+{isAdmin ? &lt;Badge /&gt; : null}                   <span class="c">// one or the other</span>
+{count &gt; 0 &amp;&amp; &lt;span&gt;{count} unread&lt;/span&gt;}     <span class="c">// never {count &amp;&amp; …}</span>
+if (!item) return &lt;p&gt;Select one.&lt;/p&gt;;         <span class="c">// early return</span>
+
+let content;                                   <span class="c">// complex: decide above the return</span>
+if (status === 'loading') content = &lt;Spinner /&gt;;
+else if (items.length === 0) content = &lt;Empty /&gt;;
+else content = &lt;List items={items} /&gt;;
+return &lt;div className="card"&gt;{content}&lt;/div&gt;;
+
+const cx = (...c) =&gt; c.filter(Boolean).join(' ');
+&lt;li className={cx('row', active &amp;&amp; 'is-active', starred &amp;&amp; 'is-starred')}&gt;</pre>
+  </section>
+
+  <section class="card" id="p-data">
+    <div class="card-head"><h3>Shaping data</h3><p>sort, group, count, format</p><button class="copy">Copy</button></div>
+<pre>[...items].sort((a, b) =&gt; a.name.localeCompare(b.name));                <span class="c">// A→Z</span>
+[...items].sort((a, b) =&gt; b.amount - a.amount);                          <span class="c">// biggest first</span>
+[...items].sort((a, b) =&gt; new Date(b.updatedAt) - new Date(a.updatedAt)); <span class="c">// newest first</span>
+a.version.localeCompare(b.version, undefined, { numeric: true })        <span class="c">// v2.9 before v2.10</span>
+
+const total = items.reduce((sum, i) =&gt; sum + i.amount, 0);
+const unread = items.filter((i) =&gt; !i.read).length;
+const anyDone = items.some((i) =&gt; i.done);
+
+const ORDER = ['Today', 'Yesterday', 'Older'];                           <span class="c">// ordered sections</span>
+const sections = ORDER
+  .map((label) =&gt; ({ label, items: items.filter((i) =&gt; groupOf(i) === label) }))
+  .filter((s) =&gt; s.items.length &gt; 0);
+
+new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)  <span class="c">// $1,290.50</span>
+new Intl.NumberFormat('en-US', { notation: 'compact' }).format(n)                 <span class="c">// 1.2M</span>
+new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })      <span class="c">// Sep 28</span>
+`${n} ${n === 1 ? 'item' : 'items'}`                                             <span class="c">// plural</span></pre>
+  </section>
+
+  <section class="card" id="p-timer">
+    <div class="card-head"><h3>Timers: "Copied!" for 2s, debounce</h3><p>always clean up</p><button class="copy">Copy</button></div>
+<pre><span class="c">// show a message briefly</span>
+useEffect(() =&gt; {
+  if (!copied) return;
+  const id = setTimeout(() =&gt; setCopied(false), 2000);
+  return () =&gt; clearTimeout(id);
+}, [copied]);
+
+<span class="c">// debounce: wait until typing pauses</span>
+const [debounced, setDebounced] = useState(query);
+useEffect(() =&gt; {
+  const id = setTimeout(() =&gt; setDebounced(query), 300);
+  return () =&gt; clearTimeout(id);
+}, [query]);
+
+<span class="c">// repeating: use the updater form, or it sticks</span>
+useEffect(() =&gt; {
+  const id = setInterval(() =&gt; setSeconds((s) =&gt; s + 1), 1000);
+  return () =&gt; clearInterval(id);
+}, []);</pre>
+  </section>
+
+  <section class="card" id="p-listen">
+    <div class="card-head"><h3>Escape, click outside, focus</h3><p>listeners on document need cleanup</p><button class="copy">Copy</button></div>
+<pre>const menuRef = useRef(null);
+
+useEffect(() =&gt; {
+  if (!open) return;
+  const onDown = (e) =&gt; { if (menuRef.current &amp;&amp; !menuRef.current.contains(e.target)) setOpen(false); };
+  const onKey = (e) =&gt; { if (e.key === 'Escape') setOpen(false); };
+  document.addEventListener('mousedown', onDown);
+  document.addEventListener('keydown', onKey);
+  return () =&gt; {
+    document.removeEventListener('mousedown', onDown);
+    document.removeEventListener('keydown', onKey);
+  };
+}, [open]);
+
+&lt;div ref={menuRef} className="menu-wrap"&gt; ... &lt;/div&gt;
+
+<span class="c">// focus an input when it appears</span>
+const inputRef = useRef(null);
+useEffect(() =&gt; { if (editing) inputRef.current?.focus(); }, [editing]);
+&lt;input ref={inputRef} /&gt;
+
+<span class="c">// stop a click reaching the parent row</span>
+&lt;button onClick={(e) =&gt; { e.stopPropagation(); remove(id); }}&gt;×&lt;/button&gt;</pre>
+  </section>
+
+  <section class="card" id="p-css">
+    <div class="card-head"><h3>CSS I reach for</h3><p>layout goes on the parent</p><button class="copy">Copy</button></div>
+<pre>* { box-sizing: border-box; }
+.row    { display: flex; align-items: center; gap: 12px; }
+.header { display: flex; justify-content: space-between; align-items: center; }
+.stack  { display: flex; flex-direction: column; gap: 8px; }
+.grow   { flex: 1; min-width: 0; }            <span class="c">/* fill + allow truncation */</span>
+.fixed  { flex-shrink: 0; }                    <span class="c">/* avatars, icons */</span>
+.push   { margin-left: auto; }                 <span class="c">/* to the right edge */</span>
+.cards  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.layout { display: grid; grid-template-columns: 260px 1fr; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card  { position: relative; }  .badge { position: absolute; top: 12px; right: 12px; }
+.list  { flex: 1; min-height: 0; overflow-y: auto; }   <span class="c">/* scroll inside a flex column */</span>
+.item:hover { background: var(--color-hover); }
+.item.is-active { background: var(--color-active); font-weight: 500; }
+.row:hover .star, .row.is-starred .star { opacity: 1; }
+button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }</pre>
+    <p class="say"><b>Use the codebase's</b> <code>var(--…)</code> colors instead of hex codes. Figma auto layout = flex; spacing = <code>gap</code>; Fill = <code>flex: 1</code>.</p>
+  </section>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+  (function () {
+    var toast = document.getElementById('toast');
+    var timer;
+    function show(msg) {
+      toast.textContent = msg;
+      toast.hidden = false;
+      clearTimeout(timer);
+      timer = setTimeout(function () { toast.hidden = true; }, 1400);
+    }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.copy');
+      if (!btn) return;
+      var pre = btn.closest('.card').querySelector('pre');
+      var text = pre.innerText;
+      try {
+        navigator.clipboard.writeText(text).then(function () { show('Copied'); }, function () { select(pre); });
+      } catch (err) { select(pre); }
+    });
+    function select(el) {
+      var r = document.createRange();
+      r.selectNodeContents(el);
+      var s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      show('Selected. Press Ctrl/⌘ + C');
+    }
+  })();
+</script>

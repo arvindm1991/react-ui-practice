@@ -1,0 +1,367 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Category = {
+  id: string;
+  name: string;
+};
+
+export type Product = {
+  id: string;
+  name: string;
+  categoryId: string;
+  priceCents: number;
+  tone: string; // background color for the photo placeholder
+  emoji: string;
+};
+
+const CATEGORIES: Category[] = [
+  { id: 'plants', name: 'Indoor plants' },
+  { id: 'pots', name: 'Pots' },
+  { id: 'care', name: 'Plant care' },
+  { id: 'gifts', name: 'Gift cards' },
+];
+
+const PRODUCTS: Product[] = [
+  { id: 'p1', name: 'Monstera Deliciosa', categoryId: 'plants', priceCents: 4800, tone: '#DCE8D2', emoji: '🌿' },
+  { id: 'p2', name: 'Fiddle Leaf Fig', categoryId: 'plants', priceCents: 6500, tone: '#E4ECD9', emoji: '🌳' },
+  { id: 'p3', name: 'Snake Plant', categoryId: 'plants', priceCents: 3200, tone: '#D8E4D0', emoji: '🪴' },
+  { id: 'p4', name: 'Golden Pothos', categoryId: 'plants', priceCents: 2400, tone: '#E7EED8', emoji: '🍃' },
+  { id: 'p5', name: 'Mini Cactus Trio', categoryId: 'plants', priceCents: 2900, tone: '#EDEBD5', emoji: '🌵' },
+  { id: 'p6', name: 'Terracotta Pot, 6"', categoryId: 'pots', priceCents: 1800, tone: '#F1DCCB', emoji: '🏺' },
+  { id: 'p7', name: 'Speckled Ceramic Planter', categoryId: 'pots', priceCents: 3600, tone: '#EFE6DA', emoji: '🪣' },
+  { id: 'p8', name: 'Hanging Macramé Pot', categoryId: 'pots', priceCents: 2700, tone: '#F2E8D8', emoji: '🧺' },
+  { id: 'p9', name: 'Self-Watering Pot', categoryId: 'pots', priceCents: 3100, tone: '#E9E3D8', emoji: '💧' },
+  { id: 'p10', name: 'Organic Potting Mix', categoryId: 'care', priceCents: 1400, tone: '#E6DED0', emoji: '🪨' },
+  { id: 'p11', name: 'Brass Mister', categoryId: 'care', priceCents: 2200, tone: '#EEE5CC', emoji: '✨' },
+  { id: 'p12', name: 'Leaf Shine Spray', categoryId: 'care', priceCents: 1200, tone: '#E2EAD8', emoji: '🧴' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /products -> Product[]
+export async function getProducts(): Promise<Product[]> {
+  await randomDelay(500, 1200);
+  return PRODUCTS.map((p) => ({ ...p }));
+}
+
+// GET /categories -> Category[]  (no counts: the API doesn't send them)
+export async function getCategories(): Promise<Category[]> {
+  await randomDelay(300, 900);
+  return CATEGORIES.map((c) => ({ ...c }));
+}
+@@@ shared src/components/ProductCard.tsx
+import React from 'react';
+import type { Product } from '../api';
+import { formatPrice } from '../utils/formatPrice';
+
+export function ProductCard({ product }: { product: Product }) {
+  return (
+    <article className="product">
+      <div className="product-photo" style={{ background: product.tone }}>{product.emoji}</div>
+      <h3>{product.name}</h3>
+      <p className="product-price">{formatPrice(product.priceCents)}</p>
+    </article>
+  );
+}
+@@@ shared src/utils/formatPrice.ts
+// formatPrice(4800) -> "$48.00"
+export function formatPrice(cents: number): string {
+  return '$' + (cents / 100).toFixed(2);
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProducts } from './api';
+import type { Product } from './api';
+import { ProductCard } from './components/ProductCard';
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">Fernwood</span>
+      <nav className="nav">
+        <a>Shop</a>
+        <a>Journal</a>
+        <a>Care guides</a>
+      </nav>
+      <span className="cart">Cart (0)</span>
+    </header>
+  );
+}
+
+// TODO: category chips go between the heading and the grid.
+function ProductGrid() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProducts().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProducts(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <p className="loading">Loading the greenhouse…</p>;
+  }
+
+  return (
+    <div className="grid">
+      {products.map((p) => {
+        return <ProductCard key={p.id} product={p} />;
+      })}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <main className="shop">
+        <p className="eyebrow">The spring collection</p>
+        <h1>Bring the outside in</h1>
+        <ProductGrid />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F7F3EA;
+  --surface: #FFFDF8;
+  --border: #E5DDCB;
+  --text: #24301F;
+  --muted: #6F7A63;
+  --primary: #2F5D3A;
+  --primary-soft: #E2EBDC;
+  --radius: 4px;
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; gap: 28px; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+.logo { font-family: var(--serif); font-size: 24px; font-style: italic; color: var(--primary); margin-right: auto; }
+.nav { display: flex; gap: 22px; font-size: 14px; }
+.nav a { cursor: pointer; }
+.cart { font-size: 14px; font-weight: 600; }
+
+.shop { max-width: 1000px; margin: 0 auto; padding: 36px 32px 56px; }
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.shop h1 { margin: 6px 0 24px; font-family: var(--serif); font-weight: 500; font-size: 38px; letter-spacing: -0.01em; }
+.loading { color: var(--muted); font-style: italic; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 28px 20px; }
+.product h3 { margin: 12px 0 2px; font-size: 15px; font-weight: 500; }
+.product-photo { aspect-ratio: 4 / 5; border-radius: var(--radius); display: grid; place-items: center; font-size: 56px; }
+.product-price { margin: 0; font-size: 14px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .nav { display: none; }
+  .shop { padding: 24px 16px; }
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCategories, getProducts } from './api';
+import type { Category, Product } from './api';
+import { ProductCard } from './components/ProductCard';
+
+const ALL = 'all';
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">Fernwood</span>
+      <nav className="nav">
+        <a>Shop</a>
+        <a>Journal</a>
+        <a>Care guides</a>
+      </nav>
+      <span className="cart">Cart (0)</span>
+    </header>
+  );
+}
+
+type ChipProps = {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+};
+
+function Chip({ label, count, active, onClick }: ChipProps) {
+  let cls = 'chip';
+  if (active) {
+    cls = 'chip is-active';
+  }
+  return (
+    <button type="button" className={cls} aria-pressed={active} disabled={count === 0} onClick={() => { onClick(); }}>
+      {label} <span className="chip-count">{count}</span>
+    </button>
+  );
+}
+
+type CategoryChipsProps = {
+  categories: Category[];
+  products: Product[];
+  active: string;
+  onChange: (id: string) => void;
+};
+
+function CategoryChips({ categories, products, active, onChange }: CategoryChipsProps) {
+  // derived: the API has no counts, so count the products we already have.
+  function countFor(categoryId: string) {
+    return products.filter((p) => {
+      return p.categoryId === categoryId;
+    }).length;
+  }
+
+  return (
+    <div className="chips" role="group" aria-label="Filter by category">
+      <Chip label="All" count={products.length} active={active === ALL} onClick={() => { onChange(ALL); }} />
+      {categories.map((c) => {
+        return (
+          <Chip
+            key={c.id}
+            label={c.name}
+            count={countFor(c.id)}
+            active={active === c.id}
+            onClick={() => { onChange(c.id); }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ProductGrid({ products }: { products: Product[] }) {
+  return (
+    <div className="grid">
+      {products.map((p) => {
+        return <ProductCard key={p.id} product={p} />;
+      })}
+    </div>
+  );
+}
+
+// Products moved up here: the chips need them for their counts and the grid needs them to render.
+function Catalog() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState(ALL);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Two independent requests, wait for both.
+    Promise.all([getProducts(), getCategories()]).then(([productData, categoryData]) => {
+      if (cancelled) {
+        return;
+      }
+      setProducts(productData);
+      setCategories(categoryData);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived
+  let visible = products;
+  if (activeCategory !== ALL) {
+    visible = products.filter((p) => {
+      return p.categoryId === activeCategory;
+    });
+  }
+
+  if (loading) {
+    return <p className="loading">Loading the greenhouse…</p>;
+  }
+
+  return (
+    <div>
+      <CategoryChips
+        categories={categories}
+        products={products}
+        active={activeCategory}
+        onChange={(id) => { setActiveCategory(id); }}
+      />
+      <ProductGrid products={visible} />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <main className="shop">
+        <p className="eyebrow">The spring collection</p>
+        <h1>Bring the outside in</h1>
+        <Catalog />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F7F3EA;
+  --surface: #FFFDF8;
+  --border: #E5DDCB;
+  --text: #24301F;
+  --muted: #6F7A63;
+  --primary: #2F5D3A;
+  --primary-soft: #E2EBDC;
+  --radius: 4px;
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; gap: 28px; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+.logo { font-family: var(--serif); font-size: 24px; font-style: italic; color: var(--primary); margin-right: auto; }
+.nav { display: flex; gap: 22px; font-size: 14px; }
+.nav a { cursor: pointer; }
+.cart { font-size: 14px; font-weight: 600; }
+
+.shop { max-width: 1000px; margin: 0 auto; padding: 36px 32px 56px; }
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.shop h1 { margin: 6px 0 24px; font-family: var(--serif); font-weight: 500; font-size: 38px; letter-spacing: -0.01em; }
+.loading { color: var(--muted); font-style: italic; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 28px 20px; }
+.product h3 { margin: 12px 0 2px; font-size: 15px; font-weight: 500; }
+.product-photo { aspect-ratio: 4 / 5; border-radius: var(--radius); display: grid; place-items: center; font-size: 56px; }
+.product-price { margin: 0; font-size: 14px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .nav { display: none; }
+  .shop { padding: 24px 16px; }
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---- Added: category chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.chip:hover:not(:disabled) { border-color: var(--primary); }
+.chip-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; text-align: center; }
+.chip.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip.is-active .chip-count { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.chip:disabled { opacity: 0.45; cursor: not-allowed; }

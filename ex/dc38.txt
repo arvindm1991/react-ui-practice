@@ -1,0 +1,608 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type FileNode = {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  children?: FileNode[]; // folders only
+};
+
+export type FileContent = {
+  id: string;
+  content: string;
+  size: number; // bytes
+};
+
+const TREE: FileNode[] = [
+  { id: 'src', name: 'src', type: 'folder', children: [
+    { id: 'components', name: 'components', type: 'folder', children: [
+      { id: 'button', name: 'Button.tsx', type: 'file' },
+      { id: 'modal', name: 'Modal.tsx', type: 'file' },
+      { id: 'avatar', name: 'Avatar.tsx', type: 'file' },
+    ] },
+    { id: 'hooks', name: 'hooks', type: 'folder', children: [
+      { id: 'debounce', name: 'useDebounce.ts', type: 'file' },
+    ] },
+    { id: 'utils', name: 'utils', type: 'folder', children: [
+      { id: 'format', name: 'format.ts', type: 'file' },
+      { id: 'apidir', name: 'api', type: 'folder', children: [
+        { id: 'client', name: 'client.ts', type: 'file' },
+        { id: 'endpoints', name: 'endpoints.ts', type: 'file' },
+      ] },
+    ] },
+    { id: 'app', name: 'App.tsx', type: 'file' },
+    { id: 'index', name: 'index.tsx', type: 'file' },
+  ] },
+  { id: 'public', name: 'public', type: 'folder', children: [
+    { id: 'favicon', name: 'favicon.svg', type: 'file' },
+    { id: 'robots', name: 'robots.txt', type: 'file' },
+  ] },
+  { id: 'pkg', name: 'package.json', type: 'file' },
+  { id: 'readme', name: 'README.md', type: 'file' },
+  { id: 'tsconfig', name: 'tsconfig.json', type: 'file' },
+];
+
+const CONTENTS: Record<string, string> = {
+  button: "type ButtonProps = {\n  variant?: 'primary' | 'ghost';\n  children: React.ReactNode;\n  onClick?: () => void;\n};\n\nexport function Button({ variant = 'primary', children, onClick }: ButtonProps) {\n  return (\n    <button className={'btn btn-' + variant} onClick={onClick}>\n      {children}\n    </button>\n  );\n}\n",
+  modal: "export function Modal({ title, onClose, children }: ModalProps) {\n  useEscape(onClose);\n  return (\n    <div className=\"backdrop\" onClick={onClose}>\n      <div className=\"modal\" role=\"dialog\" aria-label={title}>\n        {children}\n      </div>\n    </div>\n  );\n}\n",
+  avatar: "export function Avatar({ name }: { name: string }) {\n  const initials = name.split(' ').map((p) => p[0]).join('');\n  return <span className=\"avatar\">{initials}</span>;\n}\n",
+  debounce: "export function useDebounce<T>(value: T, ms = 300): T {\n  const [debounced, setDebounced] = useState(value);\n  useEffect(() => {\n    const t = setTimeout(() => setDebounced(value), ms);\n    return () => clearTimeout(t);\n  }, [value, ms]);\n  return debounced;\n}\n",
+  format: "export function formatBytes(n: number): string {\n  if (n < 1024) return n + ' B';\n  return (n / 1024).toFixed(1) + ' KB';\n}\n",
+  client: "const BASE_URL = import.meta.env.VITE_API_URL;\n\nexport async function request<T>(path: string): Promise<T> {\n  const res = await fetch(BASE_URL + path);\n  if (!res.ok) throw new Error(res.statusText);\n  return res.json();\n}\n",
+  endpoints: "export const endpoints = {\n  me: '/me',\n  projects: '/projects',\n  project: (id: string) => '/projects/' + id,\n};\n",
+  app: "import { Button } from './components/Button';\n\nexport default function App() {\n  return (\n    <main>\n      <h1>Codebox</h1>\n      <Button>Get started</Button>\n    </main>\n  );\n}\n",
+  index: "import { createRoot } from 'react-dom/client';\nimport App from './App';\n\ncreateRoot(document.getElementById('root')!).render(<App />);\n",
+  favicon: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <rect width=\"32\" height=\"32\" rx=\"8\" fill=\"#7C3AED\" />\n</svg>\n",
+  robots: "User-agent: *\nAllow: /\n",
+  pkg: "{\n  \"name\": \"codebox-web\",\n  \"version\": \"0.4.2\",\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"tsc && vite build\"\n  }\n}\n",
+  readme: "# codebox-web\n\nThe Codebox marketing site and dashboard.\n\n## Develop\n\n    npm install\n    npm run dev\n",
+  tsconfig: "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"jsx\": \"react-jsx\",\n    \"strict\": true\n  }\n}\n",
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /repo/tree -> FileNode[] (nested; folders have children)
+export async function getTree(): Promise<FileNode[]> {
+  await randomDelay(400, 900);
+  return JSON.parse(JSON.stringify(TREE));
+}
+
+// GET /repo/files/:id -> FileContent
+export async function getFile(id: string): Promise<FileContent> {
+  await randomDelay(300, 800);
+  const content = CONTENTS[id] || '';
+  return { id, content, size: content.length };
+}
+@@@ shared src/components/CodeView.tsx
+import React from 'react';
+
+// Read-only code with line numbers.
+export function CodeView({ code }: { code: string }) {
+  const lines = code.replace(/\n$/, '').split('\n');
+  return (
+    <pre className="code">
+      {lines.map((line, i) => {
+        return (
+          <div key={i} className="code-line">
+            <span className="line-no">{i + 1}</span>
+            <span className="line-text">{line}</span>
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
+@@@ shared src/utils/files.ts
+// fileIcon("Button.tsx") -> "TSX", fileIcon("README.md") -> "MD" (short badge text by extension)
+export function fileIcon(name: string): string {
+  const ext = name.split('.').pop() || '';
+  const map: Record<string, string> = { tsx: 'TSX', ts: 'TS', json: '{}', md: 'MD', svg: 'SVG', txt: 'TXT' };
+  return map[ext] || 'FILE';
+}
+
+// formatBytes(412) -> "412 B", formatBytes(2048) -> "2.0 KB"
+export function formatBytes(n: number): string {
+  if (n < 1024) {
+    return n + ' B';
+  }
+  return (n / 1024).toFixed(1) + ' KB';
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTree } from './api';
+import type { FileNode } from './api';
+import { fileIcon } from './utils/files';
+
+function TitleBar() {
+  return (
+    <header className="titlebar">
+      <span className="dots"><i /><i /><i /></span>
+      <span className="title">codebox-web</span>
+      <span className="branch">⎇ main</span>
+    </header>
+  );
+}
+
+// TODO: recursive tree with expand/collapse + select a file
+function Explorer() {
+  const [tree, setTree] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTree().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTree(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="side-msg">Loading files…</p>;
+  } else {
+    body = (
+      <ul className="tree">
+        {tree.map((node) => {
+          let icon = <span className="file-icon">{fileIcon(node.name)}</span>;
+          if (node.type === 'folder') {
+            icon = <span className="folder-icon">▸</span>;
+          }
+          return (
+            <li key={node.id}>
+              <button type="button" className="tree-row">
+                {icon}
+                <span className="tree-name">{node.name}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <aside className="explorer">
+      <div className="explorer-head">
+        <span>Explorer</span>
+      </div>
+      {body}
+    </aside>
+  );
+}
+
+function Preview() {
+  return (
+    <section className="preview">
+      <div className="preview-head">
+        <span className="crumbs">codebox-web</span>
+      </div>
+      <div className="preview-empty">
+        <p className="empty-mark">{'</>'}</p>
+        <p>Select a file to preview it</p>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TitleBar />
+      <div className="workspace">
+        <Explorer />
+        <Preview />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0D1117;
+  --panel: #161B22;
+  --panel-2: #1C2230;
+  --border: #262D3A;
+  --text: #D6DEEB;
+  --muted: #7D8799;
+  --primary: #8B5CF6;
+  --primary-soft: rgba(139, 92, 246, 0.16);
+  --hover: rgba(255, 255, 255, 0.05);
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); }
+
+.app { height: 100vh; display: flex; flex-direction: column; }
+.titlebar { display: flex; align-items: center; gap: 14px; height: 40px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 11px; height: 11px; border-radius: 50%; background: #3A4150; }
+.dots i:first-child { background: #FF5F57; }
+.dots i:nth-child(2) { background: #FEBC2E; }
+.dots i:nth-child(3) { background: #28C840; }
+.title { font-weight: 600; }
+.branch { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+.workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 1fr; }
+.explorer { background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; }
+.explorer-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.side-msg { margin: 0; padding: 8px 14px; color: var(--muted); }
+
+.tree { list-style: none; margin: 0; padding: 0 0 12px; }
+.tree-row { width: 100%; height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; }
+.tree-row:hover { background: var(--hover); }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.folder-icon { width: 14px; color: var(--muted); font-size: 11px; text-align: center; }
+.file-icon { min-width: 26px; padding: 1px 3px; border-radius: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; text-align: center; color: #93C5FD; background: rgba(147, 197, 253, 0.12); }
+
+.preview { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+.preview-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.crumbs { color: var(--muted); font-size: 12px; }
+.preview-empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--muted); }
+.preview-empty p { margin: 4px 0; }
+.empty-mark { font-family: var(--mono); font-size: 34px; color: var(--border); }
+
+.code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow: auto; flex: 1; }
+.code-line { display: flex; }
+.line-no { width: 44px; padding-right: 14px; text-align: right; color: #4B5466; user-select: none; flex-shrink: 0; }
+.line-text { white-space: pre; color: var(--text); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getFile, getTree } from './api';
+import type { FileContent, FileNode } from './api';
+import { fileIcon, formatBytes } from './utils/files';
+import { CodeView } from './components/CodeView';
+
+// What the preview needs: which file, and the names from the root down to it.
+type Selection = { id: string; path: string[] };
+
+// Change: files anywhere below this folder (recursive).
+function countFiles(node: FileNode): number {
+  if (node.type === 'file') {
+    return 1;
+  }
+  let total = 0;
+  (node.children || []).forEach((child) => {
+    total = total + countFiles(child);
+  });
+  return total;
+}
+
+function TitleBar() {
+  return (
+    <header className="titlebar">
+      <span className="dots"><i /><i /><i /></span>
+      <span className="title">codebox-web</span>
+      <span className="branch">⎇ main</span>
+    </header>
+  );
+}
+
+type TreeNodeProps = {
+  node: FileNode;
+  depth: number;
+  parentPath: string[];
+  expanded: Set<string>;
+  selectedId: string | null;
+  onToggle: (id: string) => void;
+  onSelect: (selection: Selection) => void;
+};
+
+// Renders one row, and (if it's an open folder) itself again for each child.
+function TreeNode({ node, depth, parentPath, expanded, selectedId, onToggle, onSelect }: TreeNodeProps) {
+  const path = [...parentPath, node.name];
+  const isFolder = node.type === 'folder';
+  const isOpen = expanded.has(node.id);
+
+  function handleClick() {
+    if (isFolder) {
+      onToggle(node.id);
+    } else {
+      onSelect({ id: node.id, path });
+    }
+  }
+
+  let cls = 'tree-row';
+  if (node.id === selectedId) {
+    cls = 'tree-row is-selected';
+  }
+
+  let icon = <span className="file-icon">{fileIcon(node.name)}</span>;
+  let count = null;
+  if (isFolder) {
+    let chevCls = 'folder-icon';
+    if (isOpen) {
+      chevCls = 'folder-icon is-open';
+    }
+    icon = <span className={chevCls}>▸</span>;
+    count = <span className="file-count">{countFiles(node)}</span>;
+  }
+
+  let children = null;
+  if (isFolder && isOpen) {
+    children = (
+      <ul className="tree" role="group">
+        {(node.children || []).map((child) => {
+          return (
+            <TreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              parentPath={path}
+              expanded={expanded}
+              selectedId={selectedId}
+              onToggle={onToggle}
+              onSelect={onSelect}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
+
+  let ariaExpanded: boolean | undefined = undefined;
+  if (isFolder) {
+    ariaExpanded = isOpen;
+  }
+
+  return (
+    <li role="treeitem" aria-expanded={ariaExpanded}>
+      <button type="button" className={cls} style={{ paddingLeft: 10 + depth * 14 }} onClick={() => { handleClick(); }}>
+        {icon}
+        <span className="tree-name">{node.name}</span>
+        {count}
+      </button>
+      {children}
+    </li>
+  );
+}
+
+type ExplorerProps = {
+  selectedId: string | null;
+  onSelect: (selection: Selection) => void;
+};
+
+function Explorer({ selectedId, onSelect }: ExplorerProps) {
+  const [tree, setTree] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState(true);
+  // One set for the whole tree (not state per folder) so "Collapse all" can clear it.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['src']));
+
+  useEffect(() => {
+    let cancelled = false;
+    getTree().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTree(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleToggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev); // copy: never mutate state
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function handleCollapseAll() {
+    setExpanded(new Set());
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="side-msg">Loading files…</p>;
+  } else {
+    body = (
+      <ul className="tree" role="tree">
+        {tree.map((node) => {
+          return (
+            <TreeNode
+              key={node.id}
+              node={node}
+              depth={0}
+              parentPath={[]}
+              expanded={expanded}
+              selectedId={selectedId}
+              onToggle={handleToggle}
+              onSelect={onSelect}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <aside className="explorer">
+      <div className="explorer-head">
+        <span>Explorer</span>
+        <button type="button" className="head-btn" disabled={expanded.size === 0} onClick={() => { handleCollapseAll(); }}>Collapse all</button>
+      </div>
+      {body}
+    </aside>
+  );
+}
+
+function Preview({ selection }: { selection: Selection | null }) {
+  const [file, setFile] = useState<FileContent | null>(null);
+  const [loading, setLoading] = useState(false);
+  let selectedId: string | null = null;
+  if (selection) {
+    selectedId = selection.id;
+  }
+
+  // Refetch when the selected file changes; drop late responses for older clicks.
+  useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getFile(selectedId).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setFile(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
+  if (!selection) {
+    return (
+      <section className="preview">
+        <div className="preview-head">
+          <span className="crumbs">codebox-web</span>
+        </div>
+        <div className="preview-empty">
+          <p className="empty-mark">{'</>'}</p>
+          <p>Select a file to preview it</p>
+        </div>
+      </section>
+    );
+  }
+
+  const crumbs = ['codebox-web', ...selection.path];
+  let body = <p className="preview-loading">Loading…</p>;
+  let size = null;
+  if (!loading && file) {
+    body = <CodeView code={file.content} />;
+    size = <span className="file-size">{formatBytes(file.size)}</span>;
+  }
+
+  return (
+    <section className="preview">
+      <div className="preview-head">
+        <nav className="crumbs" aria-label="Breadcrumb">
+          {crumbs.map((name, i) => {
+            let cls = 'crumb';
+            let sep = null;
+            if (i === crumbs.length - 1) {
+              cls = 'crumb is-current';
+            }
+            if (i > 0) {
+              sep = <span className="crumb-sep">›</span>;
+            }
+            return (
+              <span key={i} className="crumb-wrap">
+                {sep}
+                <span className={cls}>{name}</span>
+              </span>
+            );
+          })}
+        </nav>
+        {size}
+      </div>
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  // Lifted here: the explorer highlights it, the preview loads it.
+  const [selection, setSelection] = useState<Selection | null>(null);
+
+  let selectedId: string | null = null;
+  if (selection) {
+    selectedId = selection.id;
+  }
+
+  return (
+    <div className="app">
+      <TitleBar />
+      <div className="workspace">
+        <Explorer selectedId={selectedId} onSelect={setSelection} />
+        <Preview selection={selection} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0D1117;
+  --panel: #161B22;
+  --panel-2: #1C2230;
+  --border: #262D3A;
+  --text: #D6DEEB;
+  --muted: #7D8799;
+  --primary: #8B5CF6;
+  --primary-soft: rgba(139, 92, 246, 0.16);
+  --hover: rgba(255, 255, 255, 0.05);
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); }
+
+.app { height: 100vh; display: flex; flex-direction: column; }
+.titlebar { display: flex; align-items: center; gap: 14px; height: 40px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 11px; height: 11px; border-radius: 50%; background: #3A4150; }
+.dots i:first-child { background: #FF5F57; }
+.dots i:nth-child(2) { background: #FEBC2E; }
+.dots i:nth-child(3) { background: #28C840; }
+.title { font-weight: 600; }
+.branch { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+.workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 1fr; }
+.explorer { background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; }
+.explorer-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.side-msg { margin: 0; padding: 8px 14px; color: var(--muted); }
+
+.tree { list-style: none; margin: 0; padding: 0 0 12px; }
+.tree-row { width: 100%; height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; }
+.tree-row:hover { background: var(--hover); }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.folder-icon { width: 14px; color: var(--muted); font-size: 11px; text-align: center; }
+.file-icon { min-width: 26px; padding: 1px 3px; border-radius: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; text-align: center; color: #93C5FD; background: rgba(147, 197, 253, 0.12); }
+
+.preview { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+.preview-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.crumbs { color: var(--muted); font-size: 12px; }
+.preview-empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--muted); }
+.preview-empty p { margin: 4px 0; }
+.empty-mark { font-family: var(--mono); font-size: 34px; color: var(--border); }
+
+.code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow: auto; flex: 1; }
+.code-line { display: flex; }
+.line-no { width: 44px; padding-right: 14px; text-align: right; color: #4B5466; user-select: none; flex-shrink: 0; }
+.line-text { white-space: pre; color: var(--text); }
+
+/* ---- Added: tree, preview, breadcrumb ---- */
+.folder-icon { transition: transform 0.12s ease; }
+.folder-icon.is-open { transform: rotate(90deg); }
+.tree-row.is-selected { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }
+.file-count { margin-left: auto; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; color: var(--muted); background: rgba(255, 255, 255, 0.06); }
+.head-btn { border: 0; background: none; padding: 2px 6px; border-radius: 4px; font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); cursor: pointer; }
+.head-btn:hover:not(:disabled) { color: var(--text); background: var(--hover); }
+.head-btn:disabled { opacity: 0.4; cursor: default; }
+
+.crumbs { display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+.crumb-wrap { display: inline-flex; align-items: center; }
+.crumb-sep { margin: 0 6px; color: #4B5466; }
+.crumb.is-current { color: var(--text); font-weight: 600; }
+.file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.preview-loading { margin: 0; padding: 16px; color: var(--muted); font-family: var(--mono); }

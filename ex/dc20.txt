@@ -1,0 +1,521 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type FileItem = {
+  id: string;
+  name: string;
+  kind: 'pdf' | 'image' | 'doc' | 'sheet' | 'video';
+  sizeBytes: number;
+  modified: string; // "Oct 2"
+  owner: string;
+};
+
+let FILES: FileItem[] = [
+  { id: 'f1', name: 'Q3 roadmap.pdf', kind: 'pdf', sizeBytes: 2480000, modified: 'Oct 2', owner: 'You' },
+  { id: 'f2', name: 'Brand photos (raw).zip', kind: 'image', sizeBytes: 812000000, modified: 'Sep 28', owner: 'Priya S.' },
+  { id: 'f3', name: 'Offsite agenda.docx', kind: 'doc', sizeBytes: 64200, modified: 'Sep 27', owner: 'You' },
+  { id: 'f4', name: 'Budget 2027.xlsx', kind: 'sheet', sizeBytes: 318000, modified: 'Sep 21', owner: 'Leo M.' },
+  { id: 'f5', name: 'Product demo.mp4', kind: 'video', sizeBytes: 1430000000, modified: 'Sep 14', owner: 'You' },
+  { id: 'f6', name: 'Hiring plan.docx', kind: 'doc', sizeBytes: 98000, modified: 'Sep 3', owner: 'You' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /files -> FileItem[]
+export async function getFiles(): Promise<FileItem[]> {
+  await randomDelay(300, 900);
+  return FILES.map((f) => ({ ...f }));
+}
+
+// DELETE /files/:id -> { ok: true }
+export async function deleteFile(id: string): Promise<{ ok: true }> {
+  await randomDelay(400, 1000);
+  FILES = FILES.filter((f) => f.id !== id);
+  return { ok: true };
+}
+@@@ shared src/components/Button.tsx
+import React from 'react';
+
+type ButtonProps = {
+  children: React.ReactNode;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
+  autoFocus?: boolean;
+};
+
+export function Button({ children, onClick, variant, disabled, autoFocus }: ButtonProps) {
+  const cls = 'btn btn-' + (variant || 'secondary');
+  return (
+    <button type="button" className={cls} disabled={disabled} autoFocus={autoFocus} onClick={() => { onClick(); }}>
+      {children}
+    </button>
+  );
+}
+@@@ shared src/components/FileIcon.tsx
+import React from 'react';
+import type { FileItem } from '../api';
+
+const ICONS: Record<FileItem['kind'], string> = { pdf: 'PDF', image: 'IMG', doc: 'DOC', sheet: 'XLS', video: 'MP4' };
+
+export function FileIcon({ kind }: { kind: FileItem['kind'] }) {
+  return <span className={'file-icon is-' + kind}>{ICONS[kind]}</span>;
+}
+@@@ shared src/utils/formatBytes.ts
+// formatBytes(2480000) -> "2.5 MB"   formatBytes(64200) -> "64 KB"   formatBytes(1430000000) -> "1.4 GB"
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) {
+    return (bytes / 1e9).toFixed(1) + ' GB';
+  }
+  if (bytes >= 1e6) {
+    return (bytes / 1e6).toFixed(1) + ' MB';
+  }
+  return Math.round(bytes / 1e3) + ' KB';
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getFiles } from './api';
+import type { FileItem } from './api';
+import { Button } from './components/Button';
+import { FileIcon } from './components/FileIcon';
+import { formatBytes } from './utils/formatBytes';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="logo"><span className="logo-mark">◆</span> Driftbox</div>
+      <Button variant="primary" onClick={() => {}}>+ New</Button>
+      <nav className="side-nav">
+        <a className="is-active">My files</a>
+        <a>Shared with me</a>
+        <a>Recent</a>
+        <a>Trash</a>
+      </nav>
+      <div className="storage">
+        <div className="storage-bar"><div style={{ width: '64%' }} /></div>
+        <p>12.8 GB of 20 GB used</p>
+      </div>
+    </aside>
+  );
+}
+
+type FileRowProps = {
+  file: FileItem;
+};
+
+function FileRow({ file }: FileRowProps) {
+  return (
+    <li className="file-row">
+      <FileIcon kind={file.kind} />
+      <span className="file-name">{file.name}</span>
+      <span className="file-meta">{file.owner}</span>
+      <span className="file-meta">{file.modified}</span>
+      <span className="file-meta size">{formatBytes(file.sizeBytes)}</span>
+      {/* TODO: clicking this should ask for confirmation, then delete */}
+      <button type="button" className="icon-btn" aria-label={'Delete ' + file.name}>🗑</button>
+    </li>
+  );
+}
+
+function FileList() {
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFiles().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setFiles(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <p className="msg">Loading files…</p>;
+  }
+
+  return (
+    <ul className="file-list">
+      {files.map((f) => {
+        return <FileRow key={f.id} file={f} />;
+      })}
+    </ul>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>My files</h1>
+        <div className="list-head">
+          <span>Name</span>
+          <span>Owner</span>
+          <span>Modified</span>
+          <span className="size">Size</span>
+          <span />
+        </div>
+        <FileList />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --sidebar: #F5F7FB;
+  --border: #E6E9F0;
+  --text: #1C2033;
+  --muted: #6B7289;
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; flex-shrink: 0; padding: 20px 14px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 16px; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; padding: 0 6px; }
+.logo-mark { color: var(--primary); }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-nav a { padding: 8px 10px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.side-nav a:hover { background: #EBEFF7; }
+.side-nav a.is-active { background: #E3EBFD; color: var(--primary); font-weight: 600; }
+.storage { margin-top: auto; padding: 0 6px; font-size: 12px; color: var(--muted); }
+.storage-bar { height: 6px; border-radius: 999px; background: #E2E6EF; overflow: hidden; }
+.storage-bar div { height: 100%; background: var(--primary); }
+
+.btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: #fff; border-color: var(--border); color: var(--text); }
+.btn-secondary:hover:not(:disabled) { background: var(--sidebar); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+
+.main { flex: 1; min-width: 0; padding: 24px 32px; }
+.main h1 { margin: 0 0 18px; font-size: 22px; }
+.msg { color: var(--muted); }
+
+.list-head, .file-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 80px 72px 36px; align-items: center; gap: 12px; }
+.list-head { padding: 0 12px 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); }
+.list-head span:first-child { padding-left: 48px; }
+.size { text-align: right; }
+
+.file-list { list-style: none; margin: 0; padding: 0; }
+.file-row { position: relative; padding: 10px 12px; border-bottom: 1px solid var(--border); grid-template-columns: 36px minmax(0, 1fr) 90px 80px 72px 36px; }
+.file-row:hover { background: #FAFBFD; }
+.file-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { font-size: 13px; color: var(--muted); }
+.list-head { grid-template-columns: minmax(0, 1fr) 90px 80px 72px 36px; }
+
+.file-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; }
+.file-icon.is-pdf { background: #FDECEC; color: #C2410C; }
+.file-icon.is-image { background: #EAF6EE; color: #15803D; }
+.file-icon.is-doc { background: #E8F0FE; color: #1D4ED8; }
+.file-icon.is-sheet { background: #E6F7F1; color: #047857; }
+.file-icon.is-video { background: #F3E8FF; color: #7E22CE; }
+
+.icon-btn { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; cursor: pointer; opacity: 0.55; }
+.icon-btn:hover { opacity: 1; background: #FDECEC; }
+
+@media (max-width: 680px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 12px; }
+  .file-row { grid-template-columns: 36px minmax(0, 1fr) 72px 36px; }
+  .file-row .file-meta:not(.size), .list-head span:nth-child(2), .list-head span:nth-child(3) { display: none; }
+  .list-head { grid-template-columns: minmax(0, 1fr) 72px 36px; }
+}
+@@@ solution src/App.tsx
+import React, { useCallback, useEffect, useState } from 'react';
+import { deleteFile, getFiles } from './api';
+import type { FileItem } from './api';
+import { Button } from './components/Button';
+import { FileIcon } from './components/FileIcon';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { formatBytes } from './utils/formatBytes';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="logo"><span className="logo-mark">◆</span> Driftbox</div>
+      <Button variant="primary" onClick={() => {}}>+ New</Button>
+      <nav className="side-nav">
+        <a className="is-active">My files</a>
+        <a>Shared with me</a>
+        <a>Recent</a>
+        <a>Trash</a>
+      </nav>
+      <div className="storage">
+        <div className="storage-bar"><div style={{ width: '64%' }} /></div>
+        <p>12.8 GB of 20 GB used</p>
+      </div>
+    </aside>
+  );
+}
+
+type FileRowProps = {
+  file: FileItem;
+  onDelete: (id: string) => void;
+};
+
+function FileRow({ file, onDelete }: FileRowProps) {
+  return (
+    <li className="file-row">
+      <FileIcon kind={file.kind} />
+      <span className="file-name">{file.name}</span>
+      <span className="file-meta">{file.owner}</span>
+      <span className="file-meta">{file.modified}</span>
+      <span className="file-meta size">{formatBytes(file.sizeBytes)}</span>
+      <button type="button" className="icon-btn" aria-label={'Delete ' + file.name} onClick={() => { onDelete(file.id); }}>🗑</button>
+    </li>
+  );
+}
+
+function FileList() {
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Which file the modal is asking about. null = modal closed. Store the id, not a copy.
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFiles().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setFiles(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Stable, because the modal's Escape effect depends on it.
+  const handleCancel = useCallback(() => {
+    setPendingId(null);
+  }, []);
+
+  function handleConfirm() {
+    if (!pendingId) {
+      return;
+    }
+    const id = pendingId;
+    setDeleting(true);
+    deleteFile(id).then(() => {
+      setFiles((prev) => {
+        return prev.filter((f) => {
+          return f.id !== id;
+        });
+      });
+      setDeleting(false);
+      setPendingId(null);
+    });
+  }
+
+  // derived
+  const pendingFile = files.find((f) => {
+    return f.id === pendingId;
+  });
+
+  let modal = null;
+  if (pendingFile) {
+    modal = (
+      <ConfirmDeleteModal
+        fileName={pendingFile.name}
+        deleting={deleting}
+        onCancel={handleCancel}
+        onConfirm={() => { handleConfirm(); }}
+      />
+    );
+  }
+
+  if (loading) {
+    return <p className="msg">Loading files…</p>;
+  }
+
+  let empty = null;
+  if (files.length === 0) {
+    empty = <p className="msg empty">No files left. Drop something here to upload.</p>;
+  }
+
+  return (
+    <div>
+      <ul className="file-list">
+        {files.map((f) => {
+          return <FileRow key={f.id} file={f} onDelete={(id) => { setPendingId(id); }} />;
+        })}
+      </ul>
+      {empty}
+      {modal}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>My files</h1>
+        <div className="list-head">
+          <span>Name</span>
+          <span>Owner</span>
+          <span>Modified</span>
+          <span className="size">Size</span>
+          <span />
+        </div>
+        <FileList />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/components/ConfirmDeleteModal.tsx
+import React, { useEffect } from 'react';
+import { Button } from './Button';
+
+type ConfirmDeleteModalProps = {
+  fileName: string;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+export function ConfirmDeleteModal({ fileName, deleting, onCancel, onConfirm }: ConfirmDeleteModalProps) {
+  // Escape closes (but not halfway through a delete). Always remove the listener.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !deleting) {
+        onCancel();
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [deleting, onCancel]);
+
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget && !deleting) {
+      onCancel();
+    }
+  }
+
+  // Focus starts on Cancel (autoFocus below): the safe choice for a destructive dialog.
+  let deleteLabel = 'Delete';
+  if (deleting) {
+    deleteLabel = 'Deleting…';
+  }
+
+  return (
+    <div className="backdrop" onClick={(e) => { handleBackdropClick(e); }}>
+      <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+        <div className="modal-icon">🗑</div>
+        <h2 id="confirm-title" className="modal-title">Delete “{fileName}”?</h2>
+        <p id="confirm-desc" className="modal-text">This file will be permanently deleted for everyone it’s shared with. You can’t undo this.</p>
+        <div className="modal-actions">
+          <Button autoFocus disabled={deleting} onClick={() => { onCancel(); }}>Cancel</Button>
+          <Button variant="danger" disabled={deleting} onClick={() => { onConfirm(); }}>{deleteLabel}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --sidebar: #F5F7FB;
+  --border: #E6E9F0;
+  --text: #1C2033;
+  --muted: #6B7289;
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; flex-shrink: 0; padding: 20px 14px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 16px; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; padding: 0 6px; }
+.logo-mark { color: var(--primary); }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-nav a { padding: 8px 10px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.side-nav a:hover { background: #EBEFF7; }
+.side-nav a.is-active { background: #E3EBFD; color: var(--primary); font-weight: 600; }
+.storage { margin-top: auto; padding: 0 6px; font-size: 12px; color: var(--muted); }
+.storage-bar { height: 6px; border-radius: 999px; background: #E2E6EF; overflow: hidden; }
+.storage-bar div { height: 100%; background: var(--primary); }
+
+.btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: #fff; border-color: var(--border); color: var(--text); }
+.btn-secondary:hover:not(:disabled) { background: var(--sidebar); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+
+.main { flex: 1; min-width: 0; padding: 24px 32px; }
+.main h1 { margin: 0 0 18px; font-size: 22px; }
+.msg { color: var(--muted); }
+
+.list-head, .file-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 80px 72px 36px; align-items: center; gap: 12px; }
+.list-head { padding: 0 12px 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); }
+.list-head span:first-child { padding-left: 48px; }
+.size { text-align: right; }
+
+.file-list { list-style: none; margin: 0; padding: 0; }
+.file-row { position: relative; padding: 10px 12px; border-bottom: 1px solid var(--border); grid-template-columns: 36px minmax(0, 1fr) 90px 80px 72px 36px; }
+.file-row:hover { background: #FAFBFD; }
+.file-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { font-size: 13px; color: var(--muted); }
+.list-head { grid-template-columns: minmax(0, 1fr) 90px 80px 72px 36px; }
+
+.file-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; }
+.file-icon.is-pdf { background: #FDECEC; color: #C2410C; }
+.file-icon.is-image { background: #EAF6EE; color: #15803D; }
+.file-icon.is-doc { background: #E8F0FE; color: #1D4ED8; }
+.file-icon.is-sheet { background: #E6F7F1; color: #047857; }
+.file-icon.is-video { background: #F3E8FF; color: #7E22CE; }
+
+.icon-btn { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; cursor: pointer; opacity: 0.55; }
+.icon-btn:hover { opacity: 1; background: #FDECEC; }
+
+@media (max-width: 680px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 12px; }
+  .file-row { grid-template-columns: 36px minmax(0, 1fr) 72px 36px; }
+  .file-row .file-meta:not(.size), .list-head span:nth-child(2), .list-head span:nth-child(3) { display: none; }
+  .list-head { grid-template-columns: minmax(0, 1fr) 72px 36px; }
+}
+
+/* ---- Added: confirm delete modal ---- */
+.backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(17, 24, 39, 0.45); }
+.modal { width: 100%; max-width: 400px; padding: 24px; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(17, 24, 39, 0.25); }
+.modal-icon { width: 44px; height: 44px; margin-bottom: 14px; border-radius: 50%; background: #FDECEC; display: grid; place-items: center; font-size: 20px; }
+.modal-title { margin: 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.modal-text { margin: 8px 0 22px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.empty { padding: 32px 0; text-align: center; }

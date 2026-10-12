@@ -1,0 +1,382 @@
+@@@ shared src/data/plans.ts
+export type Plan = {
+  id: string;
+  name: string;
+  tagline: string;
+  monthlyCents: number; // price per month when billed monthly
+  features: string[];
+  popular?: boolean;
+};
+
+export const PLANS: Plan[] = [
+  {
+    id: 'hobby',
+    name: 'Hobby',
+    tagline: 'For your first few videos',
+    monthlyCents: 0,
+    features: ['720p exports', '3 projects', 'Basic captions', 'Watermark on exports', 'Community support'],
+  },
+  {
+    id: 'creator',
+    name: 'Creator',
+    tagline: 'For channels that post weekly',
+    monthlyCents: 1200,
+    popular: true,
+    features: ['4K exports', 'Unlimited projects', 'AI captions in 30 languages', 'No watermark', 'Brand kit', 'Stock music library', 'Email support'],
+  },
+  {
+    id: 'studio',
+    name: 'Studio',
+    tagline: 'For teams and agencies',
+    monthlyCents: 2900,
+    features: ['Everything in Creator', '5 team seats', 'Shared asset library', 'Review links with comments', 'Version history', 'SSO', 'Priority support', 'Custom invoicing'],
+  },
+];
+@@@ shared src/utils/formatPrice.ts
+// Prices are stored in cents to avoid floating point surprises.
+// formatPrice(1200) -> "$12"   formatPrice(2417) -> "$24.17"   formatPrice(0) -> "Free"
+export function formatPrice(cents: number): string {
+  if (cents === 0) {
+    return 'Free';
+  }
+  const dollars = cents / 100;
+  if (Number.isInteger(dollars)) {
+    return '$' + dollars;
+  }
+  return '$' + dollars.toFixed(2);
+}
+@@@ starter src/App.tsx
+import React from 'react';
+import { PLANS } from './data/plans';
+import type { Plan } from './data/plans';
+import { formatPrice } from './utils/formatPrice';
+
+const VISIBLE_FEATURES = 3;
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">▶ framecut</span>
+      <nav className="topnav">
+        <a>Features</a>
+        <a>Templates</a>
+        <a className="is-active">Pricing</a>
+      </nav>
+    </header>
+  );
+}
+
+// TODO: make this switch between monthly and yearly billing.
+function BillingToggle() {
+  return (
+    <div className="billing" role="group" aria-label="Billing period">
+      <button type="button" className="billing-opt is-active">Monthly</button>
+      <button type="button" className="billing-opt">
+        Yearly <span className="save-pill">2 months free</span>
+      </button>
+    </div>
+  );
+}
+
+function PlanCard({ plan }: { plan: Plan }) {
+  let badge = null;
+  if (plan.popular) {
+    badge = <span className="popular">Most popular</span>;
+  }
+
+  let period = null;
+  if (plan.monthlyCents > 0) {
+    period = <span className="period">/month</span>;
+  }
+
+  const shown = plan.features.slice(0, VISIBLE_FEATURES);
+  const hiddenCount = plan.features.length - shown.length;
+
+  return (
+    <article className="plan">
+      <div className="plan-top">
+        <h2>{plan.name}</h2>
+        {badge}
+      </div>
+      <p className="tagline">{plan.tagline}</p>
+      <p className="price">
+        <span className="amount">{formatPrice(plan.monthlyCents)}</span>
+        {period}
+      </p>
+      <button type="button" className="choose-btn">Choose {plan.name}</button>
+      <ul className="features">
+        {shown.map((f) => {
+          return <li key={f}>{f}</li>;
+        })}
+      </ul>
+      <button type="button" className="more-btn">Show all {plan.features.length} features</button>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <TopBar />
+      <section className="hero">
+        <h1>Simple pricing for every channel</h1>
+        <p>Start free. Upgrade when your audience grows.</p>
+        <BillingToggle />
+      </section>
+      <section className="plans">
+        {PLANS.map((p) => {
+          return <PlanCard key={p.id} plan={p} />;
+        })}
+      </section>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0E0B1A;
+  --surface: #17132A;
+  --surface-2: #211B3A;
+  --border: #2D2650;
+  --text: #F3F0FF;
+  --muted: #A49CC7;
+  --primary: #A66BFF;
+  --accent: #FF5DA2;
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.page { min-height: 100vh; padding-bottom: 48px; background: radial-gradient(800px 400px at 50% -10%, rgba(166, 107, 255, 0.25), transparent 70%), var(--bg); }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; }
+.logo { font-weight: 800; letter-spacing: -0.02em; font-size: 18px; }
+.topnav { display: flex; gap: 20px; font-size: 14px; color: var(--muted); }
+.topnav a { cursor: pointer; }
+.topnav a.is-active { color: var(--text); }
+
+.hero { text-align: center; padding: 36px 20px 28px; }
+.hero h1 { margin: 0; font-size: 34px; letter-spacing: -0.03em; }
+.hero p { margin: 10px 0 24px; color: var(--muted); }
+
+.billing { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+.billing-opt { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.billing-opt.is-active { background: var(--text); color: var(--bg); }
+.save-pill { padding: 2px 8px; border-radius: 999px; background: rgba(255, 93, 162, 0.16); color: var(--accent); font-size: 11px; }
+
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 920px; margin: 0 auto; padding: 0 20px; align-items: start; }
+.plan { padding: 24px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.plan-top { display: flex; justify-content: space-between; align-items: center; }
+.plan h2 { margin: 0; font-size: 18px; }
+.popular { padding: 3px 10px; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--accent)); font-size: 11px; font-weight: 700; }
+.tagline { margin: 6px 0 18px; font-size: 13px; color: var(--muted); }
+.price { margin: 0; display: flex; align-items: baseline; gap: 4px; }
+.amount { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; }
+.period { color: var(--muted); font-size: 14px; }
+
+.choose-btn { width: 100%; height: 42px; margin: 20px 0 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
+.choose-btn:hover { border-color: var(--primary); }
+
+.features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.features li::before { content: '✓'; margin-right: 10px; color: var(--primary); font-weight: 700; }
+.more-btn { margin-top: 14px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.more-btn:hover { color: var(--text); }
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { PLANS } from './data/plans';
+import type { Plan } from './data/plans';
+import { formatPrice } from './utils/formatPrice';
+
+const VISIBLE_FEATURES = 3;
+
+type Billing = 'monthly' | 'yearly';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">▶ framecut</span>
+      <nav className="topnav">
+        <a>Features</a>
+        <a>Templates</a>
+        <a className="is-active">Pricing</a>
+      </nav>
+    </header>
+  );
+}
+
+type BillingToggleProps = {
+  billing: Billing;
+  onChange: (next: Billing) => void;
+};
+
+function BillingToggle({ billing, onChange }: BillingToggleProps) {
+  let monthlyCls = 'billing-opt';
+  let yearlyCls = 'billing-opt';
+  if (billing === 'monthly') {
+    monthlyCls = 'billing-opt is-active';
+  } else {
+    yearlyCls = 'billing-opt is-active';
+  }
+  return (
+    <div className="billing" role="group" aria-label="Billing period">
+      <button type="button" className={monthlyCls} aria-pressed={billing === 'monthly'} onClick={() => { onChange('monthly'); }}>Monthly</button>
+      <button type="button" className={yearlyCls} aria-pressed={billing === 'yearly'} onClick={() => { onChange('yearly'); }}>
+        Yearly <span className="save-pill">2 months free</span>
+      </button>
+    </div>
+  );
+}
+
+type PlanCardProps = {
+  plan: Plan;
+  billing: Billing;
+  selected: boolean;
+  onChoose: (id: string) => void;
+};
+
+function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
+  // Only this card cares whether its list is open, so the state lives here.
+  const [expanded, setExpanded] = useState(false);
+
+  let badge = null;
+  if (plan.popular) {
+    badge = <span className="popular">Most popular</span>;
+  }
+
+  // derived price: yearly = 10 months (2 months free)
+  const isFree = plan.monthlyCents === 0;
+  let amount = formatPrice(plan.monthlyCents);
+  let period = null;
+  let note = null;
+  if (!isFree && billing === 'monthly') {
+    period = <span className="period">/month</span>;
+  }
+  if (!isFree && billing === 'yearly') {
+    const yearlyCents = plan.monthlyCents * 10;
+    amount = formatPrice(yearlyCents);
+    period = <span className="period">/year</span>;
+    note = <p className="price-note">{formatPrice(Math.round(yearlyCents / 12))}/mo, billed yearly</p>;
+  }
+
+  let shown = plan.features.slice(0, VISIBLE_FEATURES);
+  let moreLabel = 'Show all ' + plan.features.length + ' features';
+  if (expanded) {
+    shown = plan.features;
+    moreLabel = 'Show less';
+  }
+
+  let cls = 'plan';
+  let chooseLabel = 'Choose ' + plan.name;
+  if (selected) {
+    cls = 'plan is-selected';
+    chooseLabel = 'Selected ✓';
+  }
+
+  return (
+    <article className={cls}>
+      <div className="plan-top">
+        <h2>{plan.name}</h2>
+        {badge}
+      </div>
+      <p className="tagline">{plan.tagline}</p>
+      <p className="price">
+        <span className="amount">{amount}</span>
+        {period}
+      </p>
+      {note}
+      <button type="button" className="choose-btn" onClick={() => { onChoose(plan.id); }}>{chooseLabel}</button>
+      <ul className="features">
+        {shown.map((f) => {
+          return <li key={f}>{f}</li>;
+        })}
+      </ul>
+      <button type="button" className="more-btn" aria-expanded={expanded} onClick={() => { setExpanded((prev) => { return !prev; }); }}>{moreLabel}</button>
+    </article>
+  );
+}
+
+export default function App() {
+  // Shared by the toggle and every card, so it lives in the parent.
+  const [billing, setBilling] = useState<Billing>('monthly');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  return (
+    <div className="page">
+      <TopBar />
+      <section className="hero">
+        <h1>Simple pricing for every channel</h1>
+        <p>Start free. Upgrade when your audience grows.</p>
+        <BillingToggle billing={billing} onChange={(next) => { setBilling(next); }} />
+      </section>
+      <section className="plans">
+        {PLANS.map((p) => {
+          return (
+            <PlanCard
+              key={p.id}
+              plan={p}
+              billing={billing}
+              selected={p.id === selectedId}
+              onChoose={(id) => { setSelectedId(id); }}
+            />
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0E0B1A;
+  --surface: #17132A;
+  --surface-2: #211B3A;
+  --border: #2D2650;
+  --text: #F3F0FF;
+  --muted: #A49CC7;
+  --primary: #A66BFF;
+  --accent: #FF5DA2;
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.page { min-height: 100vh; padding-bottom: 48px; background: radial-gradient(800px 400px at 50% -10%, rgba(166, 107, 255, 0.25), transparent 70%), var(--bg); }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; }
+.logo { font-weight: 800; letter-spacing: -0.02em; font-size: 18px; }
+.topnav { display: flex; gap: 20px; font-size: 14px; color: var(--muted); }
+.topnav a { cursor: pointer; }
+.topnav a.is-active { color: var(--text); }
+
+.hero { text-align: center; padding: 36px 20px 28px; }
+.hero h1 { margin: 0; font-size: 34px; letter-spacing: -0.03em; }
+.hero p { margin: 10px 0 24px; color: var(--muted); }
+
+.billing { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+.billing-opt { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.billing-opt.is-active { background: var(--text); color: var(--bg); }
+.save-pill { padding: 2px 8px; border-radius: 999px; background: rgba(255, 93, 162, 0.16); color: var(--accent); font-size: 11px; }
+
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 920px; margin: 0 auto; padding: 0 20px; align-items: start; }
+.plan { padding: 24px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.plan-top { display: flex; justify-content: space-between; align-items: center; }
+.plan h2 { margin: 0; font-size: 18px; }
+.popular { padding: 3px 10px; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--accent)); font-size: 11px; font-weight: 700; }
+.tagline { margin: 6px 0 18px; font-size: 13px; color: var(--muted); }
+.price { margin: 0; display: flex; align-items: baseline; gap: 4px; }
+.amount { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; }
+.period { color: var(--muted); font-size: 14px; }
+
+.choose-btn { width: 100%; height: 42px; margin: 20px 0 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
+.choose-btn:hover { border-color: var(--primary); }
+
+.features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.features li::before { content: '✓'; margin-right: 10px; color: var(--primary); font-weight: 700; }
+.more-btn { margin-top: 14px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.more-btn:hover { color: var(--text); }
+
+/* ---- Added: billing toggle, selected plan, expandable features ---- */
+.price-note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.plan { transition: border-color 0.15s, box-shadow 0.15s; }
+.plan.is-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 12px 40px rgba(166, 107, 255, 0.25); }
+.plan.is-selected .choose-btn { border-color: transparent; background: linear-gradient(90deg, var(--primary), var(--accent)); }

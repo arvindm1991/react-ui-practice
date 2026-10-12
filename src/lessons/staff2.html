@@ -1,0 +1,446 @@
+<template id="tpl-st-server">
+  <h1>Server state and data fetching</h1>
+  <p class="lede">Fetching data in a <code>useEffect</code> works fine for one screen. In a real app it slowly turns into duplicate requests, flickering spinners, wrong data after quick clicks, and screens that never update. This lesson builds up the problem in Lexi, then shows the idea that fixes it: treat server data as a cache you don't own.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Name the six ways <code>useEffect</code> fetching breaks down, with a concrete example of each</li>
+    <li>Explain the "server state is a cache" mental model in one sentence</li>
+    <li>Explain how TanStack Query works: query keys, staleTime vs gcTime, background refetch, invalidation and optimistic updates</li>
+    <li>Spot a request waterfall and turn it into parallel loading</li>
+    <li>Choose between a client cache, route loaders and server components for a given screen</li>
+  </ul></div>
+
+  <h2>1. The running example: the teacher dashboard</h2>
+  <p><b>Lexi</b> is a reading app for schools. Students do reading sessions and get a fluency score. The screen we'll follow is the <b>teacher dashboard</b>: a list of the teacher's students on the left, the selected student's recent sessions on the right, and a header showing how many assignments are due this week.</p>
+  <p>Here's how most people write the first version. It's the pattern you've used in practice exercises, and for one component it's fine.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="version 1: fetch in an effect">
+function StudentSessions({ studentId }: { studentId: string }) {
+  const [sessions, setSessions] = useState<Session[] | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    setSessions(null);
+    fetch(`/api/students/${studentId}/sessions`)
+      .then((res) => res.json())
+      .then(setSessions)
+      .catch(setError);
+  }, [studentId]);
+
+  if (error) return <ErrorState />;
+  if (!sessions) return <Spinner />;
+  return <SessionList sessions={sessions} />;
+}
+</script>
+
+  <h2>2. Six ways it breaks at scale</h2>
+  <p>Now the app grows. The same pattern is copied into 60 components. Here's what the team runs into, one problem at a time.</p>
+
+  <h3>Problem 1: duplicate requests</h3>
+  <p>The header shows "3 assignments due". The sidebar shows the same assignments as a list. The assignment panel shows them again. Each component has its own effect, so opening the dashboard sends <b>three identical requests</b> for the same data. Each one also has its own loading spinner, so the screen pops in three times.</p>
+
+  <h3>Problem 2: no cache</h3>
+  <p>The teacher clicks Maya, then Leo, then back to Maya. Maya's sessions were on screen two seconds ago, but the component threw them away when it unmounted (stopped being on screen). So she sees a spinner again and waits for the same data again. Every navigation starts from zero.</p>
+
+  <h3>Problem 3: race conditions</h3>
+  <p>A <b>race condition</b> is a bug where the result depends on which of two things finishes first. The teacher clicks Maya, then quickly clicks Leo. Two requests are now in flight. If Maya's request is slower and finishes <em>last</em>, it calls <code>setSessions</code> last, and <b>Leo's name sits above Maya's scores</b>. For a reading app, showing one child's results under another child's name is a serious bug.</p>
+  <div class="trace"><b>What happens</b>
+    <ol>
+      <li>t=0ms: click Maya → request A starts (slow server, 900ms)</li>
+      <li>t=200ms: click Leo → request B starts (fast, 300ms)</li>
+      <li>t=500ms: B returns → <b class="yes">Leo's sessions shown under Leo</b></li>
+      <li>t=900ms: A returns → <b class="no">Maya's sessions shown under Leo</b></li>
+    </ol>
+  </div>
+  <p>You can fix this by hand with an "ignore" flag in the effect's cleanup, or an <code>AbortController</code>. But now every one of the 60 effects needs that fix, and somebody will forget.</p>
+
+  <h3>Problem 4: waterfalls</h3>
+  <p>The dashboard fetches the teacher. When that arrives, it renders <code>ClassList</code>, which fetches the classes. When those arrive, it renders <code>StudentList</code>, which fetches students. Each request waits for the one before it to finish, even though the server could have answered all three at once. Three 300ms requests become 900ms of spinners. Section 7 covers this in detail.</p>
+
+  <h3>Problem 5: stale data</h3>
+  <p>The teacher grades an assignment in a modal. The modal sends a <code>POST</code>. But the "due this week" count in the header was fetched ten minutes ago and has no idea anything changed. It still says 3. Which components should refetch after a change? With effects, there's no good answer: each component owns its own copy and no one can tell it to update.</p>
+
+  <h3>Problem 6: no refetch on focus or reconnect</h3>
+  <p>The teacher leaves the dashboard open in a tab, teaches a lesson for 40 minutes, and comes back. Students finished sessions in the meantime, but the screen shows data from 40 minutes ago. Same if the school Wi-Fi drops and comes back. A user expects the screen to be "about right" when they return to it.</p>
+
+  <p>Each of these can be fixed by hand. Fixing all six, in every component, consistently, is a library. That's why these libraries exist.</p>
+
+  <h2>3. The mental model: server state is a cache you don't own</h2>
+  <p>Here's the shift in thinking. The list of Maya's sessions is not <em>your</em> state. It lives in the database. What your app has is a <b>copy</b>, taken at some moment, which may already be out of date because a student just finished a session on another device.</p>
+  <p>That makes server data different from a dialog's open flag:</p>
+  <ul>
+    <li>It's <b>shared</b>: many components want the same data.</li>
+    <li>It's <b>asynchronous</b>: you have to wait for it, and it can fail.</li>
+    <li>It can <b>go stale</b> without you doing anything.</li>
+    <li>Someone else can <b>change it</b> at any time.</li>
+  </ul>
+  <p>So instead of every component fetching and holding its own copy, you put one <b>cache</b> in the middle. A cache is a store of copies kept so you don't have to fetch again. Components ask the cache for data by name. The cache decides whether to return what it has, fetch fresh data, or both.</p>
+  <svg viewBox="0 0 680 290" width="100%" role="img" aria-label="Three components ask the query cache for data by key. The cache holds one entry per key and is the only thing that talks to the server." style="max-width:680px;display:block;margin:18px auto;color:var(--ink);font-family:var(--font-body)">
+    <defs>
+      <marker id="st2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    </defs>
+    <rect x="16" y="20" width="170" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="101" y="47" text-anchor="middle" style="fill:currentColor;font-size:13px">Header (due count)</text>
+    <rect x="16" y="112" width="170" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="101" y="139" text-anchor="middle" style="fill:currentColor;font-size:13px">AssignmentSidebar</text>
+    <rect x="16" y="204" width="170" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="101" y="231" text-anchor="middle" style="fill:currentColor;font-size:13px">StudentSessions</text>
+
+    <rect x="250" y="20" width="230" height="228" rx="10" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="365" y="44" text-anchor="middle" style="fill:currentColor;font-size:14px;font-weight:600">Query cache</text>
+    <rect x="266" y="60" width="198" height="50" rx="6" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="276" y="80" style="fill:currentColor;font-size:12px;font-family:var(--font-mono)">['assignments','c7']</text>
+    <text x="276" y="99" style="fill:var(--muted);font-size:12px">fresh · 2 subscribers</text>
+    <rect x="266" y="120" width="198" height="50" rx="6" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="276" y="140" style="fill:currentColor;font-size:12px;font-family:var(--font-mono)">['sessions','maya']</text>
+    <text x="276" y="159" style="fill:var(--muted);font-size:12px">stale · 1 subscriber</text>
+    <rect x="266" y="180" width="198" height="50" rx="6" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="276" y="200" style="fill:currentColor;font-size:12px;font-family:var(--font-mono)">['sessions','leo']</text>
+    <text x="276" y="219" style="fill:var(--muted);font-size:12px">inactive · kept until gcTime</text>
+
+    <rect x="548" y="104" width="116" height="60" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="606" y="131" text-anchor="middle" style="fill:currentColor;font-size:13px">Server</text>
+    <text x="606" y="149" text-anchor="middle" style="fill:var(--muted);font-size:12px">(the real owner)</text>
+
+    <line x1="186" y1="42" x2="264" y2="82" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st2-a)"/>
+    <line x1="186" y1="134" x2="264" y2="90" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st2-a)"/>
+    <line x1="186" y1="226" x2="264" y2="148" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st2-a)"/>
+    <line x1="480" y1="134" x2="546" y2="134" style="stroke:var(--accent);stroke-width:2" marker-start="url(#st2-a)" marker-end="url(#st2-a)"/>
+    <text x="513" y="124" text-anchor="middle" style="fill:var(--muted);font-size:12px">fetch</text>
+    <text x="101" y="278" text-anchor="middle" style="fill:var(--muted);font-size:12px">components ask by key</text>
+    <text x="606" y="200" text-anchor="middle" style="fill:var(--muted);font-size:12px">one request per key,</text>
+    <text x="606" y="216" text-anchor="middle" style="fill:var(--muted);font-size:12px">however many readers</text>
+  </svg>
+  <p>Look at how this fixes the six problems. Two components ask for the same key: one request (<b>dedupe</b>, short for de-duplicate). Go back to Maya: her entry is still in the cache, so it shows instantly (<b>cache</b>). Each key has its own entry, so Maya's late response can only ever update Maya's entry (<b>no race</b>). After a change, you tell the cache "assignments for class 7 are out of date" and every subscriber updates (<b>invalidation</b>). The cache listens for tab focus and reconnect and refetches stale entries (<b>refetch on focus</b>).</p>
+
+  <h2>4. How TanStack Query works</h2>
+  <p>TanStack Query (formerly React Query) is the most widely used library for this. SWR, RTK Query and Apollo (for GraphQL) follow the same ideas. Here's the dashboard rewritten with it.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="features/sessions/queries.ts">
+import { queryOptions } from '@tanstack/react-query';
+
+// A "key factory": one place that defines every key for this feature
+export const sessionKeys = {
+  all: ['sessions'] as const,
+  byStudent: (studentId: string) => ['sessions', 'student', studentId] as const,
+};
+
+export function studentSessionsQuery(studentId: string) {
+  return queryOptions({
+    queryKey: sessionKeys.byStudent(studentId),
+    queryFn: () => api.getSessions(studentId),
+    staleTime: 30_000, // treat as fresh for 30 seconds
+  });
+}
+</script>
+  <script type="text/x-code" data-lang="tsx" data-title="StudentSessions.tsx">
+import { useQuery } from '@tanstack/react-query';
+
+export function StudentSessions({ studentId }: { studentId: string }) {
+  const { data: sessions, isPending, error } = useQuery(studentSessionsQuery(studentId));
+
+  if (isPending) return <Spinner />;
+  if (error) return <ErrorState />;
+  return <SessionList sessions={sessions} />;
+}
+</script>
+  <p>The component got shorter, and it gained caching, dedupe, race safety, retries and refetch on focus. Here are the parts that make that work.</p>
+
+  <h3>Query keys</h3>
+  <p>The <b>query key</b> is the name of a cache entry: an array like <code>['sessions', 'student', 'maya']</code>. Two rules matter. First, <b>every value the fetch depends on must be in the key</b>. If the fetch uses <code>studentId</code> and a date range, both go in the key; otherwise Leo's data could be served from Maya's entry. Second, keys are <b>hierarchical</b>: invalidating <code>['sessions']</code> also hits every key that starts with it. That's why teams use a key factory like <code>sessionKeys</code> above, so keys are typed and consistent instead of hand-typed strings scattered across 60 files.</p>
+
+  <h3>staleTime vs gcTime</h3>
+  <p>These two settings confuse almost everyone, because both sound like "how long is data kept". They answer different questions.</p>
+  <ul>
+    <li><b>staleTime</b>: "How long is this data trusted as fresh?" While data is <b>fresh</b>, the cache serves it without refetching. Once it's <b>stale</b>, the cache still shows it, but refetches in the background at the next trigger (a new component asking for it, window focus, reconnect). The default is <b>0</b>: data is stale immediately.</li>
+    <li><b>gcTime</b> (garbage-collection time, called <code>cacheTime</code> before v5): "Once no component is using this entry, how long do we keep it in memory?" The default is <b>5 minutes</b>. After that the entry is deleted, and the next request starts from scratch with a spinner.</li>
+  </ul>
+  <svg viewBox="0 0 680 210" width="100%" role="img" aria-label="Timeline of one cache entry: fetched, fresh during staleTime, then stale, then the last component unmounts and the entry is inactive for gcTime, then removed." style="max-width:680px;display:block;margin:18px auto;color:var(--ink);font-family:var(--font-body)">
+    <line x1="20" y1="100" x2="660" y2="100" style="stroke:var(--line);stroke-width:2"/>
+    <rect x="40" y="76" width="150" height="48" rx="6" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="115" y="98" text-anchor="middle" style="fill:currentColor;font-size:13px;font-weight:600">fresh</text>
+    <text x="115" y="115" text-anchor="middle" style="fill:var(--muted);font-size:12px">served, no refetch</text>
+    <rect x="190" y="76" width="200" height="48" rx="6" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="290" y="98" text-anchor="middle" style="fill:currentColor;font-size:13px;font-weight:600">stale</text>
+    <text x="290" y="115" text-anchor="middle" style="fill:var(--muted);font-size:12px">shown, then refetched</text>
+    <rect x="390" y="76" width="220" height="48" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="500" y="98" text-anchor="middle" style="fill:currentColor;font-size:13px;font-weight:600">inactive</text>
+    <text x="500" y="115" text-anchor="middle" style="fill:var(--muted);font-size:12px">no subscribers, still in memory</text>
+    <text x="634" y="105" text-anchor="middle" style="fill:var(--accent);font-size:16px;font-weight:700">✕</text>
+
+    <line x1="40" y1="60" x2="40" y2="140" style="stroke:currentColor;stroke-width:1"/>
+    <text x="40" y="52" text-anchor="middle" style="fill:currentColor;font-size:12px">fetched</text>
+    <line x1="190" y1="60" x2="190" y2="140" style="stroke:currentColor;stroke-width:1;stroke-dasharray:3 3"/>
+    <text x="190" y="52" text-anchor="middle" style="fill:currentColor;font-size:12px">staleTime ends</text>
+    <line x1="390" y1="60" x2="390" y2="140" style="stroke:currentColor;stroke-width:1;stroke-dasharray:3 3"/>
+    <text x="390" y="52" text-anchor="middle" style="fill:currentColor;font-size:12px">last component unmounts</text>
+    <text x="634" y="52" text-anchor="middle" style="fill:currentColor;font-size:12px">removed</text>
+
+    <path d="M40,160 L40,168 L190,168 L190,160" style="fill:none;stroke:var(--ok);stroke-width:1.5"/>
+    <text x="115" y="186" text-anchor="middle" style="fill:var(--ok);font-size:12px">staleTime (default 0)</text>
+    <path d="M390,160 L390,168 L622,168 L622,160" style="fill:none;stroke:var(--muted);stroke-width:1.5"/>
+    <text x="506" y="186" text-anchor="middle" style="fill:var(--muted);font-size:12px">gcTime (default 5 min)</text>
+  </svg>
+  <p>Note that the two clocks are independent: staleTime starts when data arrives; gcTime starts when the last subscriber goes away. Data can be stale and still in active use (most data, most of the time), or fresh and inactive.</p>
+  <p>Choosing staleTime is a product question: <b>how wrong can this screen be, and for how long?</b> A student's reading level changes weekly: a staleTime of several minutes is fine. The live "students currently reading" counter during class: keep it at 0 and maybe add a polling interval. The school's list of grade levels: practically never changes, so a long staleTime saves many requests.</p>
+
+  <h3>Stale-while-revalidate and background refetch</h3>
+  <p><b>Stale-while-revalidate</b> is the core behavior: show the cached (possibly stale) copy right away, fetch a fresh one in the background, and swap it in when it arrives. Back to the "Maya, Leo, Maya" clicks: the second time Maya is selected, her sessions appear <em>instantly</em> from cache, and a moment later update if anything changed. No spinner.</p>
+  <p>That's why the query result has two different loading flags. <code>isPending</code> means "there's no data at all yet": show a skeleton. <code>isFetching</code> means "a request is in flight", which is also true during background refetches when you already have data: at most show a small subtle indicator, never replace the content with a spinner.</p>
+  <p>By default, stale queries refetch when a component using them mounts, when the window regains focus, and when the network reconnects. That's problem 6 solved with zero code. Failed requests are retried three times with increasing delays before the error is shown.</p>
+
+  <h3>Dedupe</h3>
+  <p>When the header, sidebar and panel all call <code>useQuery</code> with the same assignments key during the same render, the cache sees one key and starts <b>one</b> request. All three components subscribe to the same entry and re-render together when it arrives. This is why you can freely call the same query in many components instead of fetching once at the top and drilling the result down: <b>the query hook is the way to share server data.</b></p>
+
+  <h2>5. Changing data: mutations, invalidation and optimistic updates</h2>
+  <p>A <b>mutation</b> is a request that changes data on the server: create, update, delete. TanStack Query's <code>useMutation</code> runs it and gives you hooks for what happens before, after success, after failure, and after either.</p>
+
+  <h3>Invalidation: the simple, correct default</h3>
+  <p>After the teacher grades an assignment, which cached data is now wrong? The assignment list, and the "due this week" count. You tell the cache those keys are stale. Any that are on screen refetch right away; any that aren't will refetch next time they're used. This is problem 5 solved.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="invalidate after a mutation">
+export function useGradeAssignment(classId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: GradeInput) => api.gradeAssignment(input),
+    onSuccess: () => {
+      // Prefix match: refreshes the list, the due count, any filtered views
+      return queryClient.invalidateQueries({ queryKey: assignmentKeys.byClass(classId) });
+    },
+  });
+}
+</script>
+  <p>Returning the promise from <code>onSuccess</code> keeps the mutation in its pending state until the refetch finishes, so the button doesn't flash "done" before the list has actually updated.</p>
+
+  <h3>Optimistic updates with rollback</h3>
+  <p>Sometimes waiting for the server feels slow. When a teacher stars a student to "check in with today", the star should fill instantly. An <b>optimistic update</b> means changing the cache <em>before</em> the server confirms, on the assumption ("optimism") that it will succeed, and undoing the change if it fails.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="optimistic star with rollback">
+export function useToggleStar(classId: string) {
+  const queryClient = useQueryClient();
+  const key = studentKeys.byClass(classId);
+
+  return useMutation({
+    mutationFn: (studentId: string) => api.toggleStar(studentId),
+
+    onMutate: async (studentId) => {
+      // 1. Stop any in-flight refetch from overwriting our change
+      await queryClient.cancelQueries({ queryKey: key });
+      // 2. Remember what the cache looked like
+      const previous = queryClient.getQueryData<Student[]>(key);
+      // 3. Write the new value straight into the cache
+      queryClient.setQueryData<Student[]>(key, (old = []) =>
+        old.map((s) => (s.id === studentId ? { ...s, starred: !s.starred } : s)),
+      );
+      // 4. Whatever we return here is handed to onError as `context`
+      return { previous };
+    },
+
+    onError: (_error, _studentId, context) => {
+      // Server said no: put the old list back
+      if (context?.previous) {
+        queryClient.setQueryData(key, context.previous);
+      }
+      toast.error("Couldn't star that student. Try again.");
+    },
+
+    onSettled: () => {
+      // Success or failure: resync with the real owner
+      return queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+</script>
+  <p>The four steps are the whole pattern: <b>cancel, snapshot, write, roll back on error</b>, then always resync in <code>onSettled</code>. The final invalidation matters: the server may have changed other fields too, and the cache's job is to end up matching the server, not your guess.</p>
+  <p>Optimistic updates are not free. They add code, and they can lie to the user for a moment. Use them for small, frequent, very-likely-to-succeed actions (stars, checkboxes, reordering). Don't use them for anything where a false "done" is harmful: submitting a grade that parents will see, sending a message, payments. For those, show a pending state and wait.</p>
+  <p>For simple cases there's a lighter option: skip touching the cache and render the pending mutation's <code>variables</code> in the UI while it runs. The list itself only changes after the server confirms.</p>
+
+  <h2>6. Pagination, infinite lists and prefetching</h2>
+  <h3>Paged lists</h3>
+  <p>The district report lists 4,000 students, 50 per page. The page number goes in the query key (and in the URL, per the previous lesson). Without help, every page change blanks the table and shows a spinner. Setting <code>placeholderData: keepPreviousData</code> keeps the old page on screen while the new one loads, so the table doesn't jump.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="paged report">
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+
+const { data, isPlaceholderData } = useQuery({
+  queryKey: ['district-report', districtId, { page, grade }],
+  queryFn: () => api.getReport(districtId, { page, grade }),
+  placeholderData: keepPreviousData,
+});
+// isPlaceholderData is true while showing the old page: dim the table, disable "Next"
+</script>
+
+  <h3>Infinite lists</h3>
+  <p>A student's session history is a "Load more" list. <code>useInfiniteQuery</code> stores all loaded pages under <b>one</b> key, as <code>data.pages</code>. You tell it where to start and how to find the next page from the last one, usually a <b>cursor</b> (an opaque marker from the server meaning "continue after this item").</p>
+  <script type="text/x-code" data-lang="tsx" data-title="session history with Load more">
+function SessionHistory({ studentId }: { studentId: string }) {
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending } = useInfiniteQuery({
+    queryKey: ['sessions', 'history', studentId],
+    queryFn: ({ pageParam }) => api.getSessionPage(studentId, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined, // undefined = no more pages
+  });
+
+  if (isPending) return <Spinner />;
+
+  const sessions = data.pages.flatMap((page) => page.items);
+
+  let loadMore = null;
+  if (hasNextPage) {
+    const label = isFetchingNextPage ? 'Loading…' : 'Load more';
+    loadMore = <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>{label}</button>;
+  }
+
+  return (
+    <>
+      <SessionList sessions={sessions} />
+      {loadMore}
+    </>
+  );
+}
+</script>
+
+  <h3>Prefetching</h3>
+  <p><b>Prefetching</b> means fetching data before the user asks for it, so it's already in the cache when they do. When the teacher hovers over a student's name, there's typically a couple of hundred milliseconds before the click. Start the fetch on hover, and the detail panel often opens with no spinner at all.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="prefetch on hover">
+function StudentRow({ student, onSelect }: StudentRowProps) {
+  const queryClient = useQueryClient();
+
+  function handlePointerEnter() {
+    // Uses the same options object as the real query, so the key always matches
+    queryClient.prefetchQuery(studentSessionsQuery(student.id));
+  }
+
+  return (
+    <button onPointerEnter={handlePointerEnter} onClick={() => onSelect(student.id)}>
+      {student.name}
+    </button>
+  );
+}
+</script>
+  <p>Prefetching respects staleTime, so hovering back and forth doesn't spam the server. This is where the shared <code>queryOptions</code> object pays off: the prefetch and the real query can't drift apart.</p>
+
+  <h2>7. Waterfalls vs parallel loading</h2>
+  <p>A <b>waterfall</b> is a chain of requests where each one can't start until the one before it finishes. It's the most common cause of slow React screens, and caching doesn't fix it by itself.</p>
+  <svg viewBox="0 0 680 242" width="100%" role="img" aria-label="Waterfall: teacher, classes and assignments requests run one after another for 900 milliseconds. Parallel: all three start together and finish at 300 milliseconds." style="max-width:680px;display:block;margin:18px auto;color:var(--ink);font-family:var(--font-body)">
+    <text x="20" y="24" style="fill:currentColor;font-size:14px;font-weight:600">Waterfall: each component fetches after its parent renders</text>
+    <text x="20" y="54" style="fill:var(--muted);font-size:12px">teacher</text>
+    <rect x="120" y="40" width="160" height="20" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="20" y="80" style="fill:var(--muted);font-size:12px">classes</text>
+    <rect x="280" y="66" width="160" height="20" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="20" y="106" style="fill:var(--muted);font-size:12px">assignments</text>
+    <rect x="440" y="92" width="160" height="20" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="606" y="106" style="fill:var(--accent);font-size:12px;font-weight:600">900ms</text>
+
+    <text x="20" y="146" style="fill:currentColor;font-size:14px;font-weight:600">Parallel: all requests start together</text>
+    <text x="20" y="176" style="fill:var(--muted);font-size:12px">teacher</text>
+    <rect x="120" y="162" width="160" height="20" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="20" y="200" style="fill:var(--muted);font-size:12px">classes</text>
+    <rect x="120" y="186" width="160" height="20" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="20" y="224" style="fill:var(--muted);font-size:12px">assignments</text>
+    <rect x="120" y="210" width="160" height="20" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="290" y="224" style="fill:var(--ok);font-size:12px;font-weight:600">300ms</text>
+  </svg>
+  <p>Waterfalls come from three places:</p>
+  <ul>
+    <li><b>Fetch-on-render in nested components.</b> <code>Dashboard</code> fetches the teacher and only renders <code>ClassList</code> after it arrives; <code>ClassList</code> then starts its own fetch. The tree structure becomes a request chain.</li>
+    <li><b>Lazy-loaded code.</b> The JavaScript for a route is downloaded, <em>then</em> the component runs, <em>then</em> it starts fetching. Two round trips before data starts loading.</li>
+    <li><b>Real dependencies.</b> You need the teacher's school id before you can ask for the school's calendar. This one is genuine, and the fix is usually on the server: an endpoint that returns both.</li>
+  </ul>
+  <p>The fixes, from simplest to most structural:</p>
+  <ol>
+    <li><b>Hoist the queries.</b> If the dashboard knows the class id from the URL, it can start the classes and assignments queries at the same time, at the top, instead of waiting for each child. (Remember dedupe: children can still call the same queries and they'll share the result.)</li>
+    <li><b>Prefetch at the route.</b> Start the fetches as part of navigation, before the components even render. That's what route loaders do (next section).</li>
+    <li><b>Fix the API shape.</b> If the screen always needs three things together, one request that returns all three beats any client trick.</li>
+  </ol>
+  <p>One trap with Suspense: several <code>useSuspenseQuery</code> calls in the <em>same</em> component run one after another, because the first one suspends the component before the second is reached. Use <code>useSuspenseQueries</code> or prefetch at the route to run them in parallel.</p>
+
+  <h2>8. Where server components and route loaders fit</h2>
+  <p>A client-side cache is one way to handle server data. Two other approaches move the fetching earlier, so the client has less to do.</p>
+
+  <h3>Route loaders</h3>
+  <p>A <b>route loader</b> is a function attached to a route that the router calls when navigation starts, <em>before</em> rendering the page. React Router (v7, "framework mode") and TanStack Router both have them. Because the router knows all the matched routes at once (layout, page, nested panel), it can run all their loaders <b>in parallel</b>. That kills the nested-component waterfall by design.</p>
+  <p>Loaders and TanStack Query work well together: the loader makes sure the cache has the data, and the component reads it from the cache with the same query, keeping all the background-refetch and invalidation behavior.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="loader warms the cache (TanStack Router style)">
+export const Route = createFileRoute('/students/$studentId')({
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(studentSessionsQuery(params.studentId)),
+  component: StudentPage,
+});
+</script>
+  <p><code>ensureQueryData</code> returns cached data if it exists, and fetches it otherwise. The exact loader syntax differs between routers; the idea is the same.</p>
+
+  <h3>React Server Components</h3>
+  <p>A <b>Server Component</b> (the default in Next.js App Router) is a component that runs only on the server. It can be <code>async</code> and fetch data or query the database directly. Its output is sent to the browser already rendered, and its code never ships to the browser.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="app/district/[districtId]/report/page.tsx">
+export default async function DistrictReportPage({ params }: { params: Promise<{ districtId: string }> }) {
+  const { districtId } = await params;
+
+  // Start both before awaiting either: parallel, not a waterfall
+  const summaryPromise = getDistrictSummary(districtId);
+  const schoolsPromise = getSchools(districtId);
+  const [summary, schools] = await Promise.all([summaryPromise, schoolsPromise]);
+
+  return <ReportView summary={summary} schools={schools} />;
+}
+</script>
+  <p>Server components are excellent for <b>read-heavy pages</b>: no client fetching code, no loading-state juggling on first load, smaller JavaScript bundles, and the server is usually close to the database. The district report is a perfect fit. To update data, you use a <b>Server Action</b> (a server function a form or button can call) and then tell the framework to re-render the affected route. How Next.js caches fetches has changed between versions, so check the rules for the version you're on rather than assuming.</p>
+  <p>What server components <em>don't</em> give you is a client cache with the behaviors from section 4: instant back-navigation from cache, refetch on focus, optimistic updates tied to cache entries, infinite lists that remember loaded pages. For highly interactive client screens, teams often combine both: prefetch on the server, pass the cache to the client with <code>dehydrate</code> and <code>HydrationBoundary</code>, and let TanStack Query take over in the browser.</p>
+
+  <h3>Choosing between them</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Approach</th><th>Gives you</th><th>Costs you</th><th>Choose it when</th></tr>
+    <tr><td><code>useEffect</code> + <code>useState</code></td><td>No dependencies</td><td>All six problems, solved by hand, per component</td><td>A prototype, or a single one-off fetch</td></tr>
+    <tr><td>Client cache (TanStack Query)</td><td>Dedupe, caching, refetch on focus, invalidation, optimistic updates</td><td>A library and its concepts; waterfalls still possible</td><td>Interactive client screens with lots of reading and writing</td></tr>
+    <tr><td>Route loaders</td><td>Parallel fetching on navigation, no nested waterfalls</td><td>Data needs are tied to routes; you need a router that supports them</td><td>Single-page apps where each screen's data is known from the URL. Pair with a client cache.</td></tr>
+    <tr><td>Server Components</td><td>No client fetching code, less JS, data near the database</td><td>A framework that supports them; less client-side interactivity per component</td><td>Read-heavy pages, first-load speed, SEO. Add a client cache for interactive islands.</td></tr>
+  </table></div>
+  <p>For Lexi: the <b>district report</b> is read-heavy and loaded once, so it's server components. The <b>teacher dashboard</b> is clicked through constantly, with stars, grades and live counts, so it's a client cache, warmed by the route. The <b>reading session</b> itself is mostly client state (recording, timers) plus one mutation at the end to submit the recording.</p>
+
+  <h2>9. How a staff engineer approaches this</h2>
+  <p>A staff engineer looking at Lexi's data layer asks questions before picking a tool.</p>
+  <div class="trace"><b>The questions they ask</b>
+    <ol>
+      <li><b>Where does server data live today?</b> If it's in <code>useState</code>, Redux or context, how many copies of the same list exist? That number is your stale-data bug count.</li>
+      <li><b>How fresh does each screen need to be?</b> This sets staleTime per query, and decides polling or not. It's a product conversation, not a default.</li>
+      <li><b>What does the network tab show on first load?</b> A staircase of requests is a waterfall. Count the steps.</li>
+      <li><b>After each mutation, what goes stale?</b> Are keys structured so one invalidation covers it? Are keys in a factory, or typed by hand?</li>
+      <li><b>Which actions deserve optimistic updates?</b> Only fast, reversible, likely-to-succeed ones. Everything else waits for the server.</li>
+      <li><b>How interactive is each page?</b> This decides server components vs client cache vs both.</li>
+    </ol>
+  </div>
+  <p>Trade-offs, stated plainly:</p>
+  <ul>
+    <li><b>A longer staleTime</b> gives you fewer requests and fewer spinners at the cost of showing older data. Choose it when the data changes slowly or a few minutes of lag is harmless.</li>
+    <li><b>Invalidation</b> gives you guaranteed correctness at the cost of an extra request after each change. Choose it as the default.</li>
+    <li><b>Optimistic updates</b> give you instant UI at the cost of rollback code and a brief possible lie. Choose them for small, frequent actions where failure is rare and harmless.</li>
+    <li><b>Server components</b> give you less client code and faster first load at the cost of client-side cache behaviors. Choose them for read-heavy pages; add a client cache where users interact a lot.</li>
+  </ul>
+  <p>And a migration path rather than a rewrite: add the query client at the root; move one feature's fetches into query hooks with a key factory; delete the matching Redux slice or context once nothing reads it; repeat, starting with the screen that has the most stale-data bug reports.</p>
+
+  <h2>10. Common mistakes</h2>
+  <div class="mistake"><b>Copying query data into useState</b><p><code>const [list, setList] = useState(data)</code> creates a second copy that stops updating. Read from the query directly; derive what you need during render.</p></div>
+  <div class="mistake"><b>Missing variables in the query key</b><p>The fetch uses a filter that isn't in the key, so changing the filter returns the old cached result. Everything the <code>queryFn</code> uses goes in the key.</p></div>
+  <div class="mistake"><b>Confusing staleTime and gcTime</b><p>Raising gcTime doesn't reduce refetching; staleTime does. gcTime only controls how long unused data stays in memory.</p></div>
+  <div class="mistake"><b>Showing a full spinner on every background refetch</b><p>Check <code>isPending</code> for the skeleton, not <code>isFetching</code>. Background updates should be quiet.</p></div>
+  <div class="mistake"><b>Optimistic updates without rollback or resync</b><p>The UI keeps showing a change the server rejected. Always snapshot, roll back on error, and invalidate on settle.</p></div>
+  <div class="mistake"><b>Fetching once at the top and drilling the result</b><p>Every middle component now depends on the data. Call the query hook where the data is used; dedupe makes it free.</p></div>
+  <div class="mistake"><b>Hand-typed keys scattered everywhere</b><p>One typo and an invalidation silently misses. Use a key factory or shared <code>queryOptions</code>.</p></div>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"I treat server data as a cache I don't own, separate from client state. On the client I'd use TanStack Query: every input to a fetch goes in the query key, keys come from a factory, and staleTime is set per query based on how fresh that screen needs to be. After a mutation I invalidate the affected keys by default, and only use optimistic updates, with snapshot and rollback, for small actions that rarely fail. I'd watch for waterfalls in the network tab and fix them by hoisting or prefetching at the route, or by changing the API. For read-heavy pages like reports I'd use server components, and for interactive screens a client cache, prefetched on the server where it helps first load."</p>
+  </div>
+
+  <h2>11. Recap</h2>
+  <ul>
+    <li><code>useEffect</code> fetching breaks at scale in six ways: duplicate requests, no cache, race conditions, waterfalls, stale data, no refetch on focus.</li>
+    <li>Server state is a cache of data someone else owns. Put one cache in the middle; components ask it by key.</li>
+    <li>Query keys name entries and must include every input. staleTime = how long data counts as fresh; gcTime = how long unused data stays in memory.</li>
+    <li>Stale-while-revalidate shows cached data instantly and refreshes it quietly. <code>isPending</code> ≠ <code>isFetching</code>.</li>
+    <li>After mutations, invalidate. Optimistic updates: cancel, snapshot, write, roll back on error, resync on settle.</li>
+    <li><code>keepPreviousData</code> for paging, <code>useInfiniteQuery</code> for "Load more", prefetch on hover or at the route.</li>
+    <li>Waterfalls come from nested fetch-on-render; fix by hoisting, route loaders, or a better API.</li>
+    <li>Server components for read-heavy pages, client cache for interactive ones, often both.</li>
+  </ul>
+
+  <h3>Check yourself</h3>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">1. A query has staleTime 0 and gcTime 5 minutes. The teacher leaves Maya's page and comes back 2 minutes later. What does she see?</summary><p style="margin:10px 0 0;color:var(--muted)">Maya's sessions appear instantly from cache (the entry is still within gcTime), and because the data is stale, a background refetch runs and updates the list if anything changed. No spinner.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">2. Changing the grade filter on the report doesn't change the results. What's the most likely bug?</summary><p style="margin:10px 0 0;color:var(--muted)">The grade isn't in the query key, so the cache returns the entry for the old key. Add it to the key.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">3. Submitting a final grade that parents will see: optimistic update or not?</summary><p style="margin:10px 0 0;color:var(--muted)">Not. A false "done" here is harmful. Show a pending state, wait for the server, then invalidate the affected keys.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">4. The network tab shows teacher → classes → assignments, one after another. Name two fixes.</summary><p style="margin:10px 0 0;color:var(--muted)">Start all the queries at the top (or in a route loader) since the ids come from the URL, so they run in parallel. Or add an endpoint that returns what the dashboard needs in one request.</p></details>
+</template>

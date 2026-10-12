@@ -1,0 +1,401 @@
+@@@ shared src/data/order.ts
+export type OrderItem = {
+  id: string;
+  name: string;
+  qty: number;
+};
+
+export type Order = {
+  id: string;
+  restaurant: string;
+  deliveredAt: string;
+  courier: string;
+  items: OrderItem[];
+};
+
+export const ORDER: Order = {
+  id: 'FK-88412',
+  restaurant: 'Little Saigon Kitchen',
+  deliveredAt: 'Delivered today at 7:42 PM',
+  courier: 'Jamal',
+  items: [
+    { id: 'i1', name: 'Pho tai (large)', qty: 1 },
+    { id: 'i2', name: 'Lemongrass chicken banh mi', qty: 2 },
+    { id: 'i3', name: 'Thai iced tea', qty: 2 },
+  ],
+};
+
+// Index = number of stars. LABELS[4] === 'Good'.
+export const LABELS = ['', 'Terrible', 'Poor', 'Okay', 'Good', 'Excellent'];
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { ORDER, LABELS } from './data/order';
+import type { Order } from './data/order';
+
+function OrderSummary({ order }: { order: Order }) {
+  return (
+    <div className="order">
+      <div className="resto-logo">LS</div>
+      <div>
+        <p className="resto">{order.restaurant}</p>
+        <p className="delivered">{order.deliveredAt} · #{order.id}</p>
+        <ul className="items">
+          {order.items.map((item) => {
+            return <li key={item.id}>{item.qty}× {item.name}</li>;
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function StarRating() {
+  // TODO: interactive stars
+  return (
+    <div className="stars">
+      <span className="star">★</span>
+      <span className="star">★</span>
+      <span className="star">★</span>
+      <span className="star">★</span>
+      <span className="star">★</span>
+    </div>
+  );
+}
+
+function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: () => void }) {
+  const [comment, setComment] = useState('');
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    onSubmit();
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <OrderSummary order={order} />
+      <div className="rate-block">
+        <h1>How was your order?</h1>
+        <StarRating />
+      </div>
+      <label className="label" htmlFor="comment">Tell us more (optional)</label>
+      <textarea id="comment" className="comment" rows={3} placeholder="Food, packaging, delivery…" value={comment} onChange={(e) => { setComment(e.target.value); }} />
+      <button type="submit" className="submit">Submit review</button>
+    </form>
+  );
+}
+
+function ThankYou() {
+  return (
+    <div className="card thanks">
+      <div className="thanks-icon">✓</div>
+      <h1>Thanks for the feedback</h1>
+      <p>It helps {ORDER.restaurant} and couriers like {ORDER.courier} do better.</p>
+    </div>
+  );
+}
+
+export default function App() {
+  const [submitted, setSubmitted] = useState(false);
+
+  let content = <ReviewForm order={ORDER} onSubmit={() => { setSubmitted(true); }} />;
+  if (submitted) {
+    content = <ThankYou />;
+  }
+
+  return (
+    <div className="page">
+      <header className="topbar">forkful</header>
+      {content}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F4F4F6;
+  --surface: #FFFFFF;
+  --text: #17171C;
+  --muted: #74747F;
+  --line: #E8E8EC;
+  --primary: #E23D28;
+  --primary-hover: #C9311E;
+  --star: #FFB21E;
+  --star-empty: #DADAE0;
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.page { max-width: 460px; margin: 0 auto; padding: 0 16px 40px; }
+.topbar { padding: 18px 4px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; color: var(--primary); }
+
+.card { background: var(--surface); border-radius: var(--radius); padding: 22px; box-shadow: 0 1px 3px rgba(23, 23, 28, 0.06), 0 12px 32px rgba(23, 23, 28, 0.06); }
+
+.order { display: flex; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.order p { margin: 0; }
+.resto-logo { width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; display: grid; place-items: center; background: #FDECE9; color: var(--primary); font-weight: 800; }
+.resto { font-weight: 700; font-size: 16px; }
+.delivered { font-size: 13px; color: var(--muted); margin-top: 2px !important; }
+.items { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+
+.rate-block { text-align: center; padding: 22px 0 18px; }
+.rate-block h1 { margin: 0 0 12px; font-size: 20px; }
+.stars { display: inline-flex; gap: 4px; }
+.star { font-size: 36px; line-height: 1; color: var(--star-empty); }
+
+.label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.comment { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 14px; resize: vertical; background: #FAFAFB; }
+.comment:focus { outline: none; border-color: var(--text); background: #fff; }
+
+.submit { width: 100%; height: 48px; margin-top: 16px; border: 0; border-radius: 14px; background: var(--primary); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.submit:hover { background: var(--primary-hover); }
+.submit:disabled { background: #F1B7AF; cursor: not-allowed; }
+
+.thanks { text-align: center; padding: 40px 24px; }
+.thanks h1 { margin: 12px 0 6px; font-size: 20px; }
+.thanks p { margin: 0; color: var(--muted); font-size: 14px; }
+.thanks-icon { width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; background: #E7F7EE; color: #17955A; font-size: 26px; font-weight: 800; }
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { ORDER, LABELS } from './data/order';
+import type { Order } from './data/order';
+
+const STAR_VALUES = [1, 2, 3, 4, 5];
+const PROBLEMS = ['Late', 'Cold food', 'Missing item', 'Wrong order'];
+
+function OrderSummary({ order }: { order: Order }) {
+  return (
+    <div className="order">
+      <div className="resto-logo">LS</div>
+      <div>
+        <p className="resto">{order.restaurant}</p>
+        <p className="delivered">{order.deliveredAt} · #{order.id}</p>
+        <ul className="items">
+          {order.items.map((item) => {
+            return <li key={item.id}>{item.qty}× {item.name}</li>;
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+type StarRatingProps = {
+  value: number;
+  onChange: (value: number) => void;
+};
+
+// value lives in the form (it's submitted). hover is local: only the stars care.
+function StarRating({ value, onChange }: StarRatingProps) {
+  const [hover, setHover] = useState(0);
+
+  // derived: what to show right now
+  let shown = value;
+  if (hover > 0) {
+    shown = hover;
+  }
+
+  let label = 'Tap a star to rate';
+  let labelCls = 'rating-label is-empty';
+  if (shown > 0) {
+    label = LABELS[shown];
+    labelCls = 'rating-label';
+  }
+
+  let clearBtn = null;
+  if (value > 0) {
+    clearBtn = <button type="button" className="clear-btn" onClick={() => { onChange(0); }}>Clear</button>;
+  }
+
+  return (
+    <div className="rating">
+      <div className="stars" onMouseLeave={() => { setHover(0); }}>
+        {STAR_VALUES.map((n) => {
+          let cls = 'star';
+          if (n <= shown) {
+            cls = 'star is-on';
+          }
+          const aria = 'Rate ' + n + ' out of 5';
+          return (
+            <button
+              key={n}
+              type="button"
+              className={cls}
+              aria-label={aria}
+              onMouseEnter={() => { setHover(n); }}
+              onClick={() => { onChange(n); }}
+            >
+              ★
+            </button>
+          );
+        })}
+      </div>
+      <p className={labelCls}>{label}</p>
+      {clearBtn}
+    </div>
+  );
+}
+
+type ProblemChipsProps = {
+  selected: string[];
+  onToggle: (problem: string) => void;
+};
+
+// Change: multi-select chips for low ratings.
+function ProblemChips({ selected, onToggle }: ProblemChipsProps) {
+  return (
+    <div className="problems">
+      <p className="label">What went wrong?</p>
+      <div className="chips">
+        {PROBLEMS.map((p) => {
+          const isOn = selected.includes(p);
+          let cls = 'chip';
+          if (isOn) {
+            cls = 'chip is-on';
+          }
+          return (
+            <button key={p} type="button" className={cls} aria-pressed={isOn} onClick={() => { onToggle(p); }}>{p}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: () => void }) {
+  const [comment, setComment] = useState('');
+  const [rating, setRating] = useState(0);
+  const [problems, setProblems] = useState<string[]>([]);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    onSubmit();
+  }
+
+  function handleToggleProblem(problem: string) {
+    setProblems((prev) => {
+      if (prev.includes(problem)) {
+        return prev.filter((p) => {
+          return p !== problem;
+        });
+      }
+      return [...prev, problem];
+    });
+  }
+
+  // derived
+  const isLow = rating > 0 && rating <= 2;
+  let canSubmit = rating > 0;
+  if (isLow && problems.length === 0) {
+    canSubmit = false;
+  }
+
+  let problemsBlock = null;
+  if (isLow) {
+    problemsBlock = <ProblemChips selected={problems} onToggle={handleToggleProblem} />;
+  }
+
+  return (
+    <form className="card" onSubmit={handleSubmit}>
+      <OrderSummary order={order} />
+      <div className="rate-block">
+        <h1>How was your order?</h1>
+        <StarRating value={rating} onChange={setRating} />
+      </div>
+      {problemsBlock}
+      <label className="label" htmlFor="comment">Tell us more (optional)</label>
+      <textarea id="comment" className="comment" rows={3} placeholder="Food, packaging, delivery…" value={comment} onChange={(e) => { setComment(e.target.value); }} />
+      <button type="submit" className="submit" disabled={!canSubmit}>Submit review</button>
+    </form>
+  );
+}
+
+function ThankYou() {
+  return (
+    <div className="card thanks">
+      <div className="thanks-icon">✓</div>
+      <h1>Thanks for the feedback</h1>
+      <p>It helps {ORDER.restaurant} and couriers like {ORDER.courier} do better.</p>
+    </div>
+  );
+}
+
+export default function App() {
+  const [submitted, setSubmitted] = useState(false);
+
+  let content = <ReviewForm order={ORDER} onSubmit={() => { setSubmitted(true); }} />;
+  if (submitted) {
+    content = <ThankYou />;
+  }
+
+  return (
+    <div className="page">
+      <header className="topbar">forkful</header>
+      {content}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F4F4F6;
+  --surface: #FFFFFF;
+  --text: #17171C;
+  --muted: #74747F;
+  --line: #E8E8EC;
+  --primary: #E23D28;
+  --primary-hover: #C9311E;
+  --star: #FFB21E;
+  --star-empty: #DADAE0;
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.page { max-width: 460px; margin: 0 auto; padding: 0 16px 40px; }
+.topbar { padding: 18px 4px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; color: var(--primary); }
+
+.card { background: var(--surface); border-radius: var(--radius); padding: 22px; box-shadow: 0 1px 3px rgba(23, 23, 28, 0.06), 0 12px 32px rgba(23, 23, 28, 0.06); }
+
+.order { display: flex; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.order p { margin: 0; }
+.resto-logo { width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; display: grid; place-items: center; background: #FDECE9; color: var(--primary); font-weight: 800; }
+.resto { font-weight: 700; font-size: 16px; }
+.delivered { font-size: 13px; color: var(--muted); margin-top: 2px !important; }
+.items { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+
+.rate-block { text-align: center; padding: 22px 0 18px; }
+.rate-block h1 { margin: 0 0 12px; font-size: 20px; }
+.stars { display: inline-flex; gap: 4px; }
+.star { font-size: 36px; line-height: 1; color: var(--star-empty); }
+
+.label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.comment { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 14px; resize: vertical; background: #FAFAFB; }
+.comment:focus { outline: none; border-color: var(--text); background: #fff; }
+
+.submit { width: 100%; height: 48px; margin-top: 16px; border: 0; border-radius: 14px; background: var(--primary); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.submit:hover { background: var(--primary-hover); }
+.submit:disabled { background: #F1B7AF; cursor: not-allowed; }
+
+.thanks { text-align: center; padding: 40px 24px; }
+.thanks h1 { margin: 12px 0 6px; font-size: 20px; }
+.thanks p { margin: 0; color: var(--muted); font-size: 14px; }
+.thanks-icon { width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; background: #E7F7EE; color: #17955A; font-size: 26px; font-weight: 800; }
+
+/* ---- Added: interactive stars ---- */
+.rating { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.star { padding: 0 2px; border: 0; background: none; font-family: inherit; cursor: pointer; transition: transform 0.1s ease, color 0.1s ease; }
+.star:hover { transform: scale(1.12); }
+.star.is-on { color: var(--star); }
+.star:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 6px; }
+.rating-label { margin: 0; min-height: 20px; font-size: 15px; font-weight: 700; }
+.rating-label.is-empty { font-weight: 400; color: var(--muted); }
+.clear-btn { border: 0; background: none; padding: 2px 6px; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.clear-btn:hover { color: var(--text); }
+
+/* Change: problem chips */
+.problems { margin-bottom: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: inherit; font-size: 14px; color: var(--text); cursor: pointer; }
+.chip:hover { border-color: var(--text); }
+.chip.is-on { background: #FDECE9; border-color: var(--primary); color: var(--primary); font-weight: 600; }

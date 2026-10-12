@@ -1,0 +1,486 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type EventKind = 'holiday' | 'trip' | 'test' | 'event';
+
+export type SchoolEvent = {
+  id: string;
+  date: string;       // "YYYY-MM-DD"
+  title: string;
+  kind: EventKind;
+  time: string | null; // "9:00 AM", or null for all-day
+};
+
+const EVENTS: SchoolEvent[] = [
+  { id: 'e1', date: '2026-08-19', title: 'First day of school', kind: 'event', time: '8:15 AM' },
+  { id: 'e2', date: '2026-08-27', title: 'Back-to-school night', kind: 'event', time: '6:00 PM' },
+  { id: 'e3', date: '2026-09-07', title: 'Labor Day: no school', kind: 'holiday', time: null },
+  { id: 'e4', date: '2026-09-10', title: 'Picture day', kind: 'event', time: null },
+  { id: 'e5', date: '2026-09-15', title: 'Spelling test', kind: 'test', time: '9:00 AM' },
+  { id: 'e6', date: '2026-09-15', title: 'Soccer club', kind: 'event', time: '3:15 PM' },
+  { id: 'e7', date: '2026-09-15', title: 'PTA meeting', kind: 'event', time: '6:30 PM' },
+  { id: 'e8', date: '2026-09-18', title: 'Field trip: Science Museum', kind: 'trip', time: '8:30 AM' },
+  { id: 'e9', date: '2026-09-24', title: 'Math quiz', kind: 'test', time: '10:00 AM' },
+  { id: 'e10', date: '2026-09-29', title: 'Fall concert', kind: 'event', time: '5:30 PM' },
+  { id: 'e11', date: '2026-10-02', title: 'Book fair', kind: 'event', time: null },
+  { id: 'e12', date: '2026-10-09', title: 'Teacher planning day: no school', kind: 'holiday', time: null },
+  { id: 'e13', date: '2026-10-12', title: 'Indigenous Peoples’ Day: no school', kind: 'holiday', time: null },
+  { id: 'e14', date: '2026-10-21', title: 'Trip: Pumpkin patch', kind: 'trip', time: '9:00 AM' },
+  { id: 'e15', date: '2026-10-30', title: 'Costume parade', kind: 'event', time: '1:00 PM' },
+  { id: 'e16', date: '2026-11-11', title: 'Veterans Day: no school', kind: 'holiday', time: null },
+  { id: 'e17', date: '2026-11-26', title: 'Thanksgiving break', kind: 'holiday', time: null },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /events?year=2026&month=8 -> SchoolEvent[] for that month (month is 0-based, like Date)
+export async function getEvents(year: number, month: number): Promise<SchoolEvent[]> {
+  await randomDelay(400, 900);
+  const prefix = year + '-' + String(month + 1).padStart(2, '0') + '-';
+  return EVENTS.filter((e) => e.date.startsWith(prefix)).map((e) => ({ ...e }));
+}
+@@@ shared src/components/EventChip.tsx
+import React from 'react';
+import type { SchoolEvent } from '../api';
+
+// Small colored pill for one event. The color comes from the kind.
+export function EventChip({ event }: { event: SchoolEvent }) {
+  return <span className={'chip chip-' + event.kind} title={event.title}>{event.title}</span>;
+}
+
+export function Legend() {
+  return (
+    <div className="legend">
+      <span className="legend-item"><i className="swatch chip-event" />School event</span>
+      <span className="legend-item"><i className="swatch chip-test" />Test</span>
+      <span className="legend-item"><i className="swatch chip-trip" />Field trip</span>
+      <span className="legend-item"><i className="swatch chip-holiday" />No school</span>
+    </div>
+  );
+}
+@@@ shared src/utils/date.ts
+export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const LONG_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// daysInMonth(2026, 8) -> 30 (September; month is 0-based)
+export function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// firstWeekday(2026, 8) -> 2 (Sept 1, 2026 is a Tuesday; 0 = Sunday)
+export function firstWeekday(year: number, month: number): number {
+  return new Date(year, month, 1).getDay();
+}
+
+// toKey(2026, 8, 5) -> "2026-09-05" (same format as SchoolEvent.date)
+export function toKey(year: number, month: number, day: number): string {
+  return year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
+// formatLongDate("2026-09-15") -> "Tuesday, September 15"
+export function formatLongDate(key: string): string {
+  const parts = key.split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  return LONG_WEEKDAYS[d.getDay()] + ', ' + MONTH_NAMES[d.getMonth()] + ' ' + d.getDate();
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getEvents } from './api';
+import type { SchoolEvent } from './api';
+import { EventChip, Legend } from './components/EventChip';
+import { MONTH_NAMES, formatLongDate } from './utils/date';
+
+// The app's "today". Passed down as a prop so the calendar never reads the real clock.
+const TODAY = new Date(2026, 8, 15);
+
+function SchoolHeader() {
+  return (
+    <header className="school-header">
+      <div className="crest">🍁</div>
+      <div>
+        <p className="school-name">Maple Grove Elementary</p>
+        <p className="school-sub">Family portal · Grade 3, Ms. Alvarez</p>
+      </div>
+      <div className="student-pill">Maya R.</div>
+    </header>
+  );
+}
+
+// TODO: replace the agenda list with a month grid + prev/next month
+function SchoolCalendar({ today }: { today: Date }) {
+  const [events, setEvents] = useState<SchoolEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  useEffect(() => {
+    let cancelled = false;
+    getEvents(year, month).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setEvents(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [year, month]);
+
+  let body;
+  if (loading) {
+    body = <p className="muted">Loading events…</p>;
+  } else {
+    body = (
+      <ul className="agenda">
+        {events.map((e) => {
+          return (
+            <li key={e.id} className="agenda-row">
+              <span className="agenda-date">{formatLongDate(e.date)}</span>
+              <EventChip event={e} />
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h1 className="cal-title">{MONTH_NAMES[month]} {year}</h1>
+        <div className="cal-nav">
+          <button type="button" className="nav-btn" aria-label="Previous month">‹</button>
+          <button type="button" className="nav-btn" aria-label="Next month">›</button>
+        </div>
+      </div>
+      {body}
+      <Legend />
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <SchoolHeader />
+      <main className="page">
+        <SchoolCalendar today={TODAY} />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F4F7F2;
+  --surface: #FFFFFF;
+  --border: #E1E8DC;
+  --text: #22301F;
+  --muted: #6E7C69;
+  --primary: #2F855A;
+  --primary-soft: #E3F2E8;
+  --sun: #F6C343;
+  --event: #3B82F6;
+  --test: #8B5CF6;
+  --trip: #F97316;
+  --holiday: #E11D48;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Nunito, 'Trebuchet MS', system-ui, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.school-header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; background: var(--primary); color: #fff; }
+.crest { width: 40px; height: 40px; border-radius: 12px; background: var(--sun); display: grid; place-items: center; font-size: 22px; }
+.school-name { margin: 0; font-weight: 800; font-size: 17px; }
+.school-sub { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+.student-pill { margin-left: auto; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); font-weight: 700; font-size: 13px; }
+
+.page { padding: 24px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 2px 0 var(--border); }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cal-title { margin: 0; font-size: 22px; font-weight: 800; }
+.cal-nav { display: flex; gap: 6px; }
+.nav-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 20px; line-height: 1; color: var(--text); cursor: pointer; }
+.nav-btn:hover { background: var(--primary-soft); border-color: var(--primary); }
+.muted { color: var(--muted); }
+
+.agenda { list-style: none; margin: 0; padding: 0; }
+.agenda-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.agenda-date { width: 190px; font-weight: 700; }
+
+.chip { display: block; max-width: 100%; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-event { background: #DBEAFE; color: #1D4ED8; }
+.chip-test { background: #EDE9FE; color: #6D28D9; }
+.chip-trip { background: #FFEDD5; color: #C2410C; }
+.chip-holiday { background: #FFE4E6; color: #BE123C; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: 12px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getEvents } from './api';
+import type { SchoolEvent } from './api';
+import { EventChip, Legend } from './components/EventChip';
+import { MONTH_NAMES, WEEKDAYS, daysInMonth, firstWeekday, formatLongDate, toKey } from './utils/date';
+
+// The app's "today". Passed down as a prop so the calendar never reads the real clock.
+const TODAY = new Date(2026, 8, 15);
+
+function SchoolHeader() {
+  return (
+    <header className="school-header">
+      <div className="crest">🍁</div>
+      <div>
+        <p className="school-name">Maple Grove Elementary</p>
+        <p className="school-sub">Family portal · Grade 3, Ms. Alvarez</p>
+      </div>
+      <div className="student-pill">Maya R.</div>
+    </header>
+  );
+}
+
+type DayPanelProps = {
+  dateKey: string;
+  events: SchoolEvent[];
+  onClose: () => void;
+};
+
+// Change: the side panel for the clicked day.
+function DayPanel({ dateKey, events, onClose }: DayPanelProps) {
+  let body = <p className="muted">No events this day.</p>;
+  if (events.length > 0) {
+    body = (
+      <ul className="panel-list">
+        {events.map((e) => {
+          let time = 'All day';
+          if (e.time) {
+            time = e.time;
+          }
+          return (
+            <li key={e.id} className="panel-item">
+              <span className="panel-time">{time}</span>
+              <EventChip event={e} />
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  return (
+    <aside className="day-panel">
+      <div className="panel-head">
+        <h2>{formatLongDate(dateKey)}</h2>
+        <button type="button" className="panel-close" aria-label="Close" onClick={() => { onClose(); }}>✕</button>
+      </div>
+      {body}
+    </aside>
+  );
+}
+
+const MAX_CHIPS = 2;
+
+function SchoolCalendar({ today }: { today: Date }) {
+  // The visible month. Starts at "today" but moves independently of it.
+  const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
+  const [events, setEvents] = useState<SchoolEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  // Refetch whenever the visible month changes. The guard drops a slow
+  // response for a month you've already clicked away from.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getEvents(view.year, view.month).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setEvents(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [view.year, view.month]);
+
+  function handleMonth(delta: number) {
+    setView((prev) => {
+      // new Date handles the year rollover (month 12 -> January next year).
+      const d = new Date(prev.year, prev.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+    setSelectedKey(null);
+  }
+
+  // derived: the cells of the grid. null = blank cell before the 1st / after the last day.
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday(view.year, view.month); i++) {
+    cells.push(null);
+  }
+  for (let d = 1; d <= daysInMonth(view.year, view.month); d++) {
+    cells.push(d);
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  const todayKey = toKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  function eventsOn(key: string): SchoolEvent[] {
+    return events.filter((e) => {
+      return e.date === key;
+    });
+  }
+
+  let status = null;
+  if (loading) {
+    status = <span className="loading-dot">Loading…</span>;
+  }
+
+  let panel = null;
+  let layoutCls = 'cal-layout';
+  if (selectedKey) {
+    layoutCls = 'cal-layout has-panel';
+    panel = <DayPanel dateKey={selectedKey} events={eventsOn(selectedKey)} onClose={() => { setSelectedKey(null); }} />;
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h1 className="cal-title">{MONTH_NAMES[view.month]} {view.year}</h1>
+        {status}
+        <div className="cal-nav">
+          <button type="button" className="nav-btn" aria-label="Previous month" onClick={() => { handleMonth(-1); }}>‹</button>
+          <button type="button" className="nav-btn" aria-label="Next month" onClick={() => { handleMonth(1); }}>›</button>
+        </div>
+      </div>
+      <div className={layoutCls}>
+        <div className="cal-grid">
+          {WEEKDAYS.map((w) => {
+            return <div key={w} className="cal-weekday">{w}</div>;
+          })}
+          {cells.map((day, i) => {
+            if (day === null) {
+              return <div key={'blank-' + i} className="cal-cell is-blank" />;
+            }
+            const key = toKey(view.year, view.month, day);
+            const dayEvents = eventsOn(key);
+            let cls = 'cal-cell is-day';
+            if (key === todayKey) {
+              cls = cls + ' is-today';
+            }
+            if (key === selectedKey) {
+              cls = cls + ' is-selected';
+            }
+            let more = null;
+            if (dayEvents.length > MAX_CHIPS) {
+              more = <span className="more">+{dayEvents.length - MAX_CHIPS} more</span>;
+            }
+            return (
+              <button key={key} type="button" className={cls} onClick={() => { setSelectedKey(key); }}>
+                <span className="day-num">{day}</span>
+                {dayEvents.slice(0, MAX_CHIPS).map((e) => {
+                  return <EventChip key={e.id} event={e} />;
+                })}
+                {more}
+              </button>
+            );
+          })}
+        </div>
+        {panel}
+      </div>
+      <Legend />
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <SchoolHeader />
+      <main className="page">
+        <SchoolCalendar today={TODAY} />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F4F7F2;
+  --surface: #FFFFFF;
+  --border: #E1E8DC;
+  --text: #22301F;
+  --muted: #6E7C69;
+  --primary: #2F855A;
+  --primary-soft: #E3F2E8;
+  --sun: #F6C343;
+  --event: #3B82F6;
+  --test: #8B5CF6;
+  --trip: #F97316;
+  --holiday: #E11D48;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Nunito, 'Trebuchet MS', system-ui, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.school-header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; background: var(--primary); color: #fff; }
+.crest { width: 40px; height: 40px; border-radius: 12px; background: var(--sun); display: grid; place-items: center; font-size: 22px; }
+.school-name { margin: 0; font-weight: 800; font-size: 17px; }
+.school-sub { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+.student-pill { margin-left: auto; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); font-weight: 700; font-size: 13px; }
+
+.page { padding: 24px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 2px 0 var(--border); }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cal-title { margin: 0; font-size: 22px; font-weight: 800; }
+.cal-nav { display: flex; gap: 6px; }
+.nav-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 20px; line-height: 1; color: var(--text); cursor: pointer; }
+.nav-btn:hover { background: var(--primary-soft); border-color: var(--primary); }
+.muted { color: var(--muted); }
+
+.agenda { list-style: none; margin: 0; padding: 0; }
+.agenda-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.agenda-date { width: 190px; font-weight: 700; }
+
+.chip { display: block; max-width: 100%; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-event { background: #DBEAFE; color: #1D4ED8; }
+.chip-test { background: #EDE9FE; color: #6D28D9; }
+.chip-trip { background: #FFEDD5; color: #C2410C; }
+.chip-holiday { background: #FFE4E6; color: #BE123C; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: 12px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+
+/* ---- Added: month grid + day panel ---- */
+.loading-dot { margin-left: 12px; margin-right: auto; font-size: 12px; font-weight: 700; color: var(--muted); }
+.cal-layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.cal-layout.has-panel { grid-template-columns: 1fr 240px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.cal-weekday { padding: 4px 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.cal-cell { min-height: 92px; padding: 6px; border-radius: 10px; }
+.cal-cell.is-blank { background: repeating-linear-gradient(135deg, transparent 0 6px, #F1F4EF 6px 7px); }
+.cal-cell.is-day { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; border: 1px solid var(--border); background: var(--surface); font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.cal-cell.is-day:hover { border-color: var(--primary); }
+.day-num { font-weight: 800; font-size: 13px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
+.cal-cell.is-today .day-num { background: var(--sun); }
+.cal-cell.is-selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); background: #FAFDF9; }
+.more { font-size: 11px; font-weight: 700; color: var(--muted); padding-left: 4px; }
+
+.day-panel { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: #FBFCFA; align-self: start; }
+.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.panel-head h2 { margin: 0; font-size: 15px; font-weight: 800; }
+.panel-close { border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+.panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.panel-item { display: flex; flex-direction: column; gap: 4px; }
+.panel-time { font-size: 12px; font-weight: 700; color: var(--muted); }
+.panel-item .chip { white-space: normal; }

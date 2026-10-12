@@ -1,0 +1,430 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type CourseStatus = 'in-progress' | 'completed' | 'wishlist';
+
+export type Course = {
+  id: string;
+  title: string;
+  instructor: string;
+  lessonsDone: number;
+  lessonsTotal: number;
+  color: string; // cover color
+  emoji: string;
+  status: CourseStatus;
+};
+
+const COURSES: Course[] = [
+  { id: 'c1', title: 'Spanish for Travelers', instructor: 'Lucía Romero', lessonsDone: 14, lessonsTotal: 24, color: '#FFD166', emoji: '🌮', status: 'in-progress' },
+  { id: 'c2', title: 'Intro to Data Science', instructor: 'Dr. Amir Haddad', lessonsDone: 5, lessonsTotal: 30, color: '#8DD3C7', emoji: '📊', status: 'in-progress' },
+  { id: 'c3', title: 'Watercolor Basics', instructor: 'Hana Sato', lessonsDone: 2, lessonsTotal: 12, color: '#F4A6C6', emoji: '🎨', status: 'in-progress' },
+  { id: 'c4', title: 'Public Speaking', instructor: 'Marcus Lee', lessonsDone: 9, lessonsTotal: 10, color: '#B9A6F4', emoji: '🎤', status: 'in-progress' },
+  { id: 'c5', title: 'Personal Finance 101', instructor: 'Priya Nair', lessonsDone: 16, lessonsTotal: 16, color: '#9AD0F5', emoji: '💸', status: 'completed' },
+  { id: 'c6', title: 'Photography: Light', instructor: 'Tom Becker', lessonsDone: 20, lessonsTotal: 20, color: '#FFB38A', emoji: '📷', status: 'completed' },
+  // Nothing on the wishlist yet: the API returns an empty array for it.
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /me/courses?status=... -> Course[]
+// When shouldFail is true the request rejects (the "Simulate failure" checkbox).
+export async function getCourses(status: CourseStatus, shouldFail: boolean): Promise<Course[]> {
+  await randomDelay(400, 1200);
+  if (shouldFail) {
+    throw new Error('503 Service Unavailable');
+  }
+  return COURSES.filter((c) => c.status === status).map((c) => ({ ...c }));
+}
+@@@ shared src/components/CourseCard.tsx
+import React from 'react';
+import type { Course } from '../api';
+
+export function CourseCard({ course }: { course: Course }) {
+  const percent = Math.round((course.lessonsDone / course.lessonsTotal) * 100);
+
+  let cta = 'Continue';
+  if (percent === 100) {
+    cta = 'Review';
+  }
+
+  return (
+    <article className="course-card">
+      <div className="course-cover" style={{ background: course.color }}>{course.emoji}</div>
+      <div className="course-body">
+        <h3>{course.title}</h3>
+        <p className="instructor">{course.instructor}</p>
+        <div className="progress"><div className="progress-fill" style={{ width: percent + '%' }} /></div>
+        <div className="course-foot">
+          <span>{course.lessonsDone}/{course.lessonsTotal} lessons</span>
+          <button type="button" className="ghost-btn">{cta}</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import type { CourseStatus } from './api';
+import { CourseCard } from './components/CourseCard';
+
+const TABS: { id: CourseStatus; label: string }[] = [
+  { id: 'in-progress', label: 'In progress' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'wishlist', label: 'Wishlist' },
+];
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">learn<b>loop</b></span>
+      <div className="streak">🔥 12-day streak</div>
+      <div className="me">JK</div>
+    </header>
+  );
+}
+
+type TabsProps = {
+  active: CourseStatus;
+  onChange: (id: CourseStatus) => void;
+};
+
+function Tabs({ active, onChange }: TabsProps) {
+  return (
+    <div className="tabs" role="tablist">
+      {TABS.map((t) => {
+        let cls = 'tab';
+        if (t.id === active) {
+          cls = 'tab is-active';
+        }
+        return (
+          <button key={t.id} type="button" role="tab" aria-selected={t.id === active} className={cls} onClick={() => { onChange(t.id); }}>
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Dev-only toolbar so you can test the error state on purpose.
+function DevToolbar({ fail, onFailChange }: { fail: boolean; onFailChange: (v: boolean) => void }) {
+  return (
+    <label className="devbar">
+      <input type="checkbox" checked={fail} onChange={(e) => { onFailChange(e.target.checked); }} />
+      Simulate failure
+    </label>
+  );
+}
+
+type CourseListProps = {
+  status: CourseStatus;
+  shouldFail: boolean;
+};
+
+function CourseList({ status, shouldFail }: CourseListProps) {
+  // TODO: load courses with getCourses(status, shouldFail) and render a CourseCard for each.
+  return <div className="course-grid" />;
+}
+
+export default function App() {
+  const [tab, setTab] = useState<CourseStatus>('in-progress');
+  const [fail, setFail] = useState(false);
+
+  return (
+    <div className="app">
+      <Header />
+      <main className="main">
+        <div className="title-row">
+          <div>
+            <h1>My learning</h1>
+            <p className="sub">Pick up where you left off, Jordan.</p>
+          </div>
+          <DevToolbar fail={fail} onFailChange={(v) => { setFail(v); }} />
+        </div>
+        <Tabs active={tab} onChange={(id) => { setTab(id); }} />
+        <CourseList status={tab} shouldFail={fail} />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFBF3;
+  --surface: #FFFFFF;
+  --border: #F0E6D2;
+  --text: #2B2118;
+  --muted: #8A7B68;
+  --primary: #FF7A1A;
+  --primary-soft: #FFEBD9;
+  --danger: #D93A2B;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-size: 20px; letter-spacing: -0.02em; margin-right: auto; }
+.logo b { color: var(--primary); }
+.streak { padding: 6px 12px; border-radius: 999px; background: var(--primary-soft); font-size: 13px; font-weight: 700; color: #B4520A; }
+.me { width: 34px; height: 34px; border-radius: 50%; background: var(--text); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+
+.main { max-width: 900px; margin: 0 auto; padding: 28px 28px 48px; }
+.title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.main h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.devbar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px dashed #D9C9AA; border-radius: 8px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+
+.tabs { display: flex; gap: 6px; margin: 24px 0 20px; }
+.tab { height: 36px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.tab.is-active { background: var(--text); border-color: var(--text); color: #fff; }
+
+.course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.course-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.course-cover { height: 96px; display: grid; place-items: center; font-size: 40px; }
+.course-body { padding: 14px 16px 16px; }
+.course-body h3 { margin: 0; font-size: 16px; }
+.instructor { margin: 2px 0 14px; font-size: 13px; color: var(--muted); }
+.progress { height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--primary); }
+.course-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.ghost-btn { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; }
+.ghost-btn:hover { border-color: var(--primary); color: var(--primary); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCourses } from './api';
+import type { Course, CourseStatus } from './api';
+import { CourseCard } from './components/CourseCard';
+
+const TABS: { id: CourseStatus; label: string }[] = [
+  { id: 'in-progress', label: 'In progress' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'wishlist', label: 'Wishlist' },
+];
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">learn<b>loop</b></span>
+      <div className="streak">🔥 12-day streak</div>
+      <div className="me">JK</div>
+    </header>
+  );
+}
+
+type TabsProps = {
+  active: CourseStatus;
+  onChange: (id: CourseStatus) => void;
+};
+
+function Tabs({ active, onChange }: TabsProps) {
+  return (
+    <div className="tabs" role="tablist">
+      {TABS.map((t) => {
+        let cls = 'tab';
+        if (t.id === active) {
+          cls = 'tab is-active';
+        }
+        return (
+          <button key={t.id} type="button" role="tab" aria-selected={t.id === active} className={cls} onClick={() => { onChange(t.id); }}>
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Dev-only toolbar so you can test the error state on purpose.
+function DevToolbar({ fail, onFailChange }: { fail: boolean; onFailChange: (v: boolean) => void }) {
+  return (
+    <label className="devbar">
+      <input type="checkbox" checked={fail} onChange={(e) => { onFailChange(e.target.checked); }} />
+      Simulate failure
+    </label>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="course-card skeleton-card" aria-hidden="true">
+      <div className="sk sk-cover" />
+      <div className="course-body">
+        <div className="sk sk-line" />
+        <div className="sk sk-line short" />
+        <div className="sk sk-bar" />
+      </div>
+    </div>
+  );
+}
+
+type CourseListProps = {
+  status: CourseStatus;
+  shouldFail: boolean;
+};
+
+function CourseList({ status, shouldFail }: CourseListProps) {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Bumping this number re-runs the effect: that is the whole Retry button.
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getCourses(status, shouldFail)
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+        setCourses(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setError('Couldn’t load your courses.');
+        setLoading(false);
+      });
+    return () => {
+      // A newer request (tab switch, retry) replaces this one: ignore its answer.
+      cancelled = true;
+    };
+  }, [status, shouldFail, attempt]);
+
+  function handleRetry() {
+    setAttempt((prev) => {
+      return prev + 1;
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="course-grid" aria-busy="true">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="state-panel is-error" role="alert">
+        <span className="state-icon">⚠️</span>
+        <h3>{error}</h3>
+        <p>Check your connection and try again.</p>
+        <button type="button" className="primary-btn" onClick={() => { handleRetry(); }}>Retry</button>
+      </div>
+    );
+  }
+
+  if (courses.length === 0) {
+    return (
+      <div className="state-panel">
+        <span className="state-icon">📚</span>
+        <h3>No courses here yet</h3>
+        <p>Save courses you like and they will show up in this list.</p>
+        <button type="button" className="primary-btn">Browse catalog</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="course-grid">
+      {courses.map((c) => {
+        return <CourseCard key={c.id} course={c} />;
+      })}
+    </div>
+  );
+}
+
+export default function App() {
+  const [tab, setTab] = useState<CourseStatus>('in-progress');
+  const [fail, setFail] = useState(false);
+
+  return (
+    <div className="app">
+      <Header />
+      <main className="main">
+        <div className="title-row">
+          <div>
+            <h1>My learning</h1>
+            <p className="sub">Pick up where you left off, Jordan.</p>
+          </div>
+          <DevToolbar fail={fail} onFailChange={(v) => { setFail(v); }} />
+        </div>
+        <Tabs active={tab} onChange={(id) => { setTab(id); }} />
+        <CourseList status={tab} shouldFail={fail} />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFBF3;
+  --surface: #FFFFFF;
+  --border: #F0E6D2;
+  --text: #2B2118;
+  --muted: #8A7B68;
+  --primary: #FF7A1A;
+  --primary-soft: #FFEBD9;
+  --danger: #D93A2B;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-size: 20px; letter-spacing: -0.02em; margin-right: auto; }
+.logo b { color: var(--primary); }
+.streak { padding: 6px 12px; border-radius: 999px; background: var(--primary-soft); font-size: 13px; font-weight: 700; color: #B4520A; }
+.me { width: 34px; height: 34px; border-radius: 50%; background: var(--text); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+
+.main { max-width: 900px; margin: 0 auto; padding: 28px 28px 48px; }
+.title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.main h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.devbar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px dashed #D9C9AA; border-radius: 8px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+
+.tabs { display: flex; gap: 6px; margin: 24px 0 20px; }
+.tab { height: 36px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.tab.is-active { background: var(--text); border-color: var(--text); color: #fff; }
+
+.course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.course-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.course-cover { height: 96px; display: grid; place-items: center; font-size: 40px; }
+.course-body { padding: 14px 16px 16px; }
+.course-body h3 { margin: 0; font-size: 16px; }
+.instructor { margin: 2px 0 14px; font-size: 13px; color: var(--muted); }
+.progress { height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--primary); }
+.course-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.ghost-btn { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; }
+.ghost-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* ---- Added: loading, error and empty states ---- */
+.sk { border-radius: 8px; background: linear-gradient(90deg, #F5EDDD 25%, #FBF5EA 50%, #F5EDDD 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+.sk-cover { height: 96px; border-radius: 0; }
+.sk-line { height: 14px; margin-bottom: 8px; }
+.sk-line.short { width: 55%; margin-bottom: 18px; }
+.sk-bar { height: 6px; border-radius: 999px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.state-panel { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 40px 24px; text-align: center; background: var(--surface); border: 1px dashed #E3D3B4; border-radius: var(--radius); }
+.state-panel.is-error { border: 1px solid #F5C6BF; background: #FFF5F3; }
+.state-panel.is-error h3 { color: var(--danger); }
+.state-icon { font-size: 32px; }
+.state-panel h3 { margin: 4px 0 0; font-size: 17px; }
+.state-panel p { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+.primary-btn { height: 38px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.primary-btn:hover { background: #E86A0C; }

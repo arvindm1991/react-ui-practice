@@ -1,0 +1,620 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type FieldType = 'text' | 'email' | 'select' | 'checkbox';
+
+export type Field = {
+  id: string;
+  type: FieldType;
+  label: string;
+  required: boolean;
+  options: string[]; // only used by "select"
+};
+
+export type FormDef = {
+  name: string;
+  fields: Field[];
+};
+
+const FORM: FormDef = {
+  name: 'Beta waitlist',
+  fields: [
+    { id: 'f1', type: 'text', label: 'Full name', required: true, options: [] },
+    { id: 'f2', type: 'email', label: 'Work email', required: true, options: [] },
+  ],
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /forms/waitlist -> FormDef
+export async function getForm(): Promise<FormDef> {
+  await randomDelay(300, 800);
+  return { name: FORM.name, fields: FORM.fields.map((f) => ({ ...f, options: [...f.options] })) };
+}
+@@@ shared src/utils/id.ts
+let counter = 0;
+// uid("f") -> "f-1712345678901-1"
+export function uid(prefix: string): string {
+  counter += 1;
+  return prefix + '-' + Date.now() + '-' + counter;
+}
+@@@ shared src/utils/fieldTypes.ts
+import type { FieldType } from '../api';
+
+// Display info for each field type. Use it for buttons, badges and default labels.
+export const FIELD_TYPES: { type: FieldType; label: string; icon: string }[] = [
+  { type: 'text', label: 'Short text', icon: 'Aa' },
+  { type: 'email', label: 'Email', icon: '@' },
+  { type: 'select', label: 'Dropdown', icon: '▾' },
+  { type: 'checkbox', label: 'Checkbox', icon: '☑' },
+];
+
+export function typeInfo(type: FieldType) {
+  return FIELD_TYPES.find((t) => t.type === type) || FIELD_TYPES[0];
+}
+
+// isEmail("a@b.co") -> true
+export function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+@@@ shared src/components/Toggle.tsx
+import React from 'react';
+
+type ToggleProps = {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+};
+
+// Accessible switch: a real checkbox styled as a toggle.
+export default function Toggle({ label, checked, onChange }: ToggleProps) {
+  return (
+    <label className="toggle">
+      <input type="checkbox" role="switch" checked={checked} onChange={(e) => { onChange(e.target.checked); }} />
+      <span className="toggle-track" aria-hidden="true"><span className="toggle-thumb" /></span>
+      <span className="toggle-label">{label}</span>
+    </label>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getForm } from './api';
+import type { Field } from './api';
+import { FIELD_TYPES, typeInfo } from './utils/fieldTypes';
+
+function AddFieldPanel() {
+  // TODO: clicking a type should add a field
+  return (
+    <aside className="panel add-panel">
+      <h2 className="panel-title">Add field</h2>
+      {FIELD_TYPES.map((t) => {
+        return (
+          <button key={t.type} type="button" className="type-btn">
+            <span className="type-icon">{t.icon}</span>
+            {t.label}
+          </button>
+        );
+      })}
+    </aside>
+  );
+}
+
+function FieldCard({ field }: { field: Field }) {
+  let required = null;
+  if (field.required) {
+    required = <span className="req-tag">Required</span>;
+  }
+  return (
+    <li className="field-card">
+      <span className="type-badge">{typeInfo(field.type).icon}</span>
+      <span className="field-card-label">{field.label}</span>
+      {required}
+    </li>
+  );
+}
+
+function PreviewPanel({ name }: { name: string }) {
+  return (
+    <section className="panel preview-panel">
+      <h2 className="panel-title">Live preview</h2>
+      <div className="preview-card">
+        <h3 className="preview-name">{name}</h3>
+        <p className="muted">The form your users see will render here.</p>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [name, setName] = useState('');
+  const [fields, setFields] = useState<Field[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getForm().then((form) => {
+      if (cancelled) {
+        return;
+      }
+      setName(form.name);
+      setFields(form.fields);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let list;
+  if (loading) {
+    list = <p className="muted">Loading form…</p>;
+  } else {
+    list = (
+      <ul className="field-list">
+        {fields.map((f) => {
+          return <FieldCard key={f.id} field={f} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">formcraft</span>
+        <span className="form-name">{name}</span>
+      </header>
+      <div className="workspace">
+        <AddFieldPanel />
+        <section className="panel builder-panel">
+          <h2 className="panel-title">Fields</h2>
+          {list}
+        </section>
+        <PreviewPanel name={name} />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F5F3FF;
+  --surface: #FFFFFF;
+  --line: #E6E1F7;
+  --text: #1E1B2E;
+  --muted: #6E6887;
+  --primary: #6D4AFF;
+  --primary-soft: #EFEAFF;
+  --danger: #E5484D;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { min-height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.logo { font-weight: 800; color: var(--primary); font-size: 18px; letter-spacing: -0.02em; }
+.form-name { font-size: 14px; color: var(--muted); }
+
+.workspace { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 20px; align-items: start; }
+@media (max-width: 860px) { .workspace { grid-template-columns: 1fr; } }
+.panel { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.panel-title { margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); font-size: 14px; }
+
+.type-btn { width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; margin-bottom: 6px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.type-btn:hover { border-color: var(--primary); background: var(--primary-soft); }
+.type-icon, .type-badge { width: 24px; height: 24px; flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 700; }
+
+.field-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.field-card { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.field-card-label { flex: 1; font-size: 14px; font-weight: 600; }
+.req-tag { padding: 2px 8px; border-radius: 999px; background: #FFF1F1; color: var(--danger); font-size: 11px; font-weight: 600; }
+
+.preview-card { padding: 20px; border-radius: 10px; background: linear-gradient(180deg, #FBFAFF, #fff); border: 1px solid var(--line); }
+.preview-name { margin: 0 0 8px; font-size: 20px; }
+
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle-track { width: 32px; height: 18px; padding: 2px; border-radius: 999px; background: #D5D0E6; transition: background 0.15s; }
+.toggle-thumb { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.toggle input:checked + .toggle-track { background: var(--primary); }
+.toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getForm } from './api';
+import type { Field, FieldType } from './api';
+import { FIELD_TYPES, isEmail, typeInfo } from './utils/fieldTypes';
+import { uid } from './utils/id';
+import Toggle from './components/Toggle';
+
+type Values = Record<string, string | boolean>; // field id -> value
+type Errors = Record<string, string>;           // field id -> message
+
+function AddFieldPanel({ onAdd }: { onAdd: (type: FieldType) => void }) {
+  return (
+    <aside className="panel add-panel">
+      <h2 className="panel-title">Add field</h2>
+      {FIELD_TYPES.map((t) => {
+        return (
+          <button key={t.type} type="button" className="type-btn" onClick={() => { onAdd(t.type); }}>
+            <span className="type-icon">{t.icon}</span>
+            {t.label}
+          </button>
+        );
+      })}
+    </aside>
+  );
+}
+
+type FieldEditorProps = {
+  field: Field;
+  index: number;
+  count: number;
+  onChange: (id: string, patch: Partial<Field>) => void;
+  onMove: (from: number, to: number) => void;
+  onDelete: (id: string) => void;
+};
+
+function FieldEditor({ field, index, count, onChange, onMove, onDelete }: FieldEditorProps) {
+  let optionsEditor = null;
+  if (field.type === 'select') {
+    optionsEditor = (
+      <label className="editor-row">
+        <span className="editor-label">Options (one per line)</span>
+        <textarea
+          className="editor-input options-input"
+          rows={3}
+          value={field.options.join('\n')}
+          onChange={(e) => { onChange(field.id, { options: e.target.value.split('\n') }); }}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <li className="field-card is-editing">
+      <div className="field-card-top">
+        <span className="type-badge" title={typeInfo(field.type).label}>{typeInfo(field.type).icon}</span>
+        <input
+          className="editor-input label-input"
+          aria-label="Field label"
+          value={field.label}
+          onChange={(e) => { onChange(field.id, { label: e.target.value }); }}
+        />
+        <div className="card-actions">
+          <button type="button" className="card-btn" aria-label={'Move ' + field.label + ' up'} disabled={index === 0} onClick={() => { onMove(index, index - 1); }}>↑</button>
+          <button type="button" className="card-btn" aria-label={'Move ' + field.label + ' down'} disabled={index === count - 1} onClick={() => { onMove(index, index + 1); }}>↓</button>
+          <button type="button" className="card-btn is-danger" aria-label={'Delete ' + field.label} onClick={() => { onDelete(field.id); }}>✕</button>
+        </div>
+      </div>
+      {optionsEditor}
+      <div className="field-card-foot">
+        <span className="muted-sm">{typeInfo(field.type).label}</span>
+        <Toggle label="Required" checked={field.required} onChange={(checked) => { onChange(field.id, { required: checked }); }} />
+      </div>
+    </li>
+  );
+}
+
+// Returns an error message for one field, or '' when it is valid.
+function validateField(field: Field, value: string | boolean | undefined): string {
+  if (field.type === 'checkbox') {
+    if (field.required && value !== true) {
+      return 'Please check this box';
+    }
+    return '';
+  }
+  let text = '';
+  if (typeof value === 'string') {
+    text = value.trim();
+  }
+  if (field.required && text === '') {
+    return 'This field is required';
+  }
+  if (field.type === 'email' && text !== '' && !isEmail(text)) {
+    return 'Enter a valid email';
+  }
+  return '';
+}
+
+function PreviewForm({ name, fields }: { name: string; fields: Field[] }) {
+  const [values, setValues] = useState<Values>({});
+  const [errors, setErrors] = useState<Errors>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  function setValue(id: string, value: string | boolean) {
+    setValues((prev) => {
+      return { ...prev, [id]: value };
+    });
+    setSubmitted(false);
+    // clear this field's error as soon as the user fixes it
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const nextErrors: Errors = {};
+    fields.forEach((f) => {
+      const msg = validateField(f, values[f.id]);
+      if (msg) {
+        nextErrors[f.id] = msg;
+      }
+    });
+    setErrors(nextErrors);
+    setSubmitted(Object.keys(nextErrors).length === 0);
+  }
+
+  let success = null;
+  if (submitted) {
+    success = <p className="form-success" role="status">✓ Submitted. All required fields are filled in.</p>;
+  }
+
+  let empty = null;
+  if (fields.length === 0) {
+    empty = <p className="muted">Add a field to see it here.</p>;
+  }
+
+  return (
+    <form className="preview-card" noValidate onSubmit={handleSubmit}>
+      <h3 className="preview-name">{name}</h3>
+      {empty}
+      {fields.map((f) => {
+        const inputId = 'pv-' + f.id;
+        const error = errors[f.id];
+        let errorEl = null;
+        let cls = 'pv-field';
+        if (error) {
+          errorEl = <span className="pv-error" id={inputId + '-err'}>{error}</span>;
+          cls = 'pv-field has-error';
+        }
+        let star = null;
+        if (f.required) {
+          star = <span className="pv-star" aria-hidden="true">*</span>;
+        }
+        let describedBy: string | undefined = undefined;
+        if (error) {
+          describedBy = inputId + '-err';
+        }
+
+        let control;
+        if (f.type === 'checkbox') {
+          control = (
+            <label className="pv-check" htmlFor={inputId}>
+              <input id={inputId} type="checkbox" aria-invalid={Boolean(error)} aria-describedby={describedBy} checked={values[f.id] === true} onChange={(e) => { setValue(f.id, e.target.checked); }} />
+              {f.label}{star}
+            </label>
+          );
+        } else {
+          let input;
+          let value = '';
+          if (typeof values[f.id] === 'string') {
+            value = values[f.id] as string;
+          }
+          if (f.type === 'select') {
+            const options = f.options.filter((o) => {
+              return o.trim() !== '';
+            });
+            input = (
+              <select id={inputId} className="pv-input" aria-invalid={Boolean(error)} aria-describedby={describedBy} value={value} onChange={(e) => { setValue(f.id, e.target.value); }}>
+                <option value="">Choose…</option>
+                {options.map((o, i) => {
+                  return <option key={i} value={o}>{o}</option>;
+                })}
+              </select>
+            );
+          } else {
+            input = <input id={inputId} className="pv-input" type={f.type} aria-invalid={Boolean(error)} aria-describedby={describedBy} value={value} onChange={(e) => { setValue(f.id, e.target.value); }} />;
+          }
+          control = (
+            <div>
+              <label className="pv-label" htmlFor={inputId}>{f.label}{star}</label>
+              {input}
+            </div>
+          );
+        }
+        return (
+          <div key={f.id} className={cls}>
+            {control}
+            {errorEl}
+          </div>
+        );
+      })}
+      <button type="submit" className="pv-submit">Submit</button>
+      {success}
+    </form>
+  );
+}
+
+export default function App() {
+  const [name, setName] = useState('');
+  const [fields, setFields] = useState<Field[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getForm().then((form) => {
+      if (cancelled) {
+        return;
+      }
+      setName(form.name);
+      setFields(form.fields);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleAdd(type: FieldType) {
+    let options: string[] = [];
+    if (type === 'select') {
+      options = ['Option 1', 'Option 2'];
+    }
+    const field: Field = { id: uid('f'), type: type, label: 'Untitled ' + typeInfo(type).label.toLowerCase(), required: false, options: options };
+    setFields((prev) => {
+      return [...prev, field];
+    });
+  }
+
+  function handleChange(id: string, patch: Partial<Field>) {
+    setFields((prev) => {
+      return prev.map((f) => {
+        if (f.id !== id) {
+          return f;
+        }
+        return { ...f, ...patch };
+      });
+    });
+  }
+
+  function handleMove(from: number, to: number) {
+    setFields((prev) => {
+      if (to < 0 || to >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
+  function handleDelete(id: string) {
+    setFields((prev) => {
+      return prev.filter((f) => {
+        return f.id !== id;
+      });
+    });
+  }
+
+  // derived: the exported definition is just the current state, serialized
+  const json = JSON.stringify({ name: name, fields: fields }, null, 2);
+
+  let list;
+  if (loading) {
+    list = <p className="muted">Loading form…</p>;
+  } else if (fields.length === 0) {
+    list = <p className="muted">No fields yet. Add one from the left.</p>;
+  } else {
+    list = (
+      <ul className="field-list">
+        {fields.map((f, i) => {
+          return <FieldEditor key={f.id} field={f} index={i} count={fields.length} onChange={handleChange} onMove={handleMove} onDelete={handleDelete} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">formcraft</span>
+        <span className="form-name">{name}</span>
+      </header>
+      <div className="workspace">
+        <AddFieldPanel onAdd={handleAdd} />
+        <section className="panel builder-panel">
+          <h2 className="panel-title">Fields · {fields.length}</h2>
+          {list}
+        </section>
+        <div className="right-col">
+          <section className="panel preview-panel">
+            <h2 className="panel-title">Live preview</h2>
+            <PreviewForm name={name} fields={fields} />
+          </section>
+          <section className="panel json-panel">
+            <h2 className="panel-title">Form definition (JSON)</h2>
+            <pre className="json" aria-label="Form definition JSON" tabIndex={0}>{json}</pre>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F5F3FF;
+  --surface: #FFFFFF;
+  --line: #E6E1F7;
+  --text: #1E1B2E;
+  --muted: #6E6887;
+  --primary: #6D4AFF;
+  --primary-soft: #EFEAFF;
+  --danger: #E5484D;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { min-height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.logo { font-weight: 800; color: var(--primary); font-size: 18px; letter-spacing: -0.02em; }
+.form-name { font-size: 14px; color: var(--muted); }
+
+.workspace { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 20px; align-items: start; }
+@media (max-width: 860px) { .workspace { grid-template-columns: 1fr; } }
+.panel { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.panel-title { margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); font-size: 14px; }
+
+.type-btn { width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; margin-bottom: 6px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.type-btn:hover { border-color: var(--primary); background: var(--primary-soft); }
+.type-icon, .type-badge { width: 24px; height: 24px; flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 700; }
+
+.field-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.field-card { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.field-card-label { flex: 1; font-size: 14px; font-weight: 600; }
+.req-tag { padding: 2px 8px; border-radius: 999px; background: #FFF1F1; color: var(--danger); font-size: 11px; font-weight: 600; }
+
+.preview-card { padding: 20px; border-radius: 10px; background: linear-gradient(180deg, #FBFAFF, #fff); border: 1px solid var(--line); }
+.preview-name { margin: 0 0 8px; font-size: 20px; }
+
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle-track { width: 32px; height: 18px; padding: 2px; border-radius: 999px; background: #D5D0E6; transition: background 0.15s; }
+.toggle-thumb { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.toggle input:checked + .toggle-track { background: var(--primary); }
+.toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ---- Added: field editor, preview form, JSON export ---- */
+.field-card.is-editing { flex-direction: column; align-items: stretch; gap: 10px; }
+.field-card-top { display: flex; align-items: center; gap: 8px; }
+.field-card-foot { display: flex; justify-content: space-between; align-items: center; }
+.muted-sm { font-size: 12px; color: var(--muted); }
+.editor-input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface); }
+.editor-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+.label-input { flex: 1; height: 34px; font-weight: 600; }
+.options-input { resize: vertical; font-size: 13px; }
+.editor-row { display: flex; flex-direction: column; gap: 4px; }
+.editor-label { font-size: 12px; color: var(--muted); }
+.card-actions { display: flex; gap: 4px; }
+.card-btn { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.card-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.card-btn.is-danger:hover { border-color: var(--danger); color: var(--danger); }
+.card-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.right-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pv-field { margin-bottom: 14px; }
+.pv-label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+.pv-star { margin-left: 3px; color: var(--danger); }
+.pv-input { width: 100%; height: 38px; padding: 0 10px; border: 1px solid #D5D0E6; border-radius: 8px; font: inherit; font-size: 14px; background: #fff; }
+.pv-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+.pv-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.pv-field.has-error .pv-input { border-color: var(--danger); background: #FFF7F7; }
+.pv-error { display: block; margin-top: 4px; font-size: 12px; color: var(--danger); }
+.pv-submit { height: 40px; padding: 0 20px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.form-success { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: #E8F8EF; color: #157347; font-size: 14px; }
+.json { margin: 0; max-height: 240px; overflow: auto; padding: 12px; border-radius: 8px; background: #1E1B2E; color: #D9D2FF; font: 12px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; }

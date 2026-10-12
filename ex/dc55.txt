@@ -1,0 +1,590 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Campaign = {
+  id: string;
+  name: string;
+  channel: 'Search' | 'Social' | 'Display' | 'Email' | 'Video';
+  status: 'Active' | 'Paused' | 'Ended';
+  impressions: number;
+  clicks: number;
+  ctr: number;          // 0.0312 = 3.12%
+  spend: number;        // dollars
+  conversions: number;
+  cpa: number;          // cost per acquisition, dollars
+  roas: number;         // return on ad spend, 3.4 = 3.4x
+};
+
+const NAMES = [
+  'Spring Sale Brand', 'Retargeting Cart Abandoners', 'Lookalike 1% Purchasers', 'Newsletter Winback', 'Q2 Webinar Promo',
+  'Competitor Keywords', 'Product Launch Teaser', 'App Install iOS', 'App Install Android', 'Holiday Gift Guide',
+  'Free Trial Nurture', 'Brand Awareness CTV', 'Pricing Page Retarget', 'Partner Co-marketing', 'Black Friday Early Access',
+  'Customer Stories Video', 'Enterprise ABM', 'SMB Self-serve', 'Generic Keywords US', 'Generic Keywords EU',
+  'Referral Program', 'Onboarding Drip', 'Summer Clearance', 'Podcast Sponsorship', 'Influencer Seeding',
+  'Feature Announcement', 'Churn Prevention', 'Event Follow-up', 'Student Discount', 'Year in Review',
+];
+const CHANNELS: Campaign['channel'][] = ['Search', 'Social', 'Display', 'Email', 'Video'];
+const STATUSES: Campaign['status'][] = ['Active', 'Active', 'Paused', 'Active', 'Ended'];
+
+// Deterministic pseudo-random numbers so the data is the same on every load.
+let seed = 42;
+function rand(): number {
+  seed = (seed * 16807) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+
+const CAMPAIGNS: Campaign[] = NAMES.map((name, i) => {
+  const impressions = Math.round(20000 + rand() * 900000);
+  const ctr = 0.004 + rand() * 0.05;
+  const clicks = Math.round(impressions * ctr);
+  const spend = Math.round(clicks * (0.4 + rand() * 2.6) * 100) / 100;
+  const conversions = Math.max(1, Math.round(clicks * (0.01 + rand() * 0.08)));
+  return {
+    id: 'cmp-' + (i + 1),
+    name,
+    channel: CHANNELS[i % CHANNELS.length],
+    status: STATUSES[(i * 7) % STATUSES.length],
+    impressions,
+    clicks,
+    ctr: clicks / impressions,
+    spend,
+    conversions,
+    cpa: Math.round((spend / conversions) * 100) / 100,
+    roas: Math.round((0.6 + rand() * 6) * 10) / 10,
+  };
+});
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /reports/campaigns?range=30d -> Campaign[]
+export async function getCampaigns(): Promise<Campaign[]> {
+  await randomDelay(400, 1100);
+  return CAMPAIGNS.map((c) => ({ ...c }));
+}
+@@@ shared src/utils/format.ts
+// formatNumber(1234567) -> "1,234,567"
+export function formatNumber(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+// formatCurrency(1234.5) -> "$1,234.50"
+export function formatCurrency(n: number): string {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+// formatPercent(0.0312) -> "3.12%"
+export function formatPercent(n: number): string {
+  return (n * 100).toFixed(2) + '%';
+}
+@@@ shared src/columns.ts
+import type { Campaign } from './api';
+import { formatNumber, formatCurrency, formatPercent } from './utils/format';
+
+export type ColumnKey = keyof Omit<Campaign, 'id'>;
+
+export type Column = {
+  key: ColumnKey;
+  label: string;
+  width: number;                      // default width in px
+  align: 'left' | 'right';
+  render: (row: Campaign) => string;
+};
+
+export const COLUMNS: Column[] = [
+  { key: 'name', label: 'Campaign', width: 230, align: 'left', render: (r) => r.name },
+  { key: 'channel', label: 'Channel', width: 110, align: 'left', render: (r) => r.channel },
+  { key: 'status', label: 'Status', width: 100, align: 'left', render: (r) => r.status },
+  { key: 'impressions', label: 'Impressions', width: 120, align: 'right', render: (r) => formatNumber(r.impressions) },
+  { key: 'clicks', label: 'Clicks', width: 100, align: 'right', render: (r) => formatNumber(r.clicks) },
+  { key: 'ctr', label: 'CTR', width: 90, align: 'right', render: (r) => formatPercent(r.ctr) },
+  { key: 'spend', label: 'Spend', width: 120, align: 'right', render: (r) => formatCurrency(r.spend) },
+  { key: 'conversions', label: 'Conversions', width: 120, align: 'right', render: (r) => formatNumber(r.conversions) },
+  { key: 'cpa', label: 'CPA', width: 100, align: 'right', render: (r) => formatCurrency(r.cpa) },
+  { key: 'roas', label: 'ROAS', width: 90, align: 'right', render: (r) => r.roas.toFixed(1) + '×' },
+];
+@@@ shared src/components/StatusPill.tsx
+import React from 'react';
+import type { Campaign } from '../api';
+
+export default function StatusPill({ status }: { status: Campaign['status'] }) {
+  return <span className={'pill pill-' + status.toLowerCase()}>{status}</span>;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getCampaigns } from './api';
+import type { Campaign } from './api';
+import { COLUMNS } from './columns';
+import type { Column } from './columns';
+import StatusPill from './components/StatusPill';
+
+function Cell({ column, row }: { column: Column; row: Campaign }) {
+  if (column.key === 'status') {
+    return <td><StatusPill status={row.status} /></td>;
+  }
+  let cls = '';
+  if (column.align === 'right') {
+    cls = 'num';
+  }
+  return <td className={cls}>{column.render(row)}</td>;
+}
+
+function CampaignTable({ rows }: { rows: Campaign[] }) {
+  return (
+    <div className="grid-scroll">
+      <table className="grid">
+        <thead>
+          <tr>
+            {COLUMNS.map((col) => {
+              let cls = '';
+              if (col.align === 'right') {
+                cls = 'num';
+              }
+              return <th key={col.key} className={cls}>{col.label}</th>;
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            return (
+              <tr key={row.id}>
+                {COLUMNS.map((col) => {
+                  return <Cell key={col.key} column={col} row={row} />;
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  const [rows, setRows] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCampaigns().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setRows(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <div className="grid-loading">Loading report…</div>;
+  } else {
+    body = <CampaignTable rows={rows} />;
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <div>
+          <p className="eyebrow">Reports · Last 30 days</p>
+          <h1>Campaign performance</h1>
+        </div>
+        <span className="row-count">{rows.length} campaigns</span>
+      </header>
+      {body}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --border: #E1E5EC;
+  --row-alt: #FAFBFC;
+  --text: #16202E;
+  --muted: #64748B;
+  --accent: #2563EB;
+  --accent-soft: #E7EEFD;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 1040px; margin: 0 auto; padding: 24px; }
+.header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
+.eyebrow { margin: 0; font-size: 12px; color: var(--muted); }
+.header h1 { margin: 2px 0 0; font-size: 20px; letter-spacing: -0.3px; }
+.row-count { font-size: 12px; color: var(--muted); }
+
+.grid-loading { height: 480px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); }
+
+.grid-scroll { height: 480px; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.grid { border-collapse: collapse; width: 100%; }
+.grid th, .grid td { padding: 0 12px; height: 36px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--border); }
+.grid th { background: #F7F8FA; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.grid tbody tr:nth-child(even) td { background: var(--row-alt); }
+.grid tbody tr:hover td { background: var(--accent-soft); }
+.grid .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.pill-active { background: #DCFCE7; color: #166534; }
+.pill-paused { background: #FEF3C7; color: #92400E; }
+.pill-ended { background: #F1F5F9; color: #475569; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getCampaigns } from './api';
+import type { Campaign } from './api';
+import { COLUMNS } from './columns';
+import type { Column, ColumnKey } from './columns';
+import StatusPill from './components/StatusPill';
+
+const MIN_WIDTH = 70;
+const STORAGE_KEY = 'campaigns.columnWidths.v1';
+
+type Widths = Record<string, number>;
+type Sort = { key: ColumnKey; dir: 'asc' | 'desc' } | null;
+
+function defaultWidths(): Widths {
+  const w: Widths = {};
+  COLUMNS.forEach((col) => {
+    w[col.key] = col.width;
+  });
+  return w;
+}
+
+// Change: storage can be missing, full, blocked or hold garbage. Never trust it.
+function loadWidths(): Widths {
+  const widths = defaultWidths();
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    COLUMNS.forEach((col) => {
+      const v = saved[col.key];
+      if (typeof v === 'number' && v >= MIN_WIDTH && v < 2000) {
+        widths[col.key] = v;
+      }
+    });
+  } catch (e) {
+    // corrupted JSON or storage disabled: fall back to defaults
+  }
+  return widths;
+}
+
+function saveWidths(widths: Widths) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(widths));
+  } catch (e) {
+    // quota exceeded or private mode: resizing still works, it just won't persist
+  }
+}
+
+function compareRows(a: Campaign, b: Campaign, key: ColumnKey): number {
+  const x = a[key];
+  const y = b[key];
+  if (typeof x === 'number' && typeof y === 'number') {
+    return x - y;
+  }
+  return String(x).localeCompare(String(y));
+}
+
+function Cell({ column, row }: { column: Column; row: Campaign }) {
+  let cls = '';
+  if (column.align === 'right') {
+    cls = 'num';
+  }
+  if (column.key === 'name') {
+    cls = 'sticky-col';
+  }
+  if (column.key === 'status') {
+    return <td className={cls}><StatusPill status={row.status} /></td>;
+  }
+  return <td className={cls} title={column.render(row)}>{column.render(row)}</td>;
+}
+
+type HeaderCellProps = {
+  column: Column;
+  sort: Sort;
+  resizing: boolean;
+  onSort: (key: ColumnKey) => void;
+  onResizeStart: (e: React.PointerEvent<HTMLSpanElement>, key: ColumnKey) => void;
+  onResizeMove: (e: React.PointerEvent<HTMLSpanElement>) => void;
+  onResizeEnd: () => void;
+  onResetWidth: (key: ColumnKey) => void;
+};
+
+function HeaderCell({ column, sort, resizing, onSort, onResizeStart, onResizeMove, onResizeEnd, onResetWidth }: HeaderCellProps) {
+  let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
+  let arrow = '↕';
+  if (sort && sort.key === column.key) {
+    ariaSort = 'ascending';
+    arrow = '▲';
+    if (sort.dir === 'desc') {
+      ariaSort = 'descending';
+      arrow = '▼';
+    }
+  }
+
+  let cls = 'th';
+  if (column.align === 'right') {
+    cls += ' num';
+  }
+  if (column.key === 'name') {
+    cls += ' sticky-col';
+  }
+  if (ariaSort !== 'none') {
+    cls += ' is-sorted';
+  }
+
+  let resizerCls = 'resizer';
+  if (resizing) {
+    resizerCls = 'resizer is-active';
+  }
+
+  return (
+    <th className={cls} aria-sort={ariaSort}>
+      <button type="button" className="sort-btn" onClick={() => { onSort(column.key); }}>
+        <span className="th-label">{column.label}</span>
+        <span className="sort-arrow" aria-hidden="true">{arrow}</span>
+      </button>
+      <span
+        className={resizerCls}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={'Resize ' + column.label}
+        onPointerDown={(e) => { onResizeStart(e, column.key); }}
+        onPointerMove={(e) => { onResizeMove(e); }}
+        onPointerUp={() => { onResizeEnd(); }}
+        onPointerCancel={() => { onResizeEnd(); }}
+        onDoubleClick={() => { onResetWidth(column.key); }}
+      />
+    </th>
+  );
+}
+
+function CampaignTable({ rows }: { rows: Campaign[] }) {
+  const [widths, setWidths] = useState<Widths>(loadWidths); // lazy init: read storage once
+  const [sort, setSort] = useState<Sort>(null);
+  const [resizingKey, setResizingKey] = useState<ColumnKey | null>(null);
+  // Drag bookkeeping changes on every pointermove and never renders: a ref.
+  const dragRef = useRef<{ key: ColumnKey; startX: number; startWidth: number } | null>(null);
+
+  // Persist once a drag ends, not on every pointermove.
+  useEffect(() => {
+    if (resizingKey === null) {
+      saveWidths(widths);
+    }
+  }, [widths, resizingKey]);
+
+  function handleSort(key: ColumnKey) {
+    setSort((prev) => {
+      if (prev && prev.key === key && prev.dir === 'asc') {
+        return { key, dir: 'desc' };
+      }
+      return { key, dir: 'asc' };
+    });
+  }
+
+  function handleResizeStart(e: React.PointerEvent<HTMLSpanElement>, key: ColumnKey) {
+    e.preventDefault(); // no text selection while dragging
+    // Capture: keep getting pointermove even when the pointer leaves the 6px handle.
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { key, startX: e.clientX, startWidth: widths[key] };
+    setResizingKey(key);
+  }
+
+  function handleResizeMove(e: React.PointerEvent<HTMLSpanElement>) {
+    const drag = dragRef.current;
+    if (!drag) {
+      return;
+    }
+    const next = Math.max(MIN_WIDTH, Math.round(drag.startWidth + e.clientX - drag.startX));
+    setWidths((prev) => {
+      return { ...prev, [drag.key]: next };
+    });
+  }
+
+  function handleResizeEnd() {
+    dragRef.current = null;
+    setResizingKey(null);
+  }
+
+  function handleResetWidth(key: ColumnKey) {
+    const col = COLUMNS.find((c) => { return c.key === key; });
+    if (col) {
+      setWidths((prev) => {
+        return { ...prev, [key]: col.width };
+      });
+    }
+  }
+
+  // derived: sorted copy, never sort state in place
+  let sorted = rows;
+  if (sort) {
+    const s = sort;
+    sorted = [...rows].sort((a, b) => {
+      const c = compareRows(a, b, s.key);
+      if (s.dir === 'asc') {
+        return c;
+      }
+      return -c;
+    });
+  }
+
+  let total = 0;
+  COLUMNS.forEach((col) => {
+    total += widths[col.key];
+  });
+
+  let scrollCls = 'grid-scroll';
+  if (resizingKey) {
+    scrollCls = 'grid-scroll is-resizing';
+  }
+
+  return (
+    <div className={scrollCls}>
+      <table className="grid" style={{ width: total }}>
+        <colgroup>
+          {COLUMNS.map((col) => {
+            return <col key={col.key} style={{ width: widths[col.key] }} />;
+          })}
+        </colgroup>
+        <thead>
+          <tr>
+            {COLUMNS.map((col) => {
+              return (
+                <HeaderCell
+                  key={col.key}
+                  column={col}
+                  sort={sort}
+                  resizing={resizingKey === col.key}
+                  onSort={handleSort}
+                  onResizeStart={handleResizeStart}
+                  onResizeMove={handleResizeMove}
+                  onResizeEnd={handleResizeEnd}
+                  onResetWidth={handleResetWidth}
+                />
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row) => {
+            return (
+              <tr key={row.id}>
+                {COLUMNS.map((col) => {
+                  return <Cell key={col.key} column={col} row={row} />;
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  const [rows, setRows] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCampaigns().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setRows(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <div className="grid-loading">Loading report…</div>;
+  } else {
+    body = <CampaignTable rows={rows} />;
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <div>
+          <p className="eyebrow">Reports · Last 30 days</p>
+          <h1>Campaign performance</h1>
+        </div>
+        <span className="row-count">{rows.length} campaigns</span>
+      </header>
+      {body}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --border: #E1E5EC;
+  --row-alt: #FAFBFC;
+  --text: #16202E;
+  --muted: #64748B;
+  --accent: #2563EB;
+  --accent-soft: #E7EEFD;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 1040px; margin: 0 auto; padding: 24px; }
+.header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
+.eyebrow { margin: 0; font-size: 12px; color: var(--muted); }
+.header h1 { margin: 2px 0 0; font-size: 20px; letter-spacing: -0.3px; }
+.row-count { font-size: 12px; color: var(--muted); }
+
+.grid-loading { height: 480px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); }
+
+.grid-scroll { height: 480px; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.grid { border-collapse: collapse; width: 100%; }
+.grid th, .grid td { padding: 0 12px; height: 36px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--border); }
+.grid th { background: #F7F8FA; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.grid tbody tr:nth-child(even) td { background: var(--row-alt); }
+.grid tbody tr:hover td { background: var(--accent-soft); }
+.grid .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.pill-active { background: #DCFCE7; color: #166534; }
+.pill-paused { background: #FEF3C7; color: #92400E; }
+.pill-ended { background: #F1F5F9; color: #475569; }
+
+/* ---- Added: sticky header/column, resizing, sorting ---- */
+/* sticky cells lose their borders with border-collapse: collapse */
+.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.grid td { background: var(--surface); }
+
+.grid thead th { position: sticky; top: 0; z-index: 2; padding: 0; border-bottom: 1px solid #D5DBE5; }
+.grid .sticky-col { position: sticky; left: 0; z-index: 1; font-weight: 500; color: var(--text); border-right: 1px solid var(--border); }
+.grid thead th.sticky-col { z-index: 3; color: var(--muted); }
+.grid-scroll .sticky-col { box-shadow: 4px 0 6px -4px rgba(22, 32, 46, 0.12); }
+
+.th { position: relative; }
+.sort-btn { width: 100%; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 14px 0 12px; border: 0; background: none; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.th.num .sort-btn { justify-content: flex-end; }
+.th-label { overflow: hidden; text-overflow: ellipsis; }
+.sort-arrow { font-size: 9px; opacity: 0.45; }
+.th.is-sorted { color: var(--accent); }
+.th.is-sorted .sort-arrow { opacity: 1; }
+.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.resizer { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: col-resize; touch-action: none; }
+.resizer::after { content: ''; position: absolute; top: 9px; bottom: 9px; right: 3px; width: 1px; background: #D5DBE5; }
+.resizer:hover::after, .resizer.is-active::after { top: 0; bottom: 0; width: 2px; right: 2px; background: var(--accent); }
+.grid-scroll.is-resizing { cursor: col-resize; user-select: none; }

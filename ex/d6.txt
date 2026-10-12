@@ -1,0 +1,206 @@
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 560px; padding: 24px; }
+h1 { margin: 0 0 4px; font-size: 20px; }
+.summary { margin: 0 0 16px; font-size: 13px; color: #5A6273; }
+
+.form { display: flex; gap: 8px; align-items: flex-start; }
+.field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.input, .select {
+  height: 36px;
+  border: 1px solid #D5D9E0;
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+}
+.input.has-error { border-color: #D92D20; }
+.error-text { font-size: 12px; color: #B42318; }
+.btn-primary {
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #3451D1;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.list { list-style: none; margin: 16px 0 0; padding: 0; background: #fff; border: 1px solid #E2E5EA; border-radius: 10px; }
+.item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.item + .item { border-top: 1px solid #EEF0F3; }
+.item-title { flex: 1; min-width: 0; font-size: 14px; }
+.item.is-done .item-title { text-decoration: line-through; color: #98A0AE; }
+.priority { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
+.priority-high { background: #FEE4E2; color: #B42318; }
+.priority-medium { background: #FFF3DC; color: #93600B; }
+.priority-low { background: #ECEEF2; color: #545C6B; }
+.icon-btn {
+  border: 0;
+  background: transparent;
+  color: #7A8292;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.icon-btn:hover { background: #F1F2F5; color: #B42318; }
+.footer { display: flex; justify-content: flex-end; margin-top: 8px; }
+.link-btn { border: 0; background: none; color: #3451D1; font: inherit; font-size: 13px; cursor: pointer; padding: 4px; }
+.empty { margin-top: 16px; padding: 24px; text-align: center; color: #7A8292; border: 1px dashed #D5D9E0; border-radius: 10px; }
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+
+const STARTING_ITEMS = [
+  { id: 1, title: 'Fix truncation on long project names', priority: 'high', done: false },
+  { id: 2, title: 'Add empty state to the usage chart', priority: 'medium', done: true },
+];
+
+// TODO:
+// 1. The form adds an item to the top of the list (title + priority).
+// 2. Title is required: on submit with an empty title, show "Add a title" under
+//    the input and give the input the has-error class. Clear the error as they type.
+// 3. Checkbox toggles done. The x button deletes.
+// 4. Summary line: "2 open · 1 done". "Clear completed" removes done items
+//    and only shows when there is at least one done item.
+export default function App() {
+  const items = STARTING_ITEMS;
+
+  return (
+    <div className="page">
+      <h1>Feedback</h1>
+      <p className="summary">...</p>
+      <form className="form">
+        <div className="field">
+          <input className="input" placeholder="What needs fixing?" />
+        </div>
+        <select className="select">
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button className="btn-primary" type="submit">Add</button>
+      </form>
+      <ul className="list">
+        {items.map((item) => (
+          <li key={item.id} className="item">
+            <input type="checkbox" checked={item.done} readOnly />
+            <span className="item-title">{item.title}</span>
+            <span className={'priority priority-' + item.priority}>{item.priority}</span>
+            <button className="icon-btn" aria-label="Delete">×</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+@@@ solution src/App.jsx
+import React, { useState } from 'react';
+
+const STARTING_ITEMS = [
+  { id: 1, title: 'Fix truncation on long project names', priority: 'high', done: false },
+  { id: 2, title: 'Add empty state to the usage chart', priority: 'medium', done: true },
+];
+
+let nextId = 3; // simple id source; fine for an interview
+
+export default function App() {
+  const [items, setItems] = useState(STARTING_ITEMS);
+  const [title, setTitle] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [error, setError] = useState('');
+
+  const doneCount = items.filter((i) => i.done).length;
+  const openCount = items.length - doneCount;
+
+  function handleSubmit(e) {
+    e.preventDefault(); // stop the browser from reloading the page
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setError('Add a title');
+      return;
+    }
+    const item = { id: nextId++, title: trimmed, priority, done: false };
+    setItems((prev) => [item, ...prev]); // new array, new item first
+    setTitle('');
+    setPriority('medium');
+  }
+
+  function toggle(id) {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+  }
+
+  function remove(id) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  function clearCompleted() {
+    setItems((prev) => prev.filter((i) => !i.done));
+  }
+
+  return (
+    <div className="page">
+      <h1>Feedback</h1>
+      <p className="summary">
+        {openCount} open · {doneCount} done
+      </p>
+
+      <form className="form" onSubmit={handleSubmit} noValidate>
+        <div className="field">
+          <input
+            className={'input' + (error ? ' has-error' : '')}
+            placeholder="What needs fixing?"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (error) setError('');
+            }}
+            aria-invalid={Boolean(error)}
+          />
+          {error && <span className="error-text">{error}</span>}
+        </div>
+        <select className="select" value={priority} onChange={(e) => setPriority(e.target.value)}>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button className="btn-primary" type="submit">Add</button>
+      </form>
+
+      {items.length === 0 ? (
+        <div className="empty">Nothing here. Add the first item above.</div>
+      ) : (
+        <ul className="list">
+          {items.map((item) => (
+            <li key={item.id} className={'item' + (item.done ? ' is-done' : '')}>
+              <input type="checkbox" checked={item.done} onChange={() => toggle(item.id)} />
+              <span className="item-title">{item.title}</span>
+              <span className={'priority priority-' + item.priority}>{item.priority}</span>
+              <button className="icon-btn" aria-label="Delete" onClick={() => remove(item.id)}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {doneCount > 0 && (
+        <div className="footer">
+          <button className="link-btn" onClick={clearCompleted}>Clear completed</button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,452 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type PollOption = {
+  id: string;
+  label: string;
+  votes: number;
+};
+
+export type Poll = {
+  id: string;
+  question: string;
+  options: PollOption[];
+  myVote: string | null;   // option id this user voted for, or null
+  closesIn: string;
+};
+
+const POLL: Poll = {
+  id: 'p1',
+  question: 'Which map should we run in Saturday’s scrim?',
+  options: [
+    { id: 'ascent', label: 'Ascent', votes: 42 },
+    { id: 'bind', label: 'Bind', votes: 31 },
+    { id: 'haven', label: 'Haven', votes: 18 },
+    { id: 'lotus', label: 'Lotus', votes: 9 },
+  ],
+  myVote: null,
+  closesIn: '2 days',
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function copyPoll(): Poll {
+  return { ...POLL, options: POLL.options.map((o) => ({ ...o })) };
+}
+
+// GET /polls/p1 -> Poll
+export async function getPoll(): Promise<Poll> {
+  await randomDelay(500, 1100);
+  return copyPoll();
+}
+
+// POST /polls/p1/vote { optionId } -> Poll
+// One vote per user. Voting again moves your vote from the old option to the new one.
+export async function vote(optionId: string): Promise<Poll> {
+  await randomDelay(600, 1200);
+  POLL.options.forEach((o) => {
+    if (o.id === POLL.myVote) {
+      o.votes -= 1;
+    }
+  });
+  POLL.options.forEach((o) => {
+    if (o.id === optionId) {
+      o.votes += 1;
+    }
+  });
+  POLL.myVote = optionId;
+  return copyPoll();
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+// Square-ish gamer avatar: first letter on a colored tile.
+export function Avatar({ name, color }: { name: string; color: string }) {
+  return <span className="avatar" style={{ background: color }}>{name[0]}</span>;
+}
+@@@ shared src/utils/poll.ts
+// percent(9, 101) -> 9, percent(0, 0) -> 0 (whole numbers, safe when nobody has voted)
+export function percent(part: number, total: number): number {
+  if (total === 0) {
+    return 0;
+  }
+  return Math.round((part / total) * 100);
+}
+
+// formatVotes(1) -> "1 vote", formatVotes(101) -> "101 votes"
+export function formatVotes(n: number): string {
+  if (n === 1) {
+    return '1 vote';
+  }
+  return n + ' votes';
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPoll } from './api';
+import type { Poll } from './api';
+import { Avatar } from './components/Avatar';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">⬢ Guildhall</span>
+      <nav className="tabs">
+        <button type="button" className="tab is-active">#scrims</button>
+        <button type="button" className="tab">#clips</button>
+        <button type="button" className="tab">#lfg</button>
+      </nav>
+    </header>
+  );
+}
+
+// TODO: voting + results
+function PollWidget() {
+  const [poll, setPoll] = useState<Poll | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPoll().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPoll(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!poll) {
+    return <div className="poll poll-loading">Loading poll…</div>;
+  }
+
+  return (
+    <div className="poll">
+      <p className="poll-question">{poll.question}</p>
+      <ul className="poll-options">
+        {poll.options.map((o) => {
+          return (
+            <li key={o.id}>
+              <button type="button" className="poll-option">
+                <span className="poll-label">{o.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="poll-meta">Closes in {poll.closesIn}</p>
+    </div>
+  );
+}
+
+function Post() {
+  return (
+    <article className="post">
+      <div className="post-head">
+        <Avatar name="Vex" color="#8B5CF6" />
+        <div>
+          <p className="post-author">Vex <span className="role">Captain</span></p>
+          <p className="post-time">Today at 6:12 PM</p>
+        </div>
+      </div>
+      <p className="post-text">Scrim vs. Northwind is locked for Saturday 8 PM. Vote for the map. Majority wins, no complaining after. 🎯</p>
+      <PollWidget />
+      <div className="post-actions">
+        <button type="button" className="ghost">💬 24 replies</button>
+        <button type="button" className="ghost">🔁 Share</button>
+      </div>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <main className="feed">
+        <Post />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0E0F1A;
+  --surface: #171828;
+  --surface-2: #1F2135;
+  --border: #2A2D45;
+  --text: #ECEBFF;
+  --muted: #8B8DB0;
+  --primary: #A78BFA;
+  --primary-strong: #8B5CF6;
+  --accent: #22D3EE;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: var(--text); background: var(--bg); }
+
+.app { min-height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.logo { font-weight: 700; font-size: 17px; color: var(--primary); letter-spacing: 0.02em; }
+.tabs { display: flex; gap: 4px; }
+.tab { height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.tab:hover { color: var(--text); background: var(--surface-2); }
+.tab.is-active { color: var(--text); background: var(--surface-2); }
+
+.feed { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+.post { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.post-head { display: flex; gap: 12px; align-items: center; }
+.avatar { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 700; color: #fff; }
+.post-author { margin: 0; font-weight: 700; }
+.role { margin-left: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; color: var(--accent); background: rgba(34, 211, 238, 0.12); }
+.post-time { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.post-text { margin: 14px 0; line-height: 1.5; }
+.post-actions { display: flex; gap: 8px; margin-top: 14px; }
+.ghost { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.poll { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.poll-loading { color: var(--muted); text-align: center; }
+.poll-question { margin: 0 0 12px; font-weight: 700; font-size: 16px; }
+.poll-options { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.poll-option { position: relative; width: 100%; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.poll-option:hover:not(:disabled) { border-color: var(--primary); }
+.poll-label { position: relative; font-weight: 600; }
+.poll-meta { margin: 12px 0 0; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPoll, vote } from './api';
+import type { Poll } from './api';
+import { Avatar } from './components/Avatar';
+import { formatVotes, percent } from './utils/poll';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">⬢ Guildhall</span>
+      <nav className="tabs">
+        <button type="button" className="tab is-active">#scrims</button>
+        <button type="button" className="tab">#clips</button>
+        <button type="button" className="tab">#lfg</button>
+      </nav>
+    </header>
+  );
+}
+
+function PollWidget() {
+  const [poll, setPoll] = useState<Poll | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [changing, setChanging] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPoll().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPoll(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleVote(optionId: string) {
+    if (!poll) {
+      return;
+    }
+    if (poll.myVote === optionId) {
+      // Picked the same option again while changing: nothing to send.
+      setChanging(false);
+      return;
+    }
+    // Optimistic: move the vote locally now so the bars animate immediately.
+    setPoll((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const options = prev.options.map((o) => {
+        let votes = o.votes;
+        if (o.id === prev.myVote) {
+          votes = votes - 1;
+        }
+        if (o.id === optionId) {
+          votes = votes + 1;
+        }
+        return { ...o, votes };
+      });
+      return { ...prev, options, myVote: optionId };
+    });
+    setChanging(false);
+    setSaving(true);
+    // Then trust the server's numbers (other people may have voted meanwhile).
+    vote(optionId).then((fresh) => {
+      setPoll(fresh);
+      setSaving(false);
+    });
+  }
+
+  if (!poll) {
+    return <div className="poll poll-loading">Loading poll…</div>;
+  }
+
+  // derived
+  const total = poll.options.reduce((sum, o) => {
+    return sum + o.votes;
+  }, 0);
+  const showResults = poll.myVote !== null && !changing;
+
+  let meta = <p className="poll-meta">Closes in {poll.closesIn}</p>;
+  if (showResults) {
+    let status = 'Closes in ' + poll.closesIn;
+    if (saving) {
+      status = 'Saving your vote…';
+    }
+    meta = (
+      <p className="poll-meta">
+        <span className="poll-total">{formatVotes(total)}</span>
+        <span>·</span>
+        <span>{status}</span>
+        <button type="button" className="poll-link" disabled={saving} onClick={() => { setChanging(true); }}>Change vote</button>
+      </p>
+    );
+  } else if (changing) {
+    meta = (
+      <p className="poll-meta">
+        <span>Pick a new option</span>
+        <button type="button" className="poll-link" onClick={() => { setChanging(false); }}>Cancel</button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="poll">
+      <p className="poll-question">{poll.question}</p>
+      <ul className="poll-options">
+        {poll.options.map((o) => {
+          const pct = percent(o.votes, total);
+          let cls = 'poll-option';
+          let width = '0%';
+          let pctEl = null;
+          let check = null;
+          if (showResults) {
+            cls = 'poll-option is-result';
+            width = pct + '%';
+            pctEl = <span className="poll-pct">{pct}%</span>;
+          }
+          if (o.id === poll.myVote) {
+            cls = cls + ' is-mine';
+            check = <span className="poll-check" aria-label="Your vote">✓</span>;
+          }
+          return (
+            <li key={o.id}>
+              <button type="button" className={cls} disabled={showResults || saving} onClick={() => { handleVote(o.id); }}>
+                <span className="poll-bar" style={{ width }} />
+                <span className="poll-label">{o.label}</span>
+                {check}
+                {pctEl}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {meta}
+    </div>
+  );
+}
+
+function Post() {
+  return (
+    <article className="post">
+      <div className="post-head">
+        <Avatar name="Vex" color="#8B5CF6" />
+        <div>
+          <p className="post-author">Vex <span className="role">Captain</span></p>
+          <p className="post-time">Today at 6:12 PM</p>
+        </div>
+      </div>
+      <p className="post-text">Scrim vs. Northwind is locked for Saturday 8 PM. Vote for the map. Majority wins, no complaining after. 🎯</p>
+      <PollWidget />
+      <div className="post-actions">
+        <button type="button" className="ghost">💬 24 replies</button>
+        <button type="button" className="ghost">🔁 Share</button>
+      </div>
+    </article>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <main className="feed">
+        <Post />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0E0F1A;
+  --surface: #171828;
+  --surface-2: #1F2135;
+  --border: #2A2D45;
+  --text: #ECEBFF;
+  --muted: #8B8DB0;
+  --primary: #A78BFA;
+  --primary-strong: #8B5CF6;
+  --accent: #22D3EE;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: var(--text); background: var(--bg); }
+
+.app { min-height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.logo { font-weight: 700; font-size: 17px; color: var(--primary); letter-spacing: 0.02em; }
+.tabs { display: flex; gap: 4px; }
+.tab { height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.tab:hover { color: var(--text); background: var(--surface-2); }
+.tab.is-active { color: var(--text); background: var(--surface-2); }
+
+.feed { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+.post { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.post-head { display: flex; gap: 12px; align-items: center; }
+.avatar { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 700; color: #fff; }
+.post-author { margin: 0; font-weight: 700; }
+.role { margin-left: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; color: var(--accent); background: rgba(34, 211, 238, 0.12); }
+.post-time { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.post-text { margin: 14px 0; line-height: 1.5; }
+.post-actions { display: flex; gap: 8px; margin-top: 14px; }
+.ghost { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.poll { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.poll-loading { color: var(--muted); text-align: center; }
+.poll-question { margin: 0 0 12px; font-weight: 700; font-size: 16px; }
+.poll-options { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.poll-option { position: relative; width: 100%; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.poll-option:hover:not(:disabled) { border-color: var(--primary); }
+.poll-label { position: relative; font-weight: 600; }
+.poll-meta { margin: 12px 0 0; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+
+/* ---- Added: poll results ---- */
+/* The bar is always rendered; only its width changes, so the transition animates 0% -> pct. */
+.poll-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(167, 139, 250, 0.16); transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.poll-option.is-mine .poll-bar { background: linear-gradient(90deg, rgba(139, 92, 246, 0.55), rgba(34, 211, 238, 0.35)); }
+.poll-option.is-result { cursor: default; }
+.poll-option.is-mine { border-color: var(--primary); }
+.poll-option:disabled { color: var(--text); }
+.poll-check { position: relative; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--primary); color: var(--bg); }
+.poll-pct { position: relative; margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.poll-total { color: var(--text); font-weight: 600; }
+.poll-link { margin-left: auto; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 700; color: var(--primary); cursor: pointer; }
+.poll-link:disabled { opacity: 0.4; cursor: default; }
+.poll-link:hover:not(:disabled) { text-decoration: underline; }

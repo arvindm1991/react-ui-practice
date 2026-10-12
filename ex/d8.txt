@@ -1,0 +1,179 @@
+@@@ shared src/data.js
+export const plans = [
+  { id: 'starter', label: 'Starter', price: '$0', features: ['Up to 3 projects', 'Community support'] },
+  { id: 'plus', label: 'Plus', price: '$12 / mo', features: ['Unlimited projects', 'Version history', 'Email support'] },
+  { id: 'business', label: 'Business', price: '$25 / seat / mo', features: ['Everything in Plus', 'Central billing', 'Admin controls'] },
+];
+
+export const faqs = [
+  { id: 'q1', q: 'Can I switch plans later?', a: 'Yes. Upgrades apply right away; downgrades apply at the end of the billing period.' },
+  { id: 'q2', q: 'Do you offer refunds?', a: 'Contact support within 14 days of a charge and we will review it.' },
+  { id: 'q3', q: 'Can I export my projects?', a: 'Yes. Every project can be exported as a ZIP from its settings page.' },
+  { id: 'q4', q: 'How do seats work on Business?', a: 'Each member uses one seat. Admins can add or remove seats at any time.' },
+];
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 560px; padding: 24px; display: flex; flex-direction: column; gap: 28px; }
+h2 { margin: 0 0 12px; font-size: 18px; }
+
+.tablist { display: flex; gap: 4px; border-bottom: 1px solid #E2E5EA; }
+.tab {
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: #5A6273;
+  cursor: pointer;
+}
+.tab:hover { color: #1A1F2B; }
+.tab[aria-selected='true'] { color: #3451D1; border-bottom-color: #3451D1; font-weight: 600; }
+.tab:focus-visible { outline: 2px solid #3451D1; outline-offset: -2px; border-radius: 6px 6px 0 0; }
+.panel { padding: 16px 4px 0; }
+.price { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+.features { margin: 0; padding-left: 18px; line-height: 1.7; color: #3B4252; }
+
+.accordion { background: #fff; border: 1px solid #E2E5EA; border-radius: 10px; }
+.acc-item + .acc-item { border-top: 1px solid #EEF0F3; }
+.acc-trigger {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.acc-trigger:focus-visible { outline: 2px solid #3451D1; outline-offset: -2px; border-radius: 10px; }
+.chevron { transition: transform 0.15s; color: #7A8292; }
+.acc-trigger[aria-expanded='true'] .chevron { transform: rotate(180deg); }
+.acc-body { padding: 0 16px 14px; margin: 0; font-size: 14px; line-height: 1.6; color: #5A6273; }
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+import { plans, faqs } from './data';
+
+// TODO 1 — Tabs: one tab per plan; the active tab shows that plan's price
+//   and features. First tab active by default. Use role="tablist", role="tab",
+//   aria-selected and role="tabpanel" (the CSS keys off aria-selected).
+//   Bonus: Left/Right arrow keys move between tabs.
+//
+// TODO 2 — Accordion: one FAQ open at a time. Clicking the open one closes it.
+//   Use aria-expanded on the trigger button (the CSS rotates the ▾ from it).
+export default function App() {
+  return (
+    <div className="page">
+      <section>
+        <h2>Plans</h2>
+      </section>
+      <section>
+        <h2>FAQ</h2>
+      </section>
+    </div>
+  );
+}
+@@@ solution src/App.jsx
+import React, { useState } from 'react';
+import { plans, faqs } from './data';
+
+function Tabs({ items }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const active = items[activeIndex];
+
+  function onKeyDown(e) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    const next = (activeIndex + dir + items.length) % items.length;
+    setActiveIndex(next);
+    // move focus to the newly active tab
+    const tabs = e.currentTarget.querySelectorAll('[role="tab"]');
+    if (tabs[next]) tabs[next].focus();
+  }
+
+  return (
+    <div>
+      <div className="tablist" role="tablist" onKeyDown={onKeyDown}>
+        {items.map((item, i) => (
+          <button
+            key={item.id}
+            id={`tab-${item.id}`}
+            role="tab"
+            className="tab"
+            aria-selected={i === activeIndex}
+            aria-controls={`panel-${item.id}`}
+            tabIndex={i === activeIndex ? 0 : -1}
+            onClick={() => setActiveIndex(i)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="panel" role="tabpanel" id={`panel-${active.id}`} aria-labelledby={`tab-${active.id}`}>
+        <p className="price">{active.price}</p>
+        <ul className="features">
+          {active.features.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function Accordion({ items }) {
+  const [openId, setOpenId] = useState(null); // single value = only one open
+
+  return (
+    <div className="accordion">
+      {items.map((item) => {
+        const open = item.id === openId;
+        return (
+          <div key={item.id} className="acc-item">
+            <button
+              className="acc-trigger"
+              aria-expanded={open}
+              aria-controls={`acc-${item.id}`}
+              onClick={() => setOpenId(open ? null : item.id)}
+            >
+              {item.q}
+              <span className="chevron" aria-hidden="true">▾</span>
+            </button>
+            {open && (
+              <p className="acc-body" id={`acc-${item.id}`}>
+                {item.a}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <section>
+        <h2>Plans</h2>
+        <Tabs items={plans} />
+      </section>
+      <section>
+        <h2>FAQ</h2>
+        <Accordion items={faqs} />
+      </section>
+    </div>
+  );
+}

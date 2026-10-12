@@ -1,0 +1,415 @@
+@@@ shared src/App.jsx
+import React from 'react';
+import TasksPage from './pages/TasksPage';
+
+export default function App() {
+  return (
+    <div className="layout">
+      <nav className="sidenav">
+        <p className="brand">Trellis</p>
+        <a className="nav-link">Inbox</a>
+        <a className="nav-link is-current">Tasks</a>
+        <a className="nav-link">Projects</a>
+        <a className="nav-link">Reports</a>
+      </nav>
+      <main className="main">
+        <TasksPage />
+      </main>
+    </div>
+  );
+}
+@@@ shared src/data/people.js
+export const PEOPLE = [
+  { id: 'p1', name: 'Maya Chen' },
+  { id: 'p2', name: 'Omar Haddad' },
+  { id: 'p3', name: 'Priya Nair' },
+  { id: 'p4', name: 'Sam Rivera' },
+];
+
+export function personName(id) {
+  const person = PEOPLE.find((p) => p.id === id);
+  if (!person) {
+    return 'Unassigned';
+  }
+  return person.name;
+}
+@@@ shared src/data/tasks.js
+// Task: { id, title, assigneeId, priority: 'low' | 'medium' | 'high', done }
+export const INITIAL_TASKS = [
+  { id: 't1', title: 'Write launch announcement', assigneeId: 'p1', priority: 'high', done: false },
+  { id: 't2', title: 'Fix login redirect on Safari', assigneeId: 'p2', priority: 'high', done: false },
+  { id: 't3', title: 'Update pricing page copy', assigneeId: 'p3', priority: 'medium', done: false },
+  { id: 't4', title: 'Clean up old feature flags', assigneeId: 'p4', priority: 'low', done: true },
+  { id: 't5', title: 'Review Q4 roadmap draft', assigneeId: 'p1', priority: 'medium', done: false },
+];
+@@@ shared src/utils/ids.js
+// makeId('t') -> "t-lq3x9a2k"
+export function makeId(prefix) {
+  return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+@@@ shared src/components/Button.jsx
+import React from 'react';
+
+// variant: 'primary' | 'secondary'
+export default function Button({ variant = 'secondary', className = '', ...props }) {
+  return <button className={`btn btn-${variant} ${className}`.trim()} {...props} />;
+}
+@@@ shared src/components/PriorityBadge.jsx
+import React from 'react';
+
+const LABELS = { low: 'Low', medium: 'Medium', high: 'High' };
+
+export default function PriorityBadge({ priority }) {
+  return <span className={'priority priority-' + priority}>{LABELS[priority]}</span>;
+}
+@@@ shared src/components/TaskRow.jsx
+import React from 'react';
+import PriorityBadge from './PriorityBadge';
+import { personName } from '../data/people';
+
+export default function TaskRow({ task, onToggle }) {
+  let rowClass = 'task';
+  if (task.done) {
+    rowClass = 'task is-done';
+  }
+  return (
+    <li className={rowClass}>
+      <input type="checkbox" checked={task.done} onChange={() => { onToggle(task.id); }} />
+      <span className="task-title">{task.title}</span>
+      <PriorityBadge priority={task.priority} />
+      <span className="task-assignee">{personName(task.assigneeId)}</span>
+    </li>
+  );
+}
+@@@ starter src/pages/TasksPage.jsx
+import React, { useState } from 'react';
+import { INITIAL_TASKS } from '../data/tasks';
+import TaskRow from '../components/TaskRow';
+
+export default function TasksPage() {
+  const [tasks, setTasks] = useState(INITIAL_TASKS);
+
+  function handleToggle(id) {
+    setTasks((prev) => {
+      return prev.map((t) => {
+        if (t.id !== id) {
+          return t;
+        }
+        return { ...t, done: !t.done };
+      });
+    });
+  }
+
+  const openCount = tasks.filter((t) => {
+    return !t.done;
+  }).length;
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1>Tasks</h1>
+          <p className="page-sub">{openCount} open</p>
+        </div>
+      </header>
+
+      <ul className="task-list">
+        {tasks.map((t) => {
+          return <TaskRow key={t.id} task={t} onToggle={handleToggle} />;
+        })}
+      </ul>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --border-strong: #D0D5DD;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-soft: #EEF0FF;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidenav { width: 200px; flex-shrink: 0; padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 16px; font-weight: 700; font-size: 16px; }
+.nav-link { padding: 7px 8px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-link.is-current { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+.page { max-width: 760px; display: flex; flex-direction: column; gap: 16px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.page-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+.btn { height: 36px; padding: 0 14px; border-radius: var(--radius); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
+
+.task-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.task:last-child { border-bottom: none; }
+.task input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.task-title { flex: 1; min-width: 0; }
+.task.is-done .task-title { color: var(--muted); text-decoration: line-through; }
+.task-assignee { width: 110px; text-align: right; color: var(--muted); font-size: 13px; }
+
+.priority { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.priority-high { background: #FEF3F2; color: #B42318; }
+.priority-medium { background: #FFF6E5; color: #B54708; }
+.priority-low { background: #F2F4F7; color: #667085; }
+@@@ solution src/pages/TasksPage.jsx
+import React, { useState } from 'react';
+import { INITIAL_TASKS } from '../data/tasks';
+import TaskRow from '../components/TaskRow';
+import Button from '../components/Button';
+import NewTaskModal from '../components/NewTaskModal';
+
+export default function TasksPage() {
+  const [tasks, setTasks] = useState(INITIAL_TASKS);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  function handleToggle(id) {
+    setTasks((prev) => {
+      return prev.map((t) => {
+        if (t.id !== id) {
+          return t;
+        }
+        return { ...t, done: !t.done };
+      });
+    });
+  }
+
+  function handleCreate(task) {
+    setTasks((prev) => {
+      return [task, ...prev];
+    });
+    setModalOpen(false);
+  }
+
+  const openCount = tasks.filter((t) => {
+    return !t.done;
+  }).length;
+
+  // Rendering the modal only while open means its form state
+  // starts fresh every time it opens.
+  let modal = null;
+  if (modalOpen) {
+    modal = <NewTaskModal onCreate={handleCreate} onClose={() => { setModalOpen(false); }} />;
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1>Tasks</h1>
+          <p className="page-sub">{openCount} open</p>
+        </div>
+        <Button variant="primary" onClick={() => { setModalOpen(true); }}>+ New task</Button>
+      </header>
+
+      <ul className="task-list">
+        {tasks.map((t) => {
+          return <TaskRow key={t.id} task={t} onToggle={handleToggle} />;
+        })}
+      </ul>
+
+      {modal}
+    </div>
+  );
+}
+@@@ solution src/components/NewTaskModal.jsx
+import React, { useEffect, useState } from 'react';
+import Button from './Button';
+import { PEOPLE } from '../data/people';
+import { makeId } from '../utils/ids';
+
+const PRIORITIES = [
+  ['low', 'Low'],
+  ['medium', 'Medium'],
+  ['high', 'High'],
+];
+
+export default function NewTaskModal({ onCreate, onClose }) {
+  const [title, setTitle] = useState('');
+  const [assigneeId, setAssigneeId] = useState(PEOPLE[0].id);
+  const [priority, setPriority] = useState('medium');
+
+  // Mid-session change: Escape closes.
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const value = title.trim();
+    if (!value) {
+      return;
+    }
+    onCreate({ id: makeId('t'), title: value, assigneeId: assigneeId, priority: priority, done: false });
+  }
+
+  // Mid-session change: clicking the dark backdrop closes,
+  // clicking inside the panel does not.
+  function handleBackdropClick(e) {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }
+
+  const canCreate = title.trim() !== '';
+
+  return (
+    <div className="backdrop" onClick={handleBackdropClick}>
+      <form className="modal" onSubmit={handleSubmit} role="dialog" aria-label="New task">
+        <h2>New task</h2>
+
+        <label className="field">
+          <span className="field-label">Name</span>
+          <input
+            className="input"
+            autoFocus
+            placeholder="What needs to be done?"
+            value={title}
+            onChange={(e) => { setTitle(e.target.value); }}
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Assignee</span>
+          <select className="input" value={assigneeId} onChange={(e) => { setAssigneeId(e.target.value); }}>
+            {PEOPLE.map((p) => {
+              return <option key={p.id} value={p.id}>{p.name}</option>;
+            })}
+          </select>
+        </label>
+
+        <div className="field">
+          <span className="field-label">Priority</span>
+          <div className="segmented" role="group" aria-label="Priority">
+            {PRIORITIES.map((opt) => {
+              let segClass = 'seg';
+              if (priority === opt[0]) {
+                segClass = 'seg is-active';
+              }
+              return (
+                <button
+                  key={opt[0]}
+                  type="button"
+                  className={segClass}
+                  onClick={() => { setPriority(opt[0]); }}
+                >
+                  {opt[1]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <Button type="button" onClick={() => { onClose(); }}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!canCreate}>Create</Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --border-strong: #D0D5DD;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-soft: #EEF0FF;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidenav { width: 200px; flex-shrink: 0; padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 16px; font-weight: 700; font-size: 16px; }
+.nav-link { padding: 7px 8px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-link.is-current { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+.page { max-width: 760px; display: flex; flex-direction: column; gap: 16px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.page-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+.btn { height: 36px; padding: 0 14px; border-radius: var(--radius); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
+
+.task-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.task:last-child { border-bottom: none; }
+.task input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.task-title { flex: 1; min-width: 0; }
+.task.is-done .task-title { color: var(--muted); text-decoration: line-through; }
+.task-assignee { width: 110px; text-align: right; color: var(--muted); font-size: 13px; }
+
+.priority { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.priority-high { background: #FEF3F2; color: #B42318; }
+.priority-medium { background: #FFF6E5; color: #B54708; }
+.priority-low { background: #F2F4F7; color: #667085; }
+
+/* ---- Added for the Figma ---- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(16, 24, 40, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal h2 { margin: 0; font-size: 18px; font-weight: 600; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 13px; font-weight: 500; }
+.input { height: 36px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); color: var(--text); }
+.input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.segmented { display: flex; padding: 3px; gap: 2px; background: #F2F4F7; border-radius: var(--radius); }
+.seg { flex: 1; height: 30px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; }
+.seg.is-active { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1); }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }

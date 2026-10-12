@@ -1,0 +1,611 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green';
+
+export type Note = {
+  id: string;
+  text: string;
+  color: NoteColor;
+};
+
+export type Board = {
+  title: string;
+  notes: Note[];
+};
+
+const BOARD: Board = {
+  title: 'Sprint 42 retro',
+  notes: [
+    { id: 'n1', text: 'Release checklist saved us twice', color: 'green' },
+    { id: 'n2', text: 'Too many meetings on Wednesday', color: 'pink' },
+    { id: 'n3', text: 'Try pairing on the billing bugs', color: 'blue' },
+    { id: 'n4', text: 'Flaky e2e tests block merges', color: 'pink' },
+    { id: 'n5', text: 'Kudos to Priya for the on-call docs', color: 'yellow' },
+  ],
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /boards/retro-42 -> Board
+export async function getBoard(): Promise<Board> {
+  await randomDelay(300, 900);
+  return { title: BOARD.title, notes: BOARD.notes.map((n) => ({ ...n })) };
+}
+@@@ shared src/utils/id.ts
+// uid() -> "note-1712345678901-3", unique enough for client-side ids
+let counter = 0;
+export function uid(): string {
+  counter += 1;
+  return 'note-' + Date.now() + '-' + counter;
+}
+@@@ shared src/components/IconButton.tsx
+import React from 'react';
+
+type IconButtonProps = {
+  label: string;          // accessible name, also the tooltip
+  icon: string;
+  text?: string;          // optional visible text next to the icon
+  disabled?: boolean;
+  onClick: () => void;
+};
+
+// Small toolbar button. Use it for any new toolbar actions.
+export default function IconButton({ label, icon, text, disabled, onClick }: IconButtonProps) {
+  let textEl = null;
+  if (text) {
+    textEl = <span className="icon-btn-text">{text}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={() => { onClick(); }}
+    >
+      <span className="icon-btn-icon" aria-hidden="true">{icon}</span>
+      {textEl}
+    </button>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getBoard } from './api';
+import type { Note, NoteColor } from './api';
+import { uid } from './utils/id';
+import IconButton from './components/IconButton';
+
+const COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green'];
+
+function Header({ title }: { title: string }) {
+  return (
+    <header className="header">
+      <div className="brand">
+        <span className="brand-mark">▦</span>
+        <span className="brand-name">Pinboard</span>
+      </div>
+      <h1>{title}</h1>
+      <div className="people">
+        <span className="person" style={{ background: '#F59E0B' }}>PR</span>
+        <span className="person" style={{ background: '#6366F1' }}>JL</span>
+        <span className="person" style={{ background: '#10B981' }}>AM</span>
+      </div>
+    </header>
+  );
+}
+
+type ToolbarProps = {
+  color: NoteColor;
+  count: number;
+  onColorChange: (color: NoteColor) => void;
+  onAdd: () => void;
+};
+
+function Toolbar({ color, count, onColorChange, onAdd }: ToolbarProps) {
+  return (
+    <div className="toolbar">
+      <div className="swatches" role="group" aria-label="Note color">
+        {COLORS.map((c) => {
+          let cls = 'swatch swatch-' + c;
+          if (c === color) {
+            cls = cls + ' is-active';
+          }
+          return (
+            <button key={c} type="button" className={cls} aria-label={c} aria-pressed={c === color} onClick={() => { onColorChange(c); }} />
+          );
+        })}
+      </div>
+      <IconButton label="Add note" icon="+" text="Add note" onClick={onAdd} />
+      <span className="toolbar-spacer" />
+      <span className="note-count">{count} notes</span>
+    </div>
+  );
+}
+
+type NoteCardProps = {
+  note: Note;
+  onChange: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+};
+
+function NoteCard({ note, onChange, onDelete }: NoteCardProps) {
+  return (
+    <div className={'note note-' + note.color}>
+      <button type="button" className="note-delete" aria-label="Delete note" onClick={() => { onDelete(note.id); }}>×</button>
+      <textarea
+        className="note-text"
+        aria-label="Note text"
+        placeholder="Write something…"
+        value={note.text}
+        onChange={(e) => { onChange(note.id, e.target.value); }}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [color, setColor] = useState<NoteColor>('yellow');
+
+  useEffect(() => {
+    let cancelled = false;
+    getBoard().then((board) => {
+      if (cancelled) {
+        return;
+      }
+      setTitle(board.title);
+      setNotes(board.notes);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleAdd() {
+    setNotes((prev) => {
+      return [...prev, { id: uid(), text: '', color: color }];
+    });
+  }
+
+  function handleChange(id: string, text: string) {
+    setNotes((prev) => {
+      return prev.map((n) => {
+        if (n.id !== id) {
+          return n;
+        }
+        return { ...n, text: text };
+      });
+    });
+  }
+
+  function handleDelete(id: string) {
+    setNotes((prev) => {
+      return prev.filter((n) => {
+        return n.id !== id;
+      });
+    });
+  }
+
+  let content;
+  if (loading) {
+    content = <p className="board-message">Loading board…</p>;
+  } else if (notes.length === 0) {
+    content = <p className="board-message">No notes yet. Add the first one.</p>;
+  } else {
+    content = (
+      <div className="board">
+        {notes.map((n) => {
+          return <NoteCard key={n.id} note={n} onChange={handleChange} onDelete={handleDelete} />;
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <Header title={title} />
+      <Toolbar color={color} count={notes.length} onColorChange={setColor} onAdd={handleAdd} />
+      <main className="canvas">{content}</main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --ink: #1F2933;
+  --muted: #6B7280;
+  --line: #E5E1D8;
+  --paper: #F7F4EC;
+  --dot: #DCD6C8;
+  --accent: #2563EB;
+  --note-yellow: #FFE58A;
+  --note-pink: #FFC2D1;
+  --note-blue: #BFE3FF;
+  --note-green: #C6F0C2;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--ink); background: var(--paper); }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.brand-mark { color: var(--accent); font-size: 18px; }
+.brand-name { font-size: 14px; letter-spacing: 0.02em; }
+.header h1 { margin: 0; font-size: 16px; font-weight: 600; color: var(--muted); }
+.people { margin-left: auto; display: flex; }
+.person { width: 28px; height: 28px; margin-left: -6px; border: 2px solid #fff; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+.toolbar-spacer { flex: 1; }
+.note-count { font-size: 13px; color: var(--muted); }
+
+.swatches { display: flex; gap: 6px; padding-right: 10px; border-right: 1px solid var(--line); }
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.swatch.is-active { border-color: var(--ink); }
+.swatch-yellow { background: var(--note-yellow); }
+.swatch-pink { background: var(--note-pink); }
+.swatch-blue { background: var(--note-blue); }
+.swatch-green { background: var(--note-green); }
+
+.icon-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.icon-btn:hover:not(:disabled) { background: #F3F1EA; }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn-icon { font-size: 15px; line-height: 1; }
+
+.canvas { flex: 1; padding: 24px 20px; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; }
+.board-message { margin: 40px 0; text-align: center; color: var(--muted); }
+
+.note { position: relative; min-height: 150px; padding: 14px 12px 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 14px rgba(60, 50, 20, 0.12); transform: rotate(-1deg); }
+.note:nth-child(2n) { transform: rotate(1.2deg); }
+.note:nth-child(3n) { transform: rotate(-0.4deg); }
+.note-yellow { background: var(--note-yellow); }
+.note-pink { background: var(--note-pink); }
+.note-blue { background: var(--note-blue); }
+.note-green { background: var(--note-green); }
+.note-text { width: 100%; min-height: 120px; border: 0; background: transparent; resize: none; font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive; font-size: 15px; line-height: 1.4; color: #2B2B2B; }
+.note-text:focus { outline: none; }
+.note-delete { position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.06); color: #444; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0.5; }
+.note:hover .note-delete, .note-delete:focus-visible { opacity: 1; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getBoard } from './api';
+import type { Note, NoteColor } from './api';
+import { uid } from './utils/id';
+import IconButton from './components/IconButton';
+
+const COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green'];
+const MAX_HISTORY = 20;
+
+// One state object, so past/present/future always change together.
+type History = {
+  past: Note[][];
+  present: Note[];
+  future: Note[][];
+};
+
+// Pure helpers: given the old history, return the new one.
+function commitHistory(h: History, next: Note[]): History {
+  // keep only the newest MAX_HISTORY snapshots
+  return { past: [...h.past, h.present].slice(-MAX_HISTORY), present: next, future: [] };
+}
+
+function undoHistory(h: History): History {
+  if (h.past.length === 0) {
+    return h;
+  }
+  const previous = h.past[h.past.length - 1];
+  return { past: h.past.slice(0, -1), present: previous, future: [h.present, ...h.future] };
+}
+
+function redoHistory(h: History): History {
+  if (h.future.length === 0) {
+    return h;
+  }
+  const next = h.future[0];
+  return { past: [...h.past, h.present], present: next, future: h.future.slice(1) };
+}
+
+function Header({ title }: { title: string }) {
+  return (
+    <header className="header">
+      <div className="brand">
+        <span className="brand-mark">▦</span>
+        <span className="brand-name">Pinboard</span>
+      </div>
+      <h1>{title}</h1>
+      <div className="people">
+        <span className="person" style={{ background: '#F59E0B' }}>PR</span>
+        <span className="person" style={{ background: '#6366F1' }}>JL</span>
+        <span className="person" style={{ background: '#10B981' }}>AM</span>
+      </div>
+    </header>
+  );
+}
+
+type ToolbarProps = {
+  color: NoteColor;
+  count: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoSteps: number;
+  onColorChange: (color: NoteColor) => void;
+  onAdd: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+};
+
+function Toolbar({ color, count, canUndo, canRedo, undoSteps, onColorChange, onAdd, onUndo, onRedo }: ToolbarProps) {
+  return (
+    <div className="toolbar">
+      <div className="swatches" role="group" aria-label="Note color">
+        {COLORS.map((c) => {
+          let cls = 'swatch swatch-' + c;
+          if (c === color) {
+            cls = cls + ' is-active';
+          }
+          return (
+            <button key={c} type="button" className={cls} aria-label={c} aria-pressed={c === color} onClick={() => { onColorChange(c); }} />
+          );
+        })}
+      </div>
+      <IconButton label="Add note" icon="+" text="Add note" onClick={onAdd} />
+      <div className="history-group">
+        <IconButton label="Undo (Ctrl+Z)" icon="↶" text="Undo" disabled={!canUndo} onClick={onUndo} />
+        <IconButton label="Redo (Ctrl+Shift+Z)" icon="↷" text="Redo" disabled={!canRedo} onClick={onRedo} />
+        <span className="history-meter">{undoSteps} / {MAX_HISTORY}</span>
+      </div>
+      <span className="toolbar-spacer" />
+      <span className="note-count">{count} notes</span>
+    </div>
+  );
+}
+
+type NoteCardProps = {
+  note: Note;
+  onChange: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+  onEditStart: () => void;
+  onEditEnd: () => void;
+};
+
+function NoteCard({ note, onChange, onDelete, onEditStart, onEditEnd }: NoteCardProps) {
+  return (
+    <div className={'note note-' + note.color}>
+      <button type="button" className="note-delete" aria-label="Delete note" onClick={() => { onDelete(note.id); }}>×</button>
+      <textarea
+        className="note-text"
+        aria-label="Note text"
+        placeholder="Write something…"
+        value={note.text}
+        onChange={(e) => { onChange(note.id, e.target.value); }}
+        onFocus={() => { onEditStart(); }}
+        onBlur={() => { onEditEnd(); }}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  const [title, setTitle] = useState('');
+  const [history, setHistory] = useState<History>({ past: [], present: [], future: [] });
+  const [loading, setLoading] = useState(true);
+  const [color, setColor] = useState<NoteColor>('yellow');
+  // Snapshot taken when a note gets focus, committed on blur (one undo = one whole edit).
+  const editStart = useRef<Note[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBoard().then((board) => {
+      if (cancelled) {
+        return;
+      }
+      setTitle(board.title);
+      // Loading is not an undoable step.
+      setHistory({ past: [], present: board.notes, future: [] });
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z. The pure helpers don't close over state, so [] deps is safe.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      // While typing in a note, let the browser undo the text itself.
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') {
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') {
+        return;
+      }
+      e.preventDefault();
+      if (e.shiftKey) {
+        setHistory(redoHistory);
+      } else {
+        setHistory(undoHistory);
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, []);
+
+  function handleAdd() {
+    setHistory((h) => {
+      return commitHistory(h, [...h.present, { id: uid(), text: '', color: color }]);
+    });
+  }
+
+  function handleDelete(id: string) {
+    setHistory((h) => {
+      const next = h.present.filter((n) => {
+        return n.id !== id;
+      });
+      return commitHistory(h, next);
+    });
+  }
+
+  // Typing replaces `present` without adding history entries.
+  function handleChange(id: string, text: string) {
+    setHistory((h) => {
+      const next = h.present.map((n) => {
+        if (n.id !== id) {
+          return n;
+        }
+        return { ...n, text: text };
+      });
+      return { ...h, present: next };
+    });
+  }
+
+  function handleEditStart() {
+    editStart.current = history.present;
+  }
+
+  function handleEditEnd() {
+    const before = editStart.current;
+    editStart.current = null;
+    if (!before) {
+      return;
+    }
+    setHistory((h) => {
+      if (h.present === before) {
+        return h; // focused but nothing changed
+      }
+      return { past: [...h.past, before].slice(-MAX_HISTORY), present: h.present, future: [] };
+    });
+  }
+
+  function handleUndo() {
+    setHistory(undoHistory);
+  }
+
+  function handleRedo() {
+    setHistory(redoHistory);
+  }
+
+  // derived
+  const notes = history.present;
+
+  let content;
+  if (loading) {
+    content = <p className="board-message">Loading board…</p>;
+  } else if (notes.length === 0) {
+    content = <p className="board-message">No notes yet. Add the first one.</p>;
+  } else {
+    content = (
+      <div className="board">
+        {notes.map((n) => {
+          return (
+            <NoteCard
+              key={n.id}
+              note={n}
+              onChange={handleChange}
+              onDelete={handleDelete}
+              onEditStart={handleEditStart}
+              onEditEnd={handleEditEnd}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <Header title={title} />
+      <Toolbar
+        color={color}
+        count={notes.length}
+        canUndo={history.past.length > 0}
+        canRedo={history.future.length > 0}
+        undoSteps={history.past.length}
+        onColorChange={setColor}
+        onAdd={handleAdd}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+      />
+      <main className="canvas">{content}</main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --ink: #1F2933;
+  --muted: #6B7280;
+  --line: #E5E1D8;
+  --paper: #F7F4EC;
+  --dot: #DCD6C8;
+  --accent: #2563EB;
+  --note-yellow: #FFE58A;
+  --note-pink: #FFC2D1;
+  --note-blue: #BFE3FF;
+  --note-green: #C6F0C2;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--ink); background: var(--paper); }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.brand-mark { color: var(--accent); font-size: 18px; }
+.brand-name { font-size: 14px; letter-spacing: 0.02em; }
+.header h1 { margin: 0; font-size: 16px; font-weight: 600; color: var(--muted); }
+.people { margin-left: auto; display: flex; }
+.person { width: 28px; height: 28px; margin-left: -6px; border: 2px solid #fff; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+.toolbar-spacer { flex: 1; }
+.note-count { font-size: 13px; color: var(--muted); }
+
+.swatches { display: flex; gap: 6px; padding-right: 10px; border-right: 1px solid var(--line); }
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.swatch.is-active { border-color: var(--ink); }
+.swatch-yellow { background: var(--note-yellow); }
+.swatch-pink { background: var(--note-pink); }
+.swatch-blue { background: var(--note-blue); }
+.swatch-green { background: var(--note-green); }
+
+.icon-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.icon-btn:hover:not(:disabled) { background: #F3F1EA; }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn-icon { font-size: 15px; line-height: 1; }
+
+.canvas { flex: 1; padding: 24px 20px; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; }
+.board-message { margin: 40px 0; text-align: center; color: var(--muted); }
+
+.note { position: relative; min-height: 150px; padding: 14px 12px 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 14px rgba(60, 50, 20, 0.12); transform: rotate(-1deg); }
+.note:nth-child(2n) { transform: rotate(1.2deg); }
+.note:nth-child(3n) { transform: rotate(-0.4deg); }
+.note-yellow { background: var(--note-yellow); }
+.note-pink { background: var(--note-pink); }
+.note-blue { background: var(--note-blue); }
+.note-green { background: var(--note-green); }
+.note-text { width: 100%; min-height: 120px; border: 0; background: transparent; resize: none; font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive; font-size: 15px; line-height: 1.4; color: #2B2B2B; }
+.note-text:focus { outline: none; }
+.note-delete { position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.06); color: #444; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0.5; }
+.note:hover .note-delete, .note-delete:focus-visible { opacity: 1; }
+
+/* ---- Added: undo / redo ---- */
+.history-group { display: flex; align-items: center; gap: 6px; padding-left: 10px; border-left: 1px solid var(--line); }
+.history-meter { min-width: 44px; padding: 3px 8px; border-radius: 999px; background: #F3F1EA; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: center; }

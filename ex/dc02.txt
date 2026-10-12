@@ -1,0 +1,304 @@
+@@@ shared src/components/Field.tsx
+import React from 'react';
+
+type FieldProps = {
+  label: string;
+  htmlFor: string;
+  hint?: string;
+  children: React.ReactNode;
+};
+
+// Label + control + optional hint, with consistent spacing.
+export function Field({ label, htmlFor, hint, children }: FieldProps) {
+  let hintEl = null;
+  if (hint) {
+    hintEl = <p className="field-hint">{hint}</p>;
+  }
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={htmlFor}>{label}</label>
+      {children}
+      {hintEl}
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { Field } from './components/Field';
+
+const BIO_LIMIT = 160;
+
+function Sidebar() {
+  return (
+    <nav className="sidebar">
+      <div className="logo"><span className="logo-mark">&gt;_</span> forge</div>
+      <a className="nav-item is-active">Profile</a>
+      <a className="nav-item">Account</a>
+      <a className="nav-item">SSH keys</a>
+      <a className="nav-item">Access tokens</a>
+    </nav>
+  );
+}
+
+function ProfileForm() {
+  const [name, setName] = useState('Sam Okafor');
+  const [bio, setBio] = useState('Backend engineer. I like boring tech, fast builds and good logs.');
+  const [savedAt, setSavedAt] = useState('');
+
+  function handleSave() {
+    setSavedAt(new Date().toLocaleTimeString());
+  }
+
+  let savedNote = null;
+  if (savedAt) {
+    savedNote = <span className="saved-note">Saved at {savedAt}</span>;
+  }
+
+  return (
+    <section className="panel">
+      <h1>Public profile</h1>
+      <p className="sub">This is how other developers see you on forge.</p>
+
+      <Field label="Display name" htmlFor="name">
+        <input id="name" className="input" value={name} onChange={(e) => { setName(e.target.value); }} />
+      </Field>
+
+      <Field label="Bio" htmlFor="bio">
+        <textarea id="bio" className="input bio-input" rows={4} value={bio} onChange={(e) => { setBio(e.target.value); }} />
+      </Field>
+
+      <div className="form-footer">
+        {savedNote}
+        <button type="button" className="btn-primary" onClick={() => { handleSave(); }}>Save profile</button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <ProfileForm />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0E1120;
+  --surface: #161A2E;
+  --surface-2: #1D2238;
+  --border: #2A3050;
+  --text: #E6E8F2;
+  --muted: #8C93B0;
+  --primary: #7C6CF2;
+  --primary-hover: #8F81F5;
+  --warn: #F5A524;
+  --danger: #F2556B;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; flex-shrink: 0; padding: 20px 12px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.logo { font-family: var(--mono); font-weight: 700; font-size: 16px; padding: 0 10px 18px; }
+.logo-mark { color: var(--primary); }
+.nav-item { padding: 8px 10px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-item:hover { background: var(--surface); color: var(--text); }
+.nav-item.is-active { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 var(--primary); }
+
+.main { flex: 1; min-width: 0; padding: 32px 24px; }
+.panel { max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.panel h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.sub { margin: 4px 0 20px; color: var(--muted); font-size: 14px; }
+
+.field { margin-bottom: 18px; }
+.field-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field-hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.input { width: 100%; padding: 9px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 108, 242, 0.25); }
+.bio-input { resize: vertical; line-height: 1.5; }
+
+.form-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-top: 4px; }
+.saved-note { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+.btn-primary { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .sidebar { display: none; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { Field } from './components/Field';
+
+const BIO_LIMIT = 160;
+const WARN_AT = 20;
+
+function Sidebar() {
+  return (
+    <nav className="sidebar">
+      <div className="logo"><span className="logo-mark">&gt;_</span> forge</div>
+      <a className="nav-item is-active">Profile</a>
+      <a className="nav-item">Account</a>
+      <a className="nav-item">SSH keys</a>
+      <a className="nav-item">Access tokens</a>
+    </nav>
+  );
+}
+
+type BioMeterProps = {
+  length: number;
+};
+
+// Counter + progress bar. Everything here is derived from the length.
+function BioMeter({ length }: BioMeterProps) {
+  const remaining = BIO_LIMIT - length;
+
+  let status = 'ok';
+  if (remaining < 0) {
+    status = 'over';
+  } else if (remaining < WARN_AT) {
+    status = 'warn';
+  }
+
+  let text = remaining + ' characters left';
+  if (remaining === 1) {
+    text = '1 character left';
+  } else if (remaining === -1) {
+    text = '1 character over';
+  } else if (remaining < 0) {
+    text = -remaining + ' characters over';
+  }
+
+  // Change: bar width as a percentage, capped at 100.
+  const percent = Math.min(100, (length / BIO_LIMIT) * 100);
+  const fillStyle = { width: percent + '%' };
+  const meterCls = 'bio-meter is-' + status;
+
+  return (
+    <div className={meterCls}>
+      <div className="bio-bar">
+        <div className="bio-bar-fill" style={fillStyle} />
+      </div>
+      <span className="bio-count">{text}</span>
+    </div>
+  );
+}
+
+function ProfileForm() {
+  const [name, setName] = useState('Sam Okafor');
+  const [bio, setBio] = useState('Backend engineer. I like boring tech, fast builds and good logs.');
+  const [savedAt, setSavedAt] = useState('');
+
+  function handleSave() {
+    setSavedAt(new Date().toLocaleTimeString());
+  }
+
+  // derived: never stored in state
+  const isOver = bio.length > BIO_LIMIT;
+
+  let savedNote = null;
+  if (savedAt) {
+    savedNote = <span className="saved-note">Saved at {savedAt}</span>;
+  }
+
+  let bioCls = 'input bio-input';
+  if (isOver) {
+    bioCls = 'input bio-input is-over';
+  }
+
+  return (
+    <section className="panel">
+      <h1>Public profile</h1>
+      <p className="sub">This is how other developers see you on forge.</p>
+
+      <Field label="Display name" htmlFor="name">
+        <input id="name" className="input" value={name} onChange={(e) => { setName(e.target.value); }} />
+      </Field>
+
+      <Field label="Bio" htmlFor="bio">
+        <textarea id="bio" className={bioCls} rows={4} value={bio} onChange={(e) => { setBio(e.target.value); }} />
+        <BioMeter length={bio.length} />
+      </Field>
+
+      <div className="form-footer">
+        {savedNote}
+        <button type="button" className="btn-primary" disabled={isOver} onClick={() => { handleSave(); }}>Save profile</button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <ProfileForm />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0E1120;
+  --surface: #161A2E;
+  --surface-2: #1D2238;
+  --border: #2A3050;
+  --text: #E6E8F2;
+  --muted: #8C93B0;
+  --primary: #7C6CF2;
+  --primary-hover: #8F81F5;
+  --warn: #F5A524;
+  --danger: #F2556B;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; flex-shrink: 0; padding: 20px 12px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.logo { font-family: var(--mono); font-weight: 700; font-size: 16px; padding: 0 10px 18px; }
+.logo-mark { color: var(--primary); }
+.nav-item { padding: 8px 10px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-item:hover { background: var(--surface); color: var(--text); }
+.nav-item.is-active { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 var(--primary); }
+
+.main { flex: 1; min-width: 0; padding: 32px 24px; }
+.panel { max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.panel h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.sub { margin: 4px 0 20px; color: var(--muted); font-size: 14px; }
+
+.field { margin-bottom: 18px; }
+.field-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field-hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.input { width: 100%; padding: 9px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 108, 242, 0.25); }
+.bio-input { resize: vertical; line-height: 1.5; }
+
+.form-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-top: 4px; }
+.saved-note { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+.btn-primary { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .sidebar { display: none; }
+}
+
+/* ---- Added: bio counter ---- */
+.bio-meter { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.bio-bar { flex: 1; height: 4px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bio-bar-fill { height: 100%; border-radius: 999px; background: var(--primary); transition: width 0.15s ease; }
+.bio-count { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.bio-meter.is-warn .bio-count { color: var(--warn); }
+.bio-meter.is-warn .bio-bar-fill { background: var(--warn); }
+.bio-meter.is-over .bio-count { color: var(--danger); font-weight: 600; }
+.bio-meter.is-over .bio-bar-fill { background: var(--danger); }
+.bio-input.is-over, .bio-input.is-over:focus { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(242, 85, 107, 0.2); }

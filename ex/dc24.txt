@@ -1,0 +1,414 @@
+@@@ shared src/components/SegmentedControl.tsx
+import React from 'react';
+
+type Option = { value: string; label: string };
+
+type SegmentedControlProps = {
+  label: string;           // accessible name for the group
+  options: Option[];
+  value: string;
+  onChange: (value: string) => void;
+};
+
+// A row of buttons where exactly one is selected. Fully controlled.
+export default function SegmentedControl({ label, options, value, onChange }: SegmentedControlProps) {
+  return (
+    <div className="segmented" role="group" aria-label={label}>
+      {options.map((opt) => {
+        const selected = opt.value === value;
+        let cls = 'segment';
+        if (selected) {
+          cls = 'segment is-selected';
+        }
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            className={cls}
+            aria-pressed={selected}
+            onClick={() => { onChange(opt.value); }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+@@@ shared src/data.ts
+export type Invoice = { id: string; customer: string; amount: string; status: 'Paid' | 'Due' | 'Overdue' };
+
+export const KPIS = [
+  { label: 'MRR', value: '$84,210', delta: '+6.2%' },
+  { label: 'Active accounts', value: '1,284', delta: '+38' },
+  { label: 'Churn', value: '1.9%', delta: '-0.3 pts' },
+];
+
+export const BARS = [42, 55, 48, 63, 71, 66, 80, 77, 89, 94, 88, 100];
+
+export const INVOICES: Invoice[] = [
+  { id: 'INV-2041', customer: 'Acme Robotics', amount: '$4,800', status: 'Paid' },
+  { id: 'INV-2042', customer: 'Lumen Health', amount: '$2,150', status: 'Due' },
+  { id: 'INV-2043', customer: 'Orbit Freight', amount: '$9,320', status: 'Overdue' },
+  { id: 'INV-2044', customer: 'Pine & Co', amount: '$1,090', status: 'Paid' },
+];
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import SegmentedControl from './components/SegmentedControl';
+import { KPIS, BARS, INVOICES } from './data';
+
+const RANGES = [
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: '12m', label: '12m' },
+];
+
+function KpiCard({ label, value, delta }: { label: string; value: string; delta: string }) {
+  return (
+    <div className="card kpi">
+      <span className="kpi-label">{label}</span>
+      <span className="kpi-value">{value}</span>
+      <span className="kpi-delta">{delta}</span>
+    </div>
+  );
+}
+
+function RevenueChart() {
+  return (
+    <div className="card chart-card">
+      <h2>Revenue</h2>
+      <div className="bars">
+        {BARS.map((h, i) => {
+          return <div key={i} className="bar" style={{ height: h + '%' }} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InvoiceTable() {
+  return (
+    <div className="card">
+      <h2>Recent invoices</h2>
+      <table className="table">
+        <tbody>
+          {INVOICES.map((inv) => {
+            return (
+              <tr key={inv.id}>
+                <td className="mono">{inv.id}</td>
+                <td>{inv.customer}</td>
+                <td className="num">{inv.amount}</td>
+                <td><span className={'status status-' + inv.status.toLowerCase()}>{inv.status}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  const [range, setRange] = useState('30d');
+
+  // TODO: theme switcher (Light / Dark / System) goes in the top bar.
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">◐ Northwind Metrics</span>
+        <div className="topbar-right">
+          <SegmentedControl label="Date range" options={RANGES} value={range} onChange={setRange} />
+        </div>
+      </header>
+      <main className="content">
+        <div className="kpis">
+          {KPIS.map((k) => {
+            return <KpiCard key={k.label} label={k.label} value={k.value} delta={k.delta} />;
+          })}
+        </div>
+        <RevenueChart />
+        <InvoiceTable />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+/* Every color comes from these variables. A dark theme only has to redefine them. */
+:root {
+  --bg: #F4F6FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F6;
+  --border: #E2E6EE;
+  --text: #0F172A;
+  --muted: #64748B;
+  --accent: #2563EB;
+  --accent-soft: #DBE7FE;
+  --good: #16A34A;
+  --bad: #DC2626;
+  --warn: #D97706;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { min-height: 100vh; background: var(--bg); color: var(--text); }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; font-size: 16px; }
+.topbar-right { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.segmented { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); }
+.segment { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.segment:hover { color: var(--text); }
+.segment.is-selected { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
+
+.content { padding: 24px; display: flex; flex-direction: column; gap: 16px; max-width: 980px; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card h2 { margin: 0 0 12px; font-size: 14px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.kpi { display: flex; flex-direction: column; gap: 4px; }
+.kpi-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-value { font-size: 26px; font-weight: 700; }
+.kpi-delta { font-size: 13px; color: var(--good); font-weight: 600; }
+
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+.bar { flex: 1; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table td { padding: 10px 6px; border-top: 1px solid var(--border); }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.status { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.status-paid { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.status-due { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.status-overdue { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import SegmentedControl from './components/SegmentedControl';
+import { KPIS, BARS, INVOICES } from './data';
+
+const RANGES = [
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: '12m', label: '12m' },
+];
+
+type ThemeChoice = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
+
+const THEME_KEY = 'northwind-theme';
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+// localStorage can throw (private mode, blocked storage), so wrap every access.
+function readStoredChoice(): ThemeChoice {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+      return saved;
+    }
+  } catch (e) {
+    // ignore: fall back to the default
+  }
+  return 'system';
+}
+
+function saveChoice(choice: ThemeChoice) {
+  try {
+    localStorage.setItem(THEME_KEY, choice);
+  } catch (e) {
+    // ignore: the theme still works for this visit
+  }
+}
+
+function getSystemTheme(): Theme {
+  if (window.matchMedia(DARK_QUERY).matches) {
+    return 'dark';
+  }
+  return 'light';
+}
+
+function KpiCard({ label, value, delta }: { label: string; value: string; delta: string }) {
+  return (
+    <div className="card kpi">
+      <span className="kpi-label">{label}</span>
+      <span className="kpi-value">{value}</span>
+      <span className="kpi-delta">{delta}</span>
+    </div>
+  );
+}
+
+function RevenueChart() {
+  return (
+    <div className="card chart-card">
+      <h2>Revenue</h2>
+      <div className="bars">
+        {BARS.map((h, i) => {
+          return <div key={i} className="bar" style={{ height: h + '%' }} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InvoiceTable() {
+  return (
+    <div className="card">
+      <h2>Recent invoices</h2>
+      <table className="table">
+        <tbody>
+          {INVOICES.map((inv) => {
+            return (
+              <tr key={inv.id}>
+                <td className="mono">{inv.id}</td>
+                <td>{inv.customer}</td>
+                <td className="num">{inv.amount}</td>
+                <td><span className={'status status-' + inv.status.toLowerCase()}>{inv.status}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  const [range, setRange] = useState('30d');
+  // Lazy initial state: read storage once, not on every render.
+  const [choice, setChoice] = useState<ThemeChoice>(() => {
+    return readStoredChoice();
+  });
+  const [systemTheme, setSystemTheme] = useState<Theme>(() => {
+    return getSystemTheme();
+  });
+
+  // Follow the OS setting live while "System" could be in use.
+  useEffect(() => {
+    const mq = window.matchMedia(DARK_QUERY);
+    function handleChange() {
+      setSystemTheme(getSystemTheme());
+    }
+    mq.addEventListener('change', handleChange);
+    return () => {
+      mq.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  function handleThemeChange(value: string) {
+    const next = value as ThemeChoice;
+    setChoice(next);
+    saveChoice(next);
+  }
+
+  // derived: the theme actually applied. Never stored in state.
+  let theme: Theme = systemTheme;
+  if (choice !== 'system') {
+    theme = choice;
+  }
+
+  let systemNote = null;
+  if (choice === 'system') {
+    systemNote = <span className="theme-note">Using {theme}</span>;
+  }
+
+  return (
+    <div className="app" data-theme={theme}>
+      <header className="topbar">
+        <span className="logo">◐ Northwind Metrics</span>
+        <div className="topbar-right">
+          <SegmentedControl label="Date range" options={RANGES} value={range} onChange={setRange} />
+          <div className="theme-picker">
+            {systemNote}
+            <SegmentedControl label="Theme" options={THEME_OPTIONS} value={choice} onChange={handleThemeChange} />
+          </div>
+        </div>
+      </header>
+      <main className="content">
+        <div className="kpis">
+          {KPIS.map((k) => {
+            return <KpiCard key={k.label} label={k.label} value={k.value} delta={k.delta} />;
+          })}
+        </div>
+        <RevenueChart />
+        <InvoiceTable />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+/* Every color comes from these variables. A dark theme only has to redefine them. */
+:root {
+  --bg: #F4F6FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F6;
+  --border: #E2E6EE;
+  --text: #0F172A;
+  --muted: #64748B;
+  --accent: #2563EB;
+  --accent-soft: #DBE7FE;
+  --good: #16A34A;
+  --bad: #DC2626;
+  --warn: #D97706;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { min-height: 100vh; background: var(--bg); color: var(--text); }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; font-size: 16px; }
+.topbar-right { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.segmented { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); }
+.segment { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.segment:hover { color: var(--text); }
+.segment.is-selected { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
+
+.content { padding: 24px; display: flex; flex-direction: column; gap: 16px; max-width: 980px; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card h2 { margin: 0 0 12px; font-size: 14px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.kpi { display: flex; flex-direction: column; gap: 4px; }
+.kpi-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-value { font-size: 26px; font-weight: 700; }
+.kpi-delta { font-size: 13px; color: var(--good); font-weight: 600; }
+
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+.bar { flex: 1; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table td { padding: 10px 6px; border-top: 1px solid var(--border); }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.status { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.status-paid { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.status-due { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.status-overdue { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+
+/* ---- Added: dark theme + theme picker ---- */
+/* Variables inherit, so redefining them on the app root re-colors everything inside. */
+.app[data-theme="dark"] {
+  --bg: #0B1120;
+  --surface: #131B2E;
+  --surface-2: #0F172A;
+  --border: #23304A;
+  --text: #E2E8F0;
+  --muted: #94A3B8;
+  --accent: #60A5FA;
+  --accent-soft: #1E3A8A;
+  --good: #4ADE80;
+  --bad: #F87171;
+  --warn: #FBBF24;
+  color-scheme: dark;
+}
+.app[data-theme="dark"] .segment.is-selected { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.theme-picker { display: flex; align-items: center; gap: 8px; }
+.theme-note { font-size: 12px; color: var(--muted); }

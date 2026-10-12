@@ -1,0 +1,919 @@
+{
+ "dc01": {
+  "kind": "drill",
+  "level": 1,
+  "order": 1,
+  "minutes": 10,
+  "changeAt": 7,
+  "title": "Like button",
+  "focus": "src/App.tsx",
+  "summary": "A photo post card is built. Make the heart toggle, fill red, and keep the like count in sync.",
+  "skills": [
+   "boolean state",
+   "updater form",
+   "callback props",
+   "derived value"
+  ],
+  "brief": "<p>A small photo-sharing app, <b>lumen</b>. <code>App.tsx</code> has <code>TopBar</code>, <code>PostCard</code>, <code>PostHeader</code>, <code>PostPhoto</code> and an empty <code>LikeButton</code>. No API: the post is a constant.</p><p>Read <code>components/Icons.tsx</code> and <code>utils/format.ts</code> first. The heart icon and the \"241 likes\" text helper already exist and are worth reusing.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The heart, the likes line and (later) the photo all depend on <i>liked</i>, so the state goes in <code>PostCard</code>, the closest common parent. <code>LikeButton</code> gets <code>liked</code> and <code>onToggle</code> as props and stays dumb. The count is <code>post.likes + 1</code> when liked. I won't store the count, I'll derive it.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking the heart toggles liked. Liked: the heart is <b>filled</b> and red (<code>--like</code>, #E8445A). Clicking again unlikes it (outline, dark)",
+   "The likes line reads <b>\"241 likes\"</b>, and <b>\"242 likes\"</b> while liked. The count is derived from <code>post.likes</code>, not kept in its own state",
+   "The button's <code>aria-label</code> is \"Like\" / \"Unlike\" and it has <code>aria-pressed</code>. The heart does a quick scale \"pop\" when liked"
+  ],
+  "change": {
+   "title": "Double-click to like",
+   "html": "<p>\"Everyone double-taps the photo. Make that work.\"</p><ul><li>Double-clicking the <b>photo</b> likes the post.</li><li>If it is already liked, double-clicking keeps it liked (it never unlikes).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>PostPhoto</code> needs an <code>onDoubleClick</code> prop. The state is already in the right place.</p>"
+  },
+  "hints": [
+   "State placement: who needs to know about <i>liked</i>? The button and the likes line. Put it in their parent, <code>PostCard</code>.",
+   "<code>HeartIcon</code> already takes a <code>filled</code> prop. Color comes from <code>currentColor</code>, so a CSS class that sets <code>color</code> turns it red.",
+   "Toggle with the updater form: <code>setLiked((prev) =&gt; { return !prev; });</code>",
+   "Derive the number above the return: <code>let likeCount = post.likes; if (liked) { likeCount = post.likes + 1; }</code> then <code>pluralize(likeCount, \"like\")</code>.",
+   "For the pop, search: <b>mdn css @keyframes</b>. Scale 1 → 1.25 → 1 over 0.25s."
+  ],
+  "rubric": [
+   "State lives in PostCard, not in LikeButton",
+   "LikeButton takes liked + onToggle props",
+   "Count is derived, not a second piece of state",
+   "Updater form used for the toggle",
+   "Reused HeartIcon and pluralize",
+   "Double-click only sets liked to true",
+   "Class names and labels decided above the return"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--like",
+     "#E8445A"
+    ],
+    [
+     "--text",
+     "#262220"
+    ],
+    [
+     "--muted",
+     "#8A817A"
+    ],
+    [
+     "--border",
+     "#ECE6DC"
+    ],
+    [
+     "Icon hover",
+     "#F4EFE8"
+    ]
+   ],
+   "notes": [
+    [
+     "Icon button",
+     "40 × 40 · circle"
+    ],
+    [
+     "Heart",
+     "24px · stroke 1.8"
+    ],
+    [
+     "Liked heart",
+     "filled · --like"
+    ],
+    [
+     "Pop",
+     "scale 1 → 1.25 → 1 · 0.25s"
+    ],
+    [
+     "Likes line",
+     "14 / 700"
+    ]
+   ]
+  }
+ },
+ "dc02": {
+  "kind": "drill",
+  "level": 1,
+  "order": 2,
+  "minutes": 10,
+  "changeAt": 7,
+  "title": "Bio character counter",
+  "focus": "src/App.tsx",
+  "summary": "A dev-profile settings page. Add a live \"characters left\" counter with warning and over-limit states.",
+  "skills": [
+   "controlled textarea",
+   "derived values",
+   "conditional classes",
+   "disabled button"
+  ],
+  "brief": "<p>Settings page of a developer platform, <b>forge</b>. <code>ProfileForm</code> already holds <code>bio</code> in state (a controlled textarea) and saves on click. <code>BIO_LIMIT</code> is 160. No API.</p><p>Read <code>components/Field.tsx</code>: the counter goes inside the Bio <code>Field</code>, under the textarea.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>bio</code> is already state, so everything new is derived from <code>bio.length</code>: remaining, the status (ok / warn / over) and the label. Nothing new goes in state. I'll pull it into a small <code>BioMeter</code> component that takes the length, and compute <code>isOver</code> in the form for the Save button.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Under the bio, right-aligned and monospace: <b>\"96 characters left\"</b>, updating as you type. Exactly 1 reads <b>\"1 character left\"</b>",
+   "Under 20 left the counter turns amber (<code>--warn</code>). Over the limit it turns red (<code>--danger</code>) and reads <b>\"5 characters over\"</b> (never a negative number)",
+   "<b>Save profile</b> is disabled while the bio is over 160 characters",
+   "While over, the textarea border turns red too"
+  ],
+  "change": {
+   "title": "Progress bar",
+   "html": "<p>\"Design wants a visual for this.\"</p><ul><li>Add a thin bar (4px, pill) to the left of the counter, filling from 0% to 100% as the bio approaches 160 (capped at 100%).</li><li>It uses the same color rules: primary, then amber under 20 left, red when over.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: an inline style object built above the return: <code>const fillStyle = { width: percent + \"%\" };</code></p>"
+  },
+  "hints": [
+   "You need no new state. <code>const remaining = BIO_LIMIT - bio.length;</code>",
+   "Decide one status string above the return (<code>\"ok\"</code>, <code>\"warn\"</code>, <code>\"over\"</code>) and use it for the class: <code>\"bio-meter is-\" + status</code>. One decision, used everywhere.",
+   "For \"over\", flip the sign: <code>-remaining + \" characters over\"</code>.",
+   "Disable with <code>disabled={isOver}</code>, and style it with <code>.btn-primary:disabled</code> (already in the CSS).",
+   "For the bar, search: <b>mdn Math.min</b>. <code>Math.min(100, (length / BIO_LIMIT) * 100)</code>."
+  ],
+  "rubric": [
+   "No new state: all derived from bio.length",
+   "Status decided once, reused for color and text",
+   "Singular / plural and \"over\" wording correct",
+   "Save disabled exactly when over",
+   "Counter placed inside the existing Field",
+   "Bar width capped at 100%"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#7C6CF2"
+    ],
+    [
+     "--warn",
+     "#F5A524"
+    ],
+    [
+     "--danger",
+     "#F2556B"
+    ],
+    [
+     "--muted",
+     "#8C93B0"
+    ],
+    [
+     "--surface-2 (bar track)",
+     "#1D2238"
+    ]
+   ],
+   "notes": [
+    [
+     "Meter row",
+     "mt 8 · gap 12 · center"
+    ],
+    [
+     "Counter",
+     "12 · mono · nowrap"
+    ],
+    [
+     "Bar",
+     "h 4 · pill · flex 1"
+    ],
+    [
+     "Over textarea",
+     "border --danger · 3px ring"
+    ]
+   ]
+  }
+ },
+ "dc03": {
+  "kind": "drill",
+  "level": 1,
+  "order": 3,
+  "minutes": 12,
+  "changeAt": 8,
+  "title": "Password show/hide + strength",
+  "focus": "src/App.tsx",
+  "summary": "A bank sign-up form. Add a Show/Hide toggle and a 3-level strength meter derived from the password.",
+  "skills": [
+   "boolean toggle",
+   "derived values",
+   "regex test",
+   "segmented meter"
+  ],
+  "brief": "<p>The account sign-up form for <b>Ledgerly</b>, a business bank. <code>SignUpForm</code> already holds <code>email</code> and <code>password</code> as controlled inputs. The password input sits in an empty <code>.password-wrap</code> (already <code>position: relative</code>). No API.</p><p>The strength rules: <b>8+ characters</b>, <b>contains a number</b>, <b>contains a symbol</b> (anything not a letter or digit). Each rule met adds one level.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Only one new piece of state: <code>showPassword</code>. The strength is derived from <code>password</code>, so I'll write a pure <code>getRules(password)</code> that returns three rules with <code>met</code> booleans, count them for the score, and pass that to a <code>StrengthMeter</code>. Empty password shows nothing; anything typed is at least Weak.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "A <b>Show</b> text button inside the right edge of the password field switches the input to plain text and its label to <b>Hide</b>. Clicking again hides it. It must not submit the form",
+   "Under the password: 3 bar segments + a label. Score = rules met. 1 → <b>Weak</b> (1 red segment), 2 → <b>Fair</b> (2 amber), 3 → <b>Strong</b> (3 green). Empty password: grey segments, no label. Typed but 0 rules met still shows Weak",
+   "<b>Create account</b> is disabled until the email contains \"@\" and the password is Strong"
+  ],
+  "change": {
+   "title": "Show the rules",
+   "html": "<p>\"Users don't know what makes it Strong.\"</p><ul><li>Under the meter, list the three rules: \"At least 8 characters\", \"Contains a number\", \"Contains a symbol\".</li><li>Unmet: muted with ○. Met: green with ✓. Updates as you type.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if your rules are already an array of <code>{ id, label, met }</code>, this is one <code>.map</code>.</p>"
+  },
+  "hints": [
+   "The toggle is <code>type={inputType}</code> where <code>inputType</code> is <code>\"password\"</code> or <code>\"text\"</code>, decided above the return.",
+   "A <code>&lt;button&gt;</code> inside a form submits it by default. Give it <code>type=\"button\"</code>. Search: <b>mdn button type attribute</b>.",
+   "Test a string with a regex: <code>/\\d/.test(password)</code> for a number, <code>/[^A-Za-z0-9]/.test(password)</code> for a symbol. Search: <b>mdn RegExp test</b>.",
+   "Score: <code>rules.filter((r) =&gt; { return r.met; }).length</code>. Level: <code>0</code> if empty, else <code>Math.max(score, 1)</code>.",
+   "Segments: <code>[1, 2, 3].map((n) =&gt; { ... })</code> with <code>is-on</code> when <code>n &lt;= level</code>, and one class on the wrapper (<code>is-weak</code> / <code>is-fair</code> / <code>is-strong</code>) to color them."
+  ],
+  "rubric": [
+   "Only showPassword is new state; strength is derived",
+   "Rules written as a pure function",
+   "Toggle button is type=\"button\" and labelled",
+   "Empty vs typed handled",
+   "Segments built with map, colored by one wrapper class",
+   "Submit gate uses the same derived values"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0E7C66"
+    ],
+    [
+     "--weak",
+     "#D64545"
+    ],
+    [
+     "--fair",
+     "#E3A008"
+    ],
+    [
+     "--strong",
+     "#12A150"
+    ],
+    [
+     "--track",
+     "#E4EBE8"
+    ],
+    [
+     "--ink",
+     "#0B2A26"
+    ]
+   ],
+   "notes": [
+    [
+     "Show button",
+     "abs right 6 · h 30 · 13/600 · --primary"
+    ],
+    [
+     "Input",
+     "h 42 · radius 10 · pad-right 64"
+    ],
+    [
+     "Segments",
+     "3 cols · gap 6 · h 4 · pill"
+    ],
+    [
+     "Label",
+     "12/600 · w 48 · right"
+    ],
+    [
+     "Rules",
+     "13 · gap 4"
+    ]
+   ]
+  }
+ },
+ "dc04": {
+  "kind": "drill",
+  "level": 1,
+  "order": 4,
+  "minutes": 12,
+  "changeAt": 8,
+  "title": "Product page tabs",
+  "focus": "src/App.tsx",
+  "summary": "A coffee-gear product page. Turn the details section into Description / Specs / Reviews tabs.",
+  "skills": [
+   "active tab state",
+   "conditional render",
+   "reusing components",
+   "lifting state"
+  ],
+  "brief": "<p>A product page for <b>Kettle &amp; Co.</b> <code>ProductPage</code> already loads the product from <code>api.ts</code> (<code>getProduct</code> waits 0.4–1.2 s) and shows \"Loading product…\" first. Below the summary it only shows the description.</p><p>Read <code>components/Panels.tsx</code>: <code>DescriptionPanel</code>, <code>SpecsTable</code> and <code>ReviewList</code> are already built. Your job is the tab bar that switches between them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One piece of state: which tab is active, as an id string, default <code>\"description\"</code>. I'll make a <code>ProductTabs</code> component with an array of <code>{ id, label }</code> and map it to buttons. The panel is chosen above the return with an if/else. If anything outside the tabs ever needs to switch tab, the state moves up to <code>ProductPage</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "A tab bar with <b>Description</b>, <b>Specs</b> and <b>Reviews (3)</b> (the count comes from the data). Description is active on load",
+   "Clicking a tab shows only that panel (reuse the three panel components). The active tab is dark, weight 600, with a 2px <code>--accent</code> underline sitting on the bar's bottom border",
+   "Tabs are <code>&lt;button&gt;</code>s with <code>role=\"tab\"</code> and <code>aria-selected</code>; the bar has <code>role=\"tablist\"</code>"
+  ],
+  "change": {
+   "title": "Rating link jumps to reviews",
+   "html": "<p>\"People click the star rating expecting reviews.\"</p><ul><li>Make \"★ 4.7 · 3 reviews\" in the summary a link-style button (underlined).</li><li>Clicking it switches the tabs to <b>Reviews</b>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>ProductSummary</code> and the tabs are siblings. Where must <code>activeTab</code> live now?</p>"
+  },
+  "hints": [
+   "State: <code>const [activeTab, setActiveTab] = useState&lt;TabId&gt;(\"description\");</code> with <code>type TabId = \"description\" | \"specs\" | \"reviews\";</code>",
+   "Choose the panel above the return: <code>let panel = &lt;DescriptionPanel ... /&gt;; if (activeTab === \"specs\") { panel = ...; }</code>",
+   "The underline: <code>position: relative</code> on the tab and an <code>::after</code> at <code>bottom: -1px</code>, 2px high. Search: <b>mdn ::after pseudo-element</b>.",
+   "For the change, lift <code>activeTab</code> to <code>ProductPage</code> and pass <code>activeTab</code> + <code>onChange</code> down to the tabs, and an <code>onReviewsClick</code> to the summary."
+  ],
+  "rubric": [
+   "Active tab stored as an id, not three booleans",
+   "Panel chosen above the return",
+   "Reused the existing panel components",
+   "Review count derived from data",
+   "Lifted state cleanly for the change",
+   "Tab semantics (role, aria-selected)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--accent",
+     "#B5532A"
+    ],
+    [
+     "--text",
+     "#2B2420"
+    ],
+    [
+     "--muted",
+     "#7D716A"
+    ],
+    [
+     "--line",
+     "#E6DDD3"
+    ]
+   ],
+   "notes": [
+    [
+     "Tab bar",
+     "gap 28 · 1px bottom --line · mb 20"
+    ],
+    [
+     "Tab",
+     "pad 12 0 · 15 · muted"
+    ],
+    [
+     "Active tab",
+     "--text · 600 · 2px --accent underline at -1px"
+    ],
+    [
+     "Rating link",
+     "14 · underline offset 3"
+    ]
+   ]
+  }
+ },
+ "dc05": {
+  "kind": "drill",
+  "level": 1,
+  "order": 5,
+  "minutes": 12,
+  "changeAt": 8,
+  "title": "FAQ accordion",
+  "focus": "src/App.tsx",
+  "summary": "A hosting pricing page. Make the FAQ an accordion: one item open at a time, chevron rotates.",
+  "skills": [
+   "single selected id",
+   "toggle off",
+   "conditional render",
+   "object map state"
+  ],
+  "brief": "<p>The pricing page for <b>Skyport</b>, a deploy platform. <code>FaqSection</code> maps <code>FAQS</code> (in <code>data/faqs.ts</code>) to <code>FaqItem</code>s. Each question is already a button with a <code>ChevronIcon</code> (points down). Nothing opens yet. No API.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One item open at a time means the state is a single <code>openId</code> (string or null) in <code>FaqSection</code>, not a boolean in each item. Each <code>FaqItem</code> gets <code>isOpen</code> and <code>onToggle(id)</code>. Toggle: if the clicked id is already open, set null, otherwise set it. The chevron rotation is pure CSS on an <code>is-open</code> class.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking a question shows its answer below it. Opening another question closes the one that was open",
+   "Clicking the open question closes it. The open item's chevron rotates 180° (animated)",
+   "The open item has a highlighted background and its question turns <code>--primary</code>. The question button has <code>aria-expanded</code>"
+  ],
+  "change": {
+   "title": "Was this helpful?",
+   "html": "<p>\"Support wants to know which answers work.\"</p><ul><li>Under each open answer: \"Was this helpful?\" with <b>Yes</b> and <b>No</b> pill buttons.</li><li>After a vote, the buttons are replaced by \"Thanks for the feedback!\" for that question. It stays that way after closing and reopening it.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one object keyed by question id, e.g. <code>{ q2: \"yes\" }</code>, living next to <code>openId</code>.</p>"
+  },
+  "hints": [
+   "<code>const [openId, setOpenId] = useState&lt;string | null&gt;(null);</code> in <code>FaqSection</code>.",
+   "Toggle: <code>setOpenId((prev) =&gt; { if (prev === id) { return null; } return id; });</code>",
+   "In the map: <code>const isOpen = faq.id === openId;</code> then pass it down.",
+   "Rotate: <code>.faq-item.is-open .chevron { transform: rotate(180deg); }</code> plus a <code>transition</code> on <code>.chevron</code>. Search: <b>mdn css transform rotate</b>.",
+   "Change: <code>setVotes((prev) =&gt; { return { ...prev, [id]: vote }; });</code> Search: <b>mdn computed property names</b> for <code>[id]</code>."
+  ],
+  "rubric": [
+   "Single openId instead of per-item booleans",
+   "Clicking the open item closes it",
+   "Items are dumb: isOpen + onToggle props",
+   "Rotation done in CSS from one class",
+   "Votes keyed by id, immutable update",
+   "aria-expanded on the button"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#8B7CFF"
+    ],
+    [
+     "--accent",
+     "#43E6C4"
+    ],
+    [
+     "--surface",
+     "#14142B"
+    ],
+    [
+     "--surface-2 (open)",
+     "#1B1B38"
+    ],
+    [
+     "Open border",
+     "#3B3470"
+    ],
+    [
+     "--muted",
+     "#9A9AC0"
+    ]
+   ],
+   "notes": [
+    [
+     "Item",
+     "radius 12 · gap 8"
+    ],
+    [
+     "Question",
+     "pad 16 18 · 15/600"
+    ],
+    [
+     "Answer",
+     "pad 0 18 16 · 14 · lh 1.6 · muted"
+    ],
+    [
+     "Chevron",
+     "18 · rotate 180 · 0.2s"
+    ],
+    [
+     "Vote pills",
+     "h 28 · pad 0 12 · pill"
+    ]
+   ]
+  }
+ },
+ "dc06": {
+  "kind": "drill",
+  "level": 1,
+  "order": 6,
+  "minutes": 15,
+  "changeAt": 10,
+  "title": "Study planner todos",
+  "focus": "src/App.tsx",
+  "summary": "A student planner loads tasks from a slow API. Add, toggle, delete, and show how many are left.",
+  "skills": [
+   "add/toggle/delete in an array",
+   "form submit",
+   "immutable updates",
+   "derived count"
+  ],
+  "brief": "<p>A weekly planner, <b>studyhall</b>. <code>Planner</code> already loads tasks from <code>api.ts</code> (<code>getTasks</code> waits 0.5–1.2 s) with a loading state, and renders <code>TaskRow</code>s. The checkbox is read-only, the × does nothing, and the add input is not wired.</p><p>Read <code>utils/id.ts</code>: new tasks need ids.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list lives in <code>Planner</code> (it's already there). <code>AddTask</code> owns only its draft text and calls <code>onAdd(title)</code>. <code>TaskRow</code> gets <code>onToggle(id)</code> and <code>onDelete(id)</code>. All three updates use the updater form: spread to add, map to toggle, filter to delete. The 'left' count is derived with filter.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Typing a title and pressing <b>Enter</b> or clicking <b>Add</b> adds it to the <b>bottom</b> of the list (not done, subject \"Inbox\") and clears the input. Blank / spaces-only input adds nothing, and Add is disabled while blank",
+   "Clicking a checkbox toggles that task: done tasks are struck through and muted",
+   "The <b>×</b> button deletes that task",
+   "The header shows a yellow pill <b>\"3 left\"</b> (count of not-done tasks), updating live; <b>\"All done\"</b> (green) at 0. Nothing shows while loading"
+  ],
+  "change": {
+   "title": "Clear completed",
+   "html": "<p>\"Done tasks pile up all week.\"</p><ul><li>Below the list, a right-aligned <b>Clear completed (2)</b> button with the number of done tasks.</li><li>It only appears when at least one task is done, and removes all done tasks.</li></ul>"
+  },
+  "hints": [
+   "Wrap the input and button in a <code>&lt;form onSubmit&gt;</code> and you get Enter for free. Call <code>e.preventDefault()</code>. Search: <b>mdn submit event preventDefault</b>.",
+   "Add: <code>setTasks((prev) =&gt; { return [...prev, task]; });</code> with <code>id: makeId(\"t\")</code>.",
+   "Toggle: <code>prev.map((t) =&gt; { if (t.id !== id) { return t; } return { ...t, done: !t.done }; })</code>. Never set <code>t.done</code> directly.",
+   "Delete / clear: <code>prev.filter(...)</code>. Count: <code>tasks.filter((t) =&gt; { return !t.done; }).length</code>."
+  ],
+  "rubric": [
+   "List state stays in Planner; AddTask owns only the draft",
+   "Form submit with preventDefault (Enter works)",
+   "Trimmed empty input ignored",
+   "map / filter / spread, no mutation",
+   "Count derived, not stored",
+   "Reused makeId",
+   "Change only renders when needed"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#3D5AFE"
+    ],
+    [
+     "--highlight (left pill)",
+     "#FFD54A"
+    ],
+    [
+     "All done pill",
+     "#DDF7E6 / #1B7F45"
+    ],
+    [
+     "--danger",
+     "#E5484D"
+    ],
+    [
+     "--line",
+     "#EFE6D2"
+    ],
+    [
+     "--ink",
+     "#2D2A32"
+    ]
+   ],
+   "notes": [
+    [
+     "Add input",
+     "h 42 · radius 12 · 2px border"
+    ],
+    [
+     "Left pill",
+     "13/800 · pad 4 10 · pill"
+    ],
+    [
+     "Done row",
+     "line-through · muted"
+    ],
+    [
+     "Footer",
+     "pt 12 · 2px top --line · right"
+    ],
+    [
+     "Clear button",
+     "13/700 · muted → danger on hover"
+    ]
+   ]
+  }
+ },
+ "dc07": {
+  "kind": "drill",
+  "level": 1,
+  "order": 7,
+  "minutes": 15,
+  "changeAt": 11,
+  "title": "Searchable staff directory",
+  "focus": "src/App.tsx",
+  "summary": "A hospital care-team directory. Load staff from a slow API, then filter by name or role as you type.",
+  "skills": [
+   "useEffect fetch",
+   "loading state",
+   "controlled search",
+   "derived filter",
+   "empty state"
+  ],
+  "brief": "<p>The staff directory for <b>Cedar Health</b>. The page, toolbar and search box exist, and <code>StaffCard</code> (in <code>components/</code>) renders one person. But <code>staff</code> is an empty array: you load it.</p><p>Read <code>api.ts</code> first. <code>getStaff()</code> returns a Promise and takes a random 0.4–1.3 s, so you need <code>useEffect</code> + <code>.then</code> + a loading state.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Directory</code>: <code>staff</code>, <code>loading</code> and <code>query</code>. Load once in a <code>useEffect</code> with a cancelled guard. The visible list is derived: lowercase the trimmed query and keep people whose name or role includes it. Then one if/else chain above the return for loading / no matches / list.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "On load, show <b>\"Loading care team…\"</b> until <code>getStaff()</code> resolves, then the list of <code>StaffCard</code>s",
+   "The search input is controlled and filters by <b>name or role</b>, case-insensitive, ignoring surrounding spaces (\"nurse\" finds both nurses, \"  PRIYA \" finds Dr. Priya Nair)",
+   "Above the list (after loading): <b>\"Showing 2 of 9\"</b>",
+   "When nothing matches: <b>No matches for “xyz”.</b> and a <b>Clear search</b> link-button that empties the input"
+  ],
+  "change": {
+   "title": "On call now",
+   "html": "<p>\"At night, people only want who's on call.\"</p><ul><li>Add an <b>On call now</b> pill button to the right of the search.</li><li>When on (green, <code>aria-pressed</code>), only on-call staff show. It combines with the search, and the count stays right.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one more boolean, one more condition in the same <code>filter</code>.</p>"
+  },
+  "hints": [
+   "Copy the loading shape: <code>useEffect(() =&gt; { let cancelled = false; getStaff().then((data) =&gt; { if (cancelled) { return; } setStaff(data); setLoading(false); }); return () =&gt; { cancelled = true; }; }, []);</code>",
+   "Type the state: <code>useState&lt;Staff[]&gt;([])</code>, and <code>import type { Staff } from \"./api\";</code>",
+   "Normalize once above the filter: <code>const q = query.trim().toLowerCase();</code>. Search: <b>mdn String includes</b>.",
+   "Decide the body above the return: <code>let body; if (loading) { ... } else if (visible.length === 0) { ... } else { ... }</code>"
+  ],
+  "rubric": [
+   "Loading pattern with a cancelled guard",
+   "Filtered list derived, not stored",
+   "Case-insensitive, trimmed match on two fields",
+   "Loading, empty and list states all handled",
+   "Reused StaffCard",
+   "Filters combine in one pass"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0A7EA4"
+    ],
+    [
+     "--primary-soft",
+     "#E3F2F8"
+    ],
+    [
+     "--oncall",
+     "#1F9D63"
+    ],
+    [
+     "On chip bg",
+     "#E4F6EC"
+    ],
+    [
+     "--line",
+     "#DCE5EB"
+    ],
+    [
+     "--text",
+     "#13293D"
+    ]
+   ],
+   "notes": [
+    [
+     "Search",
+     "h 40 · radius 10"
+    ],
+    [
+     "Count",
+     "13 · muted · mb 8"
+    ],
+    [
+     "Empty state",
+     "pad 32 16 · dashed border · center"
+    ],
+    [
+     "Chip",
+     "h 40 · pill · pad 0 14"
+    ]
+   ]
+  }
+ },
+ "dc08": {
+  "kind": "drill",
+  "level": 1,
+  "order": 8,
+  "minutes": 10,
+  "changeAt": 7,
+  "title": "Ticket quantity stepper",
+  "focus": "src/App.tsx",
+  "summary": "A concert checkout panel. Make the − / + stepper work between 1 and 8 and keep the totals right.",
+  "skills": [
+   "number state",
+   "clamping",
+   "disabled at bounds",
+   "reusing a formatter"
+  ],
+  "brief": "<p>A ticket checkout for <b>gigbox</b>. <code>TicketPanel</code> shows the tier, a static stepper showing \"1\", a subtotal and Checkout. The event data is in <code>data/event.ts</code>. No API.</p><p>Read <code>utils/money.ts</code>: <code>formatPrice(cents)</code> already formats every price on the page. All prices are in <b>cents</b>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One number in state, <code>qty</code>, starting at 1 in <code>TicketPanel</code>. − and + use the updater form and clamp with <code>Math.max</code> / <code>Math.min</code>, so they can't go out of range even with fast clicks. <code>atMin</code>, <code>atMax</code> and the totals are all derived from <code>qty</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "<b>−</b> and <b>+</b> change the quantity by 1. It starts at 1, never goes below 1 or above 8",
+   "<b>−</b> is disabled (faded, not-allowed cursor) at 1 and <b>+</b> is disabled at 8",
+   "The subtotal row reads <b>\"Subtotal (3 × $48.00)\"</b> and <b>$144.00</b>, using <code>formatPrice</code>",
+   "At 8, an amber note under the stepper: <b>\"Max 8 tickets per order\"</b>. The buttons have <code>aria-label</code>s \"Decrease quantity\" / \"Increase quantity\""
+  ],
+  "change": {
+   "title": "Fees and total",
+   "html": "<p>\"Legal says the fees must be shown before checkout.\"</p><ul><li>Add a muted <b>Service fees</b> row: <code>event.feeCents</code> × quantity.</li><li>Add a bold <b>Total</b> row (subtotal + fees) with a top border.</li><li>The button reads <b>\"Checkout · $105.00\"</b> (for 2 tickets).</li></ul>"
+  },
+  "hints": [
+   "<code>const [qty, setQty] = useState(1);</code>. Pull 1 and 8 into <code>MIN_QTY</code> / <code>MAX_QTY</code> constants.",
+   "Clamp in the updater: <code>setQty((prev) =&gt; { return Math.min(MAX_QTY, prev + 1); });</code> Search: <b>mdn Math.min</b>.",
+   "<code>disabled={atMin}</code> where <code>const atMin = qty === MIN_QTY;</code>. Style it with <code>.step-btn:disabled</code>.",
+   "Do math in cents, format once at the end: <code>formatPrice(event.priceCents * qty)</code>."
+  ],
+  "rubric": [
+   "One number in state; everything else derived",
+   "Clamped inside the updater",
+   "Disabled at both bounds, styled",
+   "Reused formatPrice; math in cents",
+   "Labels built above the return",
+   "Accessible button labels"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--hot",
+     "#FF3D7F"
+    ],
+    [
+     "--ink",
+     "#1E1330"
+    ],
+    [
+     "--warn",
+     "#C26A00"
+    ],
+    [
+     "--muted",
+     "#7A6E86"
+    ],
+    [
+     "Stepper track",
+     "#F7EFEA"
+    ]
+   ],
+   "notes": [
+    [
+     "Stepper",
+     "pill · pad 4 · gap 4"
+    ],
+    [
+     "Step button",
+     "34 circle · 18/700"
+    ],
+    [
+     "Disabled",
+     "opacity .35 · no shadow"
+    ],
+    [
+     "Max note",
+     "12/700 · --warn · right"
+    ],
+    [
+     "Total row",
+     "17/800 · 1px top --line"
+    ]
+   ]
+  }
+ },
+ "dc09": {
+  "kind": "drill",
+  "level": 1,
+  "order": 9,
+  "minutes": 15,
+  "changeAt": 11,
+  "title": "Sort-by dropdown",
+  "focus": "src/App.tsx",
+  "summary": "A vacation-stays listing. Build a \"Sort by\" dropdown that re-sorts the results and closes on outside click.",
+  "skills": [
+   "open/close state",
+   "useRef + contains",
+   "document listener cleanup",
+   "copy before sort"
+  ],
+  "brief": "<p>Search results for <b>staybird</b>. <code>StaysPage</code> already loads stays from <code>api.ts</code> (<code>getStays</code> waits 0.3–1.0 s, in \"Recommended\" order) and renders <code>StayCard</code>s. The <code>SortMenu</code> button is there but does nothing.</p><p><code>useRef</code> is already imported. You will need it.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Two pieces of state in two places. <code>sortKey</code> goes in <code>StaysPage</code> because the list needs it. <code>open</code> stays inside <code>SortMenu</code> because nobody else cares. The menu takes <code>value</code> + <code>onChange</code>. Sorting is a pure function that copies first, and Recommended returns the API order untouched. For outside click: a ref on the wrapper and a document <code>mousedown</code> listener only while open.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking the button opens a menu below it, right-aligned: <b>Recommended</b>, <b>Price: low to high</b>, <b>Price: high to low</b>, <b>Top rated</b>. Clicking the button again closes it",
+   "Choosing an option closes the menu, shows it in the button (\"Sort by: <b>Top rated</b>\"), and re-sorts the grid. Recommended restores the original API order. Do not mutate the loaded array",
+   "Clicking anywhere outside the menu closes it (the listener is removed when it closes)"
+  ],
+  "change": {
+   "title": "Escape + checkmark",
+   "html": "<p>\"QA filed two bugs against the dropdown.\"</p><ul><li>Pressing <b>Escape</b> closes the menu.</li><li>The selected option is highlighted (<code>--primary-soft</code>, primary text) with a <b>✓</b> on the right.</li></ul>"
+  },
+  "hints": [
+   "<code>.sort()</code> sorts in place. Copy first: <code>const copy = [...stays]; copy.sort((a, b) =&gt; { return a.pricePerNight - b.pricePerNight; });</code>",
+   "Find the label: <code>SORT_OPTIONS.find((o) =&gt; { return o.key === value; })</code>.",
+   "Outside click: <code>const wrapRef = useRef&lt;HTMLDivElement&gt;(null);</code> on the wrapper, then in the listener <code>if (wrapRef.current &amp;&amp; !wrapRef.current.contains(e.target as Node)) { setOpen(false); }</code>. Search: <b>mdn Node contains</b>.",
+   "Add the listener in a <code>useEffect</code> that depends on <code>[open]</code>, return early when closed, and remove it in the cleanup."
+  ],
+  "rubric": [
+   "sortKey in the page, open in the menu",
+   "Copied before sorting; recommended = original order",
+   "Sorted list derived, not stored",
+   "Outside click via ref.contains",
+   "Listener cleaned up",
+   "Menu closes on select",
+   "Escape handled in the same effect"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#1F5C45"
+    ],
+    [
+     "--primary-soft",
+     "#E6F0EA"
+    ],
+    [
+     "--line",
+     "#E5DED1"
+    ],
+    [
+     "--bg (option hover)",
+     "#F6F2EA"
+    ],
+    [
+     "Menu shadow",
+     "rgba(31,42,36,.14)"
+    ]
+   ],
+   "notes": [
+    [
+     "Menu",
+     "abs · right 0 · top 100% + 6 · min-w 210 · radius 12 · pad 6"
+    ],
+    [
+     "Option",
+     "pad 9 12 · radius 8 · 14"
+    ],
+    [
+     "Selected",
+     "600 · --primary · ✓ right"
+    ]
+   ]
+  }
+ },
+ "dc10": {
+  "kind": "drill",
+  "level": 1,
+  "order": 10,
+  "minutes": 15,
+  "changeAt": 11,
+  "title": "Star rating input",
+  "focus": "src/App.tsx",
+  "summary": "A food-delivery review form. Build interactive stars with hover preview, a label, and a clear button.",
+  "skills": [
+   "hover state",
+   "controlled component",
+   "value vs preview",
+   "multi-select array"
+  ],
+  "brief": "<p>The \"rate your order\" screen of <b>forkful</b>. <code>ReviewForm</code> has the order summary, a comment box and Submit (which shows <code>ThankYou</code>). <code>StarRating</code> is five grey static stars. No API.</p><p>Read <code>data/order.ts</code>: <code>LABELS</code> maps a star count to a word.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The rating is submitted, so <code>rating</code> lives in <code>ReviewForm</code> and <code>StarRating</code> is controlled with <code>value</code> + <code>onChange</code>. Hover is purely visual, so <code>hover</code> is local state in <code>StarRating</code>. What I show is <code>hover</code> if hovering, otherwise <code>value</code>. Leaving the whole stars row resets hover to 0.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Hovering star N fills stars 1..N gold (<code>--star</code>) as a preview. Moving the mouse off the stars restores the saved rating",
+   "Clicking star N sets the rating to N. Under the stars, the label shows the word for what is shown (<b>Terrible / Poor / Okay / Good / Excellent</b>), or muted <b>\"Tap a star to rate\"</b> when 0",
+   "<b>Submit review</b> is disabled until a rating is set",
+   "A <b>Clear</b> link-button appears under the label once rated and resets to 0. Each star is a button with <code>aria-label</code> \"Rate 3 out of 5\""
+  ],
+  "change": {
+   "title": "What went wrong?",
+   "html": "<p>\"For 1–2 stars we need a reason.\"</p><ul><li>When the rating is 1 or 2, show \"What went wrong?\" with pill chips: <b>Late</b>, <b>Cold food</b>, <b>Missing item</b>, <b>Wrong order</b>. Several can be selected (tinted red when on).</li><li>With 1–2 stars, Submit stays disabled until at least one chip is on. At 3+ stars the chips disappear and are not required.</li></ul>"
+  },
+  "hints": [
+   "Controlled component: <code>function StarRating({ value, onChange }: { value: number; onChange: (n: number) =&gt; void })</code>.",
+   "Preview: <code>let shown = value; if (hover &gt; 0) { shown = hover; }</code> then star N is on when <code>n &lt;= shown</code>.",
+   "Use <code>onMouseEnter</code> on each star and one <code>onMouseLeave</code> on the row. Search: <b>mdn mouseenter vs mouseover</b>.",
+   "Stars are buttons inside a form, so <code>type=\"button\"</code> or they submit it.",
+   "Change: <code>problems: string[]</code>. Toggle with <code>includes</code> then <code>filter</code> or spread."
+  ],
+  "rubric": [
+   "rating in the form, hover local to the stars",
+   "Shown value derived from hover ?? value",
+   "Stars mapped from [1..5], not copy-pasted",
+   "type=\"button\" on stars",
+   "Submit gate derived",
+   "Multi-select chips updated immutably"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--star",
+     "#FFB21E"
+    ],
+    [
+     "--star-empty",
+     "#DADAE0"
+    ],
+    [
+     "--primary",
+     "#E23D28"
+    ],
+    [
+     "Chip on",
+     "#FDECE9"
+    ],
+    [
+     "--muted",
+     "#74747F"
+    ]
+   ],
+   "notes": [
+    [
+     "Star",
+     "36px · gap 4 · scale 1.12 on hover"
+    ],
+    [
+     "Label",
+     "15/700 · min-h 20"
+    ],
+    [
+     "Clear",
+     "13 · muted · underline"
+    ],
+    [
+     "Chips",
+     "h 34 · pill · gap 8 · wrap"
+    ]
+   ]
+  }
+ }
+}

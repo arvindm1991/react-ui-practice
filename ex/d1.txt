@@ -1,0 +1,145 @@
+@@@ shared src/App.jsx
+import React from 'react';
+
+const user = {
+  name: 'Maya Okafor',
+  role: 'Product Designer · Research Tools',
+  initials: 'MO',
+};
+
+const stats = [
+  { label: 'Projects', value: 24 },
+  { label: 'Reviews', value: 138 },
+  { label: 'Followers', value: '1.2k' },
+];
+
+// The markup is done. Your job is the CSS in styles.css.
+export default function App() {
+  return (
+    <div className="page">
+      <section className="profile-card">
+        <header className="profile-header">
+          <div className="avatar">{user.initials}</div>
+          <div className="identity">
+            <h2 className="name">{user.name}</h2>
+            <p className="role">{user.role}</p>
+          </div>
+          <button className="btn-primary">Message</button>
+        </header>
+        <ul className="stats">
+          {stats.map((s) => (
+            <li key={s.label} className="stat">
+              <span className="stat-value">{s.value}</span>
+              <span className="stat-label">{s.label}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+/* Match the design in the Design tab.
+   Use Inspect mode there to read exact sizes, spacing and colors. */
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@@@ solution src/styles.css
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F4F5F7;
+  color: #1C2230;
+}
+
+.page { padding: 32px; }
+
+.profile-card {
+  max-width: 480px;
+  background: #FFFFFF;
+  border: 1px solid #E3E6EB;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+/* Figma auto layout: horizontal, gap 12, align center */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;            /* never let flex squash the circle */
+  border-radius: 50%;
+  background: #E8EEFF;
+  color: #3451D1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* "Fill container" in Figma = flex: 1. min-width: 0 lets text truncate. */
+.identity { flex: 1; min-width: 0; }
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.role {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #626B7F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-primary {
+  background: #3451D1;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:hover { background: #2A43B3; }
+.btn-primary:focus-visible { outline: 2px solid #3451D1; outline-offset: 2px; }
+
+.stats {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid #E3E6EB;
+  display: flex;
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-value { font-size: 18px; font-weight: 600; }
+
+.stat-label {
+  font-size: 12px;
+  color: #626B7F;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

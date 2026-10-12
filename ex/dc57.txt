@@ -1,0 +1,620 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+// Every task has a `version`. Writes must send the version you last saw;
+// if someone else saved since then, the server refuses with a ConflictError.
+export type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+  version: number;
+  updatedBy: string;
+};
+
+export class ConflictError extends Error {
+  taskId: string;
+  constructor(taskId: string) {
+    super('Version mismatch on ' + taskId);
+    this.name = 'ConflictError';
+    this.taskId = taskId;
+  }
+}
+
+let DB: Task[] = [
+  { id: 't1', title: 'Book the main stage and PA system', done: true, version: 4, updatedBy: 'Marco' },
+  { id: 't2', title: 'Send vendor contracts for signature', done: false, version: 2, updatedBy: 'You' },
+  { id: 't3', title: 'Confirm food truck lineup', done: false, version: 1, updatedBy: 'Priya' },
+  { id: 't4', title: 'Order 2,000 wristbands', done: true, version: 3, updatedBy: 'Lena' },
+  { id: 't5', title: 'Schedule volunteer shifts', done: false, version: 1, updatedBy: 'Marco' },
+  { id: 't6', title: 'Arrange waste and recycling stations', done: false, version: 1, updatedBy: 'You' },
+];
+let priyaEdited = false;
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function find(id: string): Task {
+  const t = DB.find((x) => x.id === id);
+  if (!t) {
+    throw new Error('Task ' + id + ' not found');
+  }
+  return t;
+}
+
+// GET /events/harborfest/tasks -> Task[]
+export async function getTasks(): Promise<Task[]> {
+  await randomDelay(400, 900);
+  const snapshot = DB.map((t) => ({ ...t }));
+  // Simulation: right after you load, Priya edits task #3 in another tab.
+  if (!priyaEdited) {
+    priyaEdited = true;
+    DB = DB.map((t) => (t.id === 't3' ? { ...t, title: 'Confirm food truck lineup (8 trucks, 2 vegan)', version: 2, updatedBy: 'Priya' } : t));
+  }
+  return snapshot;
+}
+
+// GET /tasks/:id -> the latest version
+export async function getTask(id: string): Promise<Task> {
+  await randomDelay(300, 700);
+  return { ...find(id) };
+}
+
+// PATCH /tasks/:id  { title?, done?, version } -> the saved task (with a new version)
+export async function updateTask(id: string, patch: { title?: string; done?: boolean }, version: number): Promise<Task> {
+  await randomDelay(400, 900);
+  const current = find(id);
+  if (current.version !== version) {
+    throw new ConflictError(id);
+  }
+  const saved: Task = { ...current, ...patch, version: current.version + 1, updatedBy: 'You' };
+  DB = DB.map((t) => (t.id === id ? saved : t));
+  return { ...saved };
+}
+
+// DELETE /tasks/:id?version=N
+export async function deleteTask(id: string, version: number): Promise<void> {
+  await randomDelay(400, 900);
+  const current = find(id);
+  if (current.version !== version) {
+    throw new ConflictError(id);
+  }
+  DB = DB.filter((t) => t.id !== id);
+}
+@@@ shared src/components/Presence.tsx
+import React from 'react';
+
+const PEOPLE = [
+  { name: 'Priya', color: '#7C5CFF' },
+  { name: 'Marco', color: '#0EA5A4' },
+  { name: 'Lena', color: '#F59E0B' },
+];
+
+// Who else has this list open (decorative).
+export default function Presence() {
+  return (
+    <div className="presence" aria-label="Also viewing: Priya, Marco, Lena">
+      {PEOPLE.map((p) => {
+        return (
+          <span key={p.name} className="presence-dot" style={{ background: p.color }} title={p.name}>
+            {p.name[0]}
+          </span>
+        );
+      })}
+      <span className="presence-label">3 others viewing</span>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTasks } from './api';
+import type { Task } from './api';
+import Presence from './components/Presence';
+
+function ProgressHeader({ tasks }: { tasks: Task[] }) {
+  const done = tasks.filter((t) => {
+    return t.done;
+  }).length;
+  let pct = 0;
+  if (tasks.length > 0) {
+    pct = Math.round((done / tasks.length) * 100);
+  }
+  return (
+    <div className="progress">
+      <div className="progress-text">
+        <b>{done} of {tasks.length}</b> done
+      </div>
+      <div className="progress-bar"><span style={{ width: pct + '%' }} /></div>
+    </div>
+  );
+}
+
+function TaskRow({ task }: { task: Task }) {
+  let cls = 'task';
+  if (task.done) {
+    cls = 'task is-done';
+  }
+  // TODO: toggle, rename and delete (see the task)
+  return (
+    <li className={cls}>
+      <input type="checkbox" className="task-check" checked={task.done} readOnly aria-label={'Done: ' + task.title} />
+      <div className="task-main">
+        <span className="task-title">{task.title}</span>
+        <span className="task-meta">Last edited by {task.updatedBy}</span>
+      </div>
+      <button type="button" className="icon-btn" aria-label={'Delete ' + task.title}>✕</button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTasks().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTasks(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let list;
+  if (loading) {
+    list = <p className="loading">Loading checklist…</p>;
+  } else {
+    list = (
+      <ul className="task-list">
+        {tasks.map((t) => {
+          return <TaskRow key={t.id} task={t} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <div>
+          <p className="eyebrow">HarborFest 2026 · Jun 20</p>
+          <h1>Vendor checklist</h1>
+        </div>
+        <Presence />
+      </header>
+      <section className="card">
+        <div className="card-top">
+          <ProgressHeader tasks={tasks} />
+        </div>
+        {list}
+      </section>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FBF7F1;
+  --surface: #FFFFFF;
+  --border: #EFE6DA;
+  --text: #2B2118;
+  --muted: #8A7B6B;
+  --accent: #E4572E;
+  --accent-soft: #FDEBE4;
+  --success: #2F9E6B;
+  --warn-bg: #FFF4DB;
+  --warn-text: #8A5A00;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 640px; margin: 0 auto; padding: 36px 20px 60px; }
+.header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); }
+.header h1 { margin: 4px 0 0; font: 700 28px/1.1 Georgia, 'Times New Roman', serif; }
+
+.presence { display: flex; align-items: center; }
+.presence-dot { width: 26px; height: 26px; margin-left: -6px; border: 2px solid var(--bg); border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.presence-label { margin-left: 8px; font-size: 12px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 0 rgba(43, 33, 24, 0.04); }
+.card-top { display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.progress { flex: 1; display: flex; align-items: center; gap: 12px; }
+.progress-text { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.progress-text b { color: var(--text); }
+.progress-bar { flex: 1; height: 6px; border-radius: 999px; background: #F3ECE2; overflow: hidden; }
+.progress-bar span { display: block; height: 100%; background: var(--success); transition: width 0.3s ease; }
+
+.loading { margin: 0; padding: 30px 18px; text-align: center; color: var(--muted); }
+
+.task-list { list-style: none; margin: 0; padding: 4px 0; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #F6F0E8; }
+.task:last-child { border-bottom: 0; }
+.task-check { width: 18px; height: 18px; margin: 0; accent-color: var(--success); flex-shrink: 0; }
+.task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.task-title { font-weight: 500; }
+.task.is-done .task-title { color: var(--muted); text-decoration: line-through; }
+.task-meta { font-size: 12px; color: var(--muted); }
+
+.icon-btn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTasks, getTask, updateTask, deleteTask, ConflictError } from './api';
+import type { Task } from './api';
+import Presence from './components/Presence';
+
+type Patch = { title?: string; done?: boolean };
+
+function ProgressHeader({ tasks }: { tasks: Task[] }) {
+  const done = tasks.filter((t) => {
+    return t.done;
+  }).length;
+  let pct = 0;
+  if (tasks.length > 0) {
+    pct = Math.round((done / tasks.length) * 100);
+  }
+  return (
+    <div className="progress">
+      <div className="progress-text">
+        <b>{done} of {tasks.length}</b> done
+      </div>
+      <div className="progress-bar"><span style={{ width: pct + '%' }} /></div>
+    </div>
+  );
+}
+
+type TaskRowProps = {
+  task: Task;
+  saving: boolean;
+  conflict: boolean;
+  onToggle: (task: Task) => void;
+  onRename: (task: Task, title: string) => void;
+  onDelete: (task: Task) => void;
+  onReload: (id: string) => void;
+};
+
+function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReload }: TaskRowProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+
+  function startEdit() {
+    setDraft(task.title);
+    setEditing(true);
+  }
+
+  function commit() {
+    setEditing(false);
+    const title = draft.trim();
+    if (title !== '' && title !== task.title) {
+      onRename(task, title);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      commit();
+    } else if (e.key === 'Escape') {
+      setEditing(false); // discard the draft
+    }
+  }
+
+  let cls = 'task';
+  if (task.done) {
+    cls += ' is-done';
+  }
+  if (saving) {
+    cls += ' is-saving';
+  }
+  if (conflict) {
+    cls += ' has-conflict';
+  }
+
+  let title = (
+    <button type="button" className="task-title" disabled={saving} onClick={() => { startEdit(); }} title="Click to rename">
+      {task.title}
+    </button>
+  );
+  if (editing) {
+    title = (
+      <input
+        className="task-input"
+        autoFocus
+        aria-label="Task name"
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); }}
+        onKeyDown={handleKeyDown}
+        onBlur={() => { commit(); }}
+      />
+    );
+  }
+
+  let meta = <span className="task-meta">Last edited by {task.updatedBy}</span>;
+  if (saving) {
+    meta = <span className="task-meta">Saving…</span>;
+  }
+
+  let conflictEl = null;
+  if (conflict) {
+    conflictEl = (
+      <p className="conflict" role="alert">
+        Someone else changed this ·
+        <button type="button" className="conflict-btn" onClick={() => { onReload(task.id); }}>Reload</button>
+      </p>
+    );
+  }
+
+  return (
+    <li className={cls}>
+      <input
+        type="checkbox"
+        className="task-check"
+        checked={task.done}
+        disabled={saving}
+        aria-label={'Done: ' + task.title}
+        onChange={() => { onToggle(task); }}
+      />
+      <div className="task-main">
+        {title}
+        {meta}
+        {conflictEl}
+      </div>
+      <button type="button" className="icon-btn" disabled={saving} aria-label={'Delete ' + task.title} onClick={() => { onDelete(task); }}>✕</button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Per-task flags, keyed by id. Kept out of Task because they're client-only.
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [conflicts, setConflicts] = useState<Record<string, boolean>>({});
+  const [summary, setSummary] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getTasks().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTasks(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function replaceTask(next: Task) {
+    setTasks((prev) => {
+      return prev.map((t) => {
+        if (t.id !== next.id) {
+          return t;
+        }
+        return next;
+      });
+    });
+  }
+
+  function setFlag(setter: typeof setSaving, id: string, on: boolean) {
+    setter((prev) => {
+      const next = { ...prev };
+      if (on) {
+        next[id] = true;
+      } else {
+        delete next[id];
+      }
+      return next;
+    });
+  }
+
+  // Optimistic write. Resolves true/false and never rejects, so callers can batch it.
+  function saveTask(task: Task, patch: Patch): Promise<boolean> {
+    replaceTask({ ...task, ...patch });
+    setFlag(setSaving, task.id, true);
+    setFlag(setConflicts, task.id, false);
+    return updateTask(task.id, patch, task.version)
+      .then((saved) => {
+        replaceTask(saved); // the server's copy has the new version
+        return true;
+      })
+      .catch((err) => {
+        replaceTask(task); // roll back just this task
+        if (err instanceof ConflictError) {
+          setFlag(setConflicts, task.id, true);
+        }
+        return false;
+      })
+      .finally(() => {
+        setFlag(setSaving, task.id, false);
+      });
+  }
+
+  function handleToggle(task: Task) {
+    saveTask(task, { done: !task.done });
+  }
+
+  function handleRename(task: Task, title: string) {
+    saveTask(task, { title });
+  }
+
+  function handleDelete(task: Task) {
+    const index = tasks.findIndex((t) => {
+      return t.id === task.id;
+    });
+    setTasks((prev) => {
+      return prev.filter((t) => {
+        return t.id !== task.id;
+      });
+    });
+    setFlag(setConflicts, task.id, false);
+    deleteTask(task.id, task.version).catch((err) => {
+      // put it back where it was
+      setTasks((prev) => {
+        const next = [...prev];
+        next.splice(Math.min(index, next.length), 0, task);
+        return next;
+      });
+      if (err instanceof ConflictError) {
+        setFlag(setConflicts, task.id, true);
+      }
+    });
+  }
+
+  function handleReload(id: string) {
+    getTask(id).then((latest) => {
+      replaceTask(latest);
+      setFlag(setConflicts, id, false);
+    });
+  }
+
+  // Change: one optimistic save per open task; each one rolls back on its own.
+  function handleMarkAllDone() {
+    const targets = tasks.filter((t) => {
+      return !t.done && !saving[t.id];
+    });
+    if (targets.length === 0) {
+      return;
+    }
+    setSummary('Saving ' + targets.length + ' tasks…');
+    Promise.all(targets.map((t) => {
+      return saveTask(t, { done: true });
+    })).then((results) => {
+      const ok = results.filter(Boolean).length;
+      const failed = targets.length - ok;
+      let msg = 'Marked ' + ok + ' of ' + targets.length + ' tasks done.';
+      if (failed > 0) {
+        msg += ' ' + failed + " couldn't be saved.";
+      }
+      setSummary(msg);
+    });
+  }
+
+  const openCount = tasks.filter((t) => {
+    return !t.done;
+  }).length;
+
+  let list;
+  if (loading) {
+    list = <p className="loading">Loading checklist…</p>;
+  } else {
+    list = (
+      <ul className="task-list">
+        {tasks.map((t) => {
+          return (
+            <TaskRow
+              key={t.id}
+              task={t}
+              saving={Boolean(saving[t.id])}
+              conflict={Boolean(conflicts[t.id])}
+              onToggle={handleToggle}
+              onRename={handleRename}
+              onDelete={handleDelete}
+              onReload={handleReload}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
+
+  let summaryEl = null;
+  if (summary) {
+    summaryEl = <p className="batch-summary" role="status">{summary}</p>;
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <div>
+          <p className="eyebrow">HarborFest 2026 · Jun 20</p>
+          <h1>Vendor checklist</h1>
+        </div>
+        <Presence />
+      </header>
+      <section className="card">
+        <div className="card-top">
+          <ProgressHeader tasks={tasks} />
+          <button type="button" className="btn-secondary" disabled={loading || openCount === 0} onClick={() => { handleMarkAllDone(); }}>Mark all done</button>
+        </div>
+        {summaryEl}
+        {list}
+      </section>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FBF7F1;
+  --surface: #FFFFFF;
+  --border: #EFE6DA;
+  --text: #2B2118;
+  --muted: #8A7B6B;
+  --accent: #E4572E;
+  --accent-soft: #FDEBE4;
+  --success: #2F9E6B;
+  --warn-bg: #FFF4DB;
+  --warn-text: #8A5A00;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 640px; margin: 0 auto; padding: 36px 20px 60px; }
+.header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); }
+.header h1 { margin: 4px 0 0; font: 700 28px/1.1 Georgia, 'Times New Roman', serif; }
+
+.presence { display: flex; align-items: center; }
+.presence-dot { width: 26px; height: 26px; margin-left: -6px; border: 2px solid var(--bg); border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.presence-label { margin-left: 8px; font-size: 12px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 0 rgba(43, 33, 24, 0.04); }
+.card-top { display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.progress { flex: 1; display: flex; align-items: center; gap: 12px; }
+.progress-text { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.progress-text b { color: var(--text); }
+.progress-bar { flex: 1; height: 6px; border-radius: 999px; background: #F3ECE2; overflow: hidden; }
+.progress-bar span { display: block; height: 100%; background: var(--success); transition: width 0.3s ease; }
+
+.loading { margin: 0; padding: 30px 18px; text-align: center; color: var(--muted); }
+
+.task-list { list-style: none; margin: 0; padding: 4px 0; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #F6F0E8; }
+.task:last-child { border-bottom: 0; }
+.task-check { width: 18px; height: 18px; margin: 0; accent-color: var(--success); flex-shrink: 0; }
+.task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.task-title { font-weight: 500; }
+.task.is-done .task-title { color: var(--muted); text-decoration: line-through; }
+.task-meta { font-size: 12px; color: var(--muted); }
+
+.icon-btn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* ---- Added: optimistic edits, conflicts, batch ---- */
+.task { align-items: flex-start; }
+.task-check { margin-top: 3px; cursor: pointer; }
+button.task-title { padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: inherit; text-align: left; cursor: text; border-radius: 4px; }
+button.task-title:hover { background: #FAF5EE; }
+.task-input { font: inherit; font-weight: 500; padding: 2px 6px; margin: -3px -7px 0; border: 1px solid var(--accent); border-radius: 6px; outline: 3px solid var(--accent-soft); color: var(--text); }
+.task.is-saving { opacity: 0.6; }
+.task.is-saving .task-meta { font-style: italic; }
+.task.has-conflict { background: #FFFBF2; }
+
+.conflict { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 5px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--warn-text); font-size: 12.5px; font-weight: 500; width: fit-content; }
+.conflict-btn { padding: 0; border: 0; background: none; color: var(--warn-text); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+
+.btn-secondary { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-secondary:hover:not(:disabled) { border-color: var(--success); color: var(--success); }
+.btn-secondary:disabled { opacity: 0.45; cursor: default; }
+.batch-summary { margin: 0; padding: 9px 18px; background: #F2FAF6; border-bottom: 1px solid var(--border); color: #1F6B49; font-size: 13px; }
+.icon-btn:disabled { opacity: 0.3; cursor: default; }

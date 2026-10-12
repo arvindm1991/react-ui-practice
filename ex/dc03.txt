@@ -1,0 +1,357 @@
+@@@ shared src/components/Logo.tsx
+export function Logo() {
+  return (
+    <div className="logo">
+      <span className="logo-mark">L</span>
+      <span>Ledgerly</span>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { Logo } from './components/Logo';
+
+function BrandPanel() {
+  return (
+    <aside className="brand-panel">
+      <Logo />
+      <h2>Business banking that balances itself.</h2>
+      <ul className="perks">
+        <li>Free ACH and wires</li>
+        <li>Cards for every teammate</li>
+        <li>Books that close in minutes</li>
+      </ul>
+    </aside>
+  );
+}
+
+function SignUpForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  return (
+    <form className="form" onSubmit={(e) => { e.preventDefault(); }}>
+      <h1>Create your account</h1>
+      <p className="sub">Takes about two minutes. No credit check.</p>
+
+      <label className="label" htmlFor="email">Work email</label>
+      <input
+        id="email"
+        className="input"
+        type="email"
+        placeholder="you@company.com"
+        value={email}
+        onChange={(e) => { setEmail(e.target.value); }}
+      />
+
+      <label className="label" htmlFor="password">Password</label>
+      <div className="password-wrap">
+        <input
+          id="password"
+          className="input"
+          type="password"
+          value={password}
+          onChange={(e) => { setPassword(e.target.value); }}
+        />
+      </div>
+
+      <button type="submit" className="btn-primary">Create account</button>
+      <p className="fine">Already have an account? <a href="#">Sign in</a></p>
+    </form>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <BrandPanel />
+      <main className="form-side">
+        <SignUpForm />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F6F5;
+  --surface: #FFFFFF;
+  --ink: #0B2A26;
+  --text: #1C2B29;
+  --muted: #64746F;
+  --border: #D6DFDC;
+  --primary: #0E7C66;
+  --primary-hover: #0A6855;
+  --weak: #D64545;
+  --fair: #E3A008;
+  --strong: #12A150;
+  --track: #E4EBE8;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); }
+
+.page { display: flex; min-height: 100vh; }
+.brand-panel { width: 38%; max-width: 420px; padding: 40px 36px; background: var(--ink); color: #E4F2EE; display: flex; flex-direction: column; gap: 24px; }
+.brand-panel h2 { margin: 24px 0 0; font-family: Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.25; }
+.perks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: #A9C9C1; }
+.perks li::before { content: '✓'; color: #5FD3B5; margin-right: 10px; }
+
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.logo-mark { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: #5FD3B5; color: var(--ink); font-weight: 800; }
+
+.form-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 20px; }
+.form { width: 100%; max-width: 380px; background: var(--surface); padding: 28px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(11, 42, 38, 0.06); }
+.form h1 { margin: 0; font-size: 22px; color: var(--ink); }
+.sub { margin: 6px 0 22px; color: var(--muted); font-size: 14px; }
+
+.label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+.input { width: 100%; height: 42px; padding: 0 12px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 15px; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.15); }
+.password-wrap { position: relative; }
+
+.btn-primary { width: 100%; height: 44px; margin-top: 8px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { background: #A7BDB7; cursor: not-allowed; }
+.fine { margin: 16px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+.fine a { color: var(--primary); font-weight: 600; text-decoration: none; }
+
+@media (max-width: 720px) {
+  .brand-panel { display: none; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { Logo } from './components/Logo';
+
+const LEVELS = ['', 'Weak', 'Fair', 'Strong'];
+
+function BrandPanel() {
+  return (
+    <aside className="brand-panel">
+      <Logo />
+      <h2>Business banking that balances itself.</h2>
+      <ul className="perks">
+        <li>Free ACH and wires</li>
+        <li>Cards for every teammate</li>
+        <li>Books that close in minutes</li>
+      </ul>
+    </aside>
+  );
+}
+
+type Rule = {
+  id: string;
+  label: string;
+  met: boolean;
+};
+
+// Pure function: easy to reason about, easy to test.
+function getRules(password: string): Rule[] {
+  return [
+    { id: 'length', label: 'At least 8 characters', met: password.length >= 8 },
+    { id: 'number', label: 'Contains a number', met: /\d/.test(password) },
+    { id: 'symbol', label: 'Contains a symbol', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
+type StrengthMeterProps = {
+  password: string;
+  rules: Rule[];
+};
+
+function StrengthMeter({ password, rules }: StrengthMeterProps) {
+  const score = rules.filter((r) => {
+    return r.met;
+  }).length;
+
+  // Anything typed is at least "Weak". Empty shows nothing.
+  let level = 0;
+  if (password !== '') {
+    level = Math.max(score, 1);
+  }
+
+  let meterCls = 'strength';
+  let label = '';
+  if (level > 0) {
+    label = LEVELS[level];
+    meterCls = 'strength is-' + label.toLowerCase();
+  }
+
+  const segments = [1, 2, 3].map((n) => {
+    let cls = 'segment';
+    if (n <= level) {
+      cls = 'segment is-on';
+    }
+    return <span key={n} className={cls} />;
+  });
+
+  return (
+    <div className={meterCls}>
+      <div className="segments">{segments}</div>
+      <span className="strength-label">{label}</span>
+    </div>
+  );
+}
+
+// Change: checklist of rules.
+function RuleList({ rules }: { rules: Rule[] }) {
+  return (
+    <ul className="rules">
+      {rules.map((r) => {
+        let cls = 'rule';
+        let mark = '○';
+        if (r.met) {
+          cls = 'rule is-met';
+          mark = '✓';
+        }
+        return (
+          <li key={r.id} className={cls}>
+            <span className="rule-mark">{mark}</span>
+            {r.label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SignUpForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  function handleToggleShow() {
+    setShowPassword((prev) => {
+      return !prev;
+    });
+  }
+
+  // derived: never stored in state
+  const rules = getRules(password);
+  const allMet = rules.every((r) => {
+    return r.met;
+  });
+  const canSubmit = email.includes('@') && allMet;
+
+  let inputType = 'password';
+  let toggleText = 'Show';
+  if (showPassword) {
+    inputType = 'text';
+    toggleText = 'Hide';
+  }
+  const toggleLabel = toggleText + ' password';
+
+  return (
+    <form className="form" onSubmit={(e) => { e.preventDefault(); }}>
+      <h1>Create your account</h1>
+      <p className="sub">Takes about two minutes. No credit check.</p>
+
+      <label className="label" htmlFor="email">Work email</label>
+      <input
+        id="email"
+        className="input"
+        type="email"
+        placeholder="you@company.com"
+        value={email}
+        onChange={(e) => { setEmail(e.target.value); }}
+      />
+
+      <label className="label" htmlFor="password">Password</label>
+      <div className="password-wrap">
+        <input
+          id="password"
+          className="input password-input"
+          type={inputType}
+          value={password}
+          onChange={(e) => { setPassword(e.target.value); }}
+        />
+        <button type="button" className="show-btn" aria-label={toggleLabel} onClick={() => { handleToggleShow(); }}>
+          {toggleText}
+        </button>
+      </div>
+      <StrengthMeter password={password} rules={rules} />
+      <RuleList rules={rules} />
+
+      <button type="submit" className="btn-primary" disabled={!canSubmit}>Create account</button>
+      <p className="fine">Already have an account? <a href="#">Sign in</a></p>
+    </form>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <BrandPanel />
+      <main className="form-side">
+        <SignUpForm />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F6F5;
+  --surface: #FFFFFF;
+  --ink: #0B2A26;
+  --text: #1C2B29;
+  --muted: #64746F;
+  --border: #D6DFDC;
+  --primary: #0E7C66;
+  --primary-hover: #0A6855;
+  --weak: #D64545;
+  --fair: #E3A008;
+  --strong: #12A150;
+  --track: #E4EBE8;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); }
+
+.page { display: flex; min-height: 100vh; }
+.brand-panel { width: 38%; max-width: 420px; padding: 40px 36px; background: var(--ink); color: #E4F2EE; display: flex; flex-direction: column; gap: 24px; }
+.brand-panel h2 { margin: 24px 0 0; font-family: Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.25; }
+.perks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: #A9C9C1; }
+.perks li::before { content: '✓'; color: #5FD3B5; margin-right: 10px; }
+
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.logo-mark { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: #5FD3B5; color: var(--ink); font-weight: 800; }
+
+.form-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 20px; }
+.form { width: 100%; max-width: 380px; background: var(--surface); padding: 28px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(11, 42, 38, 0.06); }
+.form h1 { margin: 0; font-size: 22px; color: var(--ink); }
+.sub { margin: 6px 0 22px; color: var(--muted); font-size: 14px; }
+
+.label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+.input { width: 100%; height: 42px; padding: 0 12px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 15px; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.15); }
+.password-wrap { position: relative; }
+
+.btn-primary { width: 100%; height: 44px; margin-top: 8px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { background: #A7BDB7; cursor: not-allowed; }
+.fine { margin: 16px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+.fine a { color: var(--primary); font-weight: 600; text-decoration: none; }
+
+@media (max-width: 720px) {
+  .brand-panel { display: none; }
+}
+
+/* ---- Added: show/hide + strength meter ---- */
+.password-wrap .input { margin-bottom: 8px; padding-right: 64px; }
+.show-btn { position: absolute; right: 6px; top: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.show-btn:hover { background: #E8F3F0; }
+
+.strength { display: flex; align-items: center; gap: 10px; height: 18px; margin-bottom: 10px; }
+.segments { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.segment { height: 4px; border-radius: 999px; background: var(--track); transition: background 0.2s; }
+.strength-label { width: 48px; text-align: right; font-size: 12px; font-weight: 600; }
+.strength.is-weak .segment.is-on { background: var(--weak); }
+.strength.is-weak .strength-label { color: var(--weak); }
+.strength.is-fair .segment.is-on { background: var(--fair); }
+.strength.is-fair .strength-label { color: var(--fair); }
+.strength.is-strong .segment.is-on { background: var(--strong); }
+.strength.is-strong .strength-label { color: var(--strong); }
+
+.rules { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.rule { display: flex; align-items: center; gap: 8px; }
+.rule-mark { width: 14px; text-align: center; }
+.rule.is-met { color: var(--strong); }

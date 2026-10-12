@@ -1,0 +1,994 @@
+{
+ "dc11": {
+  "kind": "drill",
+  "level": 1,
+  "order": 11,
+  "minutes": 12,
+  "changeAt": 9,
+  "title": "Notification toggles",
+  "focus": "src/App.tsx",
+  "summary": "A team-chat settings page. Make seven notification rows switchable, show a derived \"4 of 7 enabled\" count, and wire \"Turn all off\".",
+  "skills": [
+   "array of objects in state",
+   "immutable map update",
+   "derived count",
+   "reusing a controlled component"
+  ],
+  "brief": "<p>Tandem’s notification settings page is laid out but the rows are read-only. <code>App.tsx</code> has <code>Sidebar</code>, <code>DoNotDisturbCard</code> and <code>NotificationsCard</code>. The seven settings come from <code>data/notifications.ts</code> (4 of them start enabled).</p><p>Read <code>components/Toggle.tsx</code> first: it is a <b>controlled</b> switch (<code>checked</code> + <code>onChange(next)</code>), and <code>DoNotDisturbCard</code> already shows how to use it. Reuse it; don’t build a new switch. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list of settings becomes state in <code>NotificationsCard</code>, initialised from <code>DEFAULT_SETTINGS</code>. Toggling one is a <code>map</code> that returns a new object for the matching id. The count is derived with <code>filter(...).length</code>, so it can never get out of sync. \"Turn all off\" is another <code>map</code> setting every <code>enabled</code> to false.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Each of the 7 rows shows the existing <code>&lt;Toggle /&gt;</code> on the right, reflecting that setting’s <code>enabled</code> value. Clicking it flips only that row",
+   "Under \"Notify me about\" the header shows <b>\"4 of 7 enabled\"</b> on load and updates on every toggle. It is derived from the list, not a separate counter",
+   "<b>Turn all off</b> switches every row off (\"0 of 7 enabled\"). Disabled rows show their label in the muted color"
+  ],
+  "change": {
+   "title": "Turn all back on",
+   "html": "<p>\"Users who hit Turn all off can’t find a way back.\"</p><ul><li>When <b>0</b> settings are enabled, the button reads <b>Turn all on</b> and switches all 7 on. Otherwise it reads <b>Turn all off</b>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: the label and the target value are both decided from the derived count, above the return.</p>"
+  },
+  "hints": [
+   "State placement: only <code>NotificationsCard</code> needs the list, so <code>useState(DEFAULT_SETTINGS)</code> goes there.",
+   "Type it: <code>useState&lt;NotificationSetting[]&gt;(DEFAULT_SETTINGS)</code> with <code>import type { NotificationSetting } from \"./data/notifications\";</code>",
+   "Never change the object in place. Search: \"react updating arrays in state\" (react.dev has a page on it).",
+   "Toggle one: <code>setSettings((prev) =&gt; { return prev.map((s) =&gt; { if (s.id !== id) { return s; } return { ...s, enabled: next }; }); });</code>",
+   "Count: <code>const enabledCount = settings.filter((s) =&gt; { return s.enabled; }).length;</code> above the return."
+  ],
+  "rubric": [
+   "Reused Toggle instead of writing a new switch",
+   "One array in state (not seven booleans)",
+   "Updates are immutable (map + spread), using the updater form",
+   "Count derived, not stored",
+   "Bulk action is one map over the list",
+   "Label/target decided above the return, no ternaries in JSX"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0F9D6E"
+    ],
+    [
+     "--primary-soft",
+     "#E3F4EC"
+    ],
+    [
+     "--toggle-off",
+     "#D6D2C8"
+    ],
+    [
+     "--text",
+     "#22201B"
+    ],
+    [
+     "--muted",
+     "#77726A"
+    ],
+    [
+     "--border",
+     "#E7E4DC"
+    ],
+    [
+     "--bg",
+     "#F6F5F1"
+    ]
+   ],
+   "notes": [
+    [
+     "Card",
+     "radius 14 · 1px border · white"
+    ],
+    [
+     "Card head",
+     "pad 16 20 · space-between · bottom border"
+    ],
+    [
+     "Count line",
+     "13 · muted"
+    ],
+    [
+     "Row",
+     "pad 14 20 · space-between · gap 16"
+    ],
+    [
+     "Toggle",
+     "40×24 · knob 18 · moves 16"
+    ],
+    [
+     "Turn all off",
+     "link button · 13/600 · --primary"
+    ]
+   ]
+  }
+ },
+ "dc12": {
+  "kind": "drill",
+  "level": 1,
+  "order": 12,
+  "minutes": 15,
+  "title": "Pricing: billing toggle",
+  "focus": "src/App.tsx",
+  "summary": "A dark pricing page for a video editor. Wire the Monthly/Yearly switch (yearly = 2 months free), plan selection, and per-card \"Show all features\".",
+  "skills": [
+   "lifting shared state",
+   "local component state",
+   "derived prices",
+   "reusing a formatter"
+  ],
+  "brief": "<p>Framecut’s pricing page renders three <code>PlanCard</code>s from <code>data/plans.ts</code>, plus a <code>BillingToggle</code> that looks right but does nothing. Prices are stored in <b>cents</b> as a monthly price.</p><p>Read <code>utils/formatPrice.ts</code> first: it already turns cents into \"$12\", \"$24.17\" or \"Free\". Reuse it for every number you show. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Billing and the selected plan are needed by every card and by the toggle, so both live in <code>App</code> and go down as props. Whether a card’s feature list is expanded only matters to that card, so that is local state in <code>PlanCard</code>. The yearly price is derived: <code>monthlyCents * 10</code>, never stored.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking <b>Monthly</b> / <b>Yearly</b> switches billing. The active option gets the white pill (<code>is-active</code>). Monthly is the default",
+   "Monthly: paid plans show \"$12\" + \"/month\". Yearly: they show the yearly total, <b>monthly × 10</b> (\"$120\" + \"/year\"), and a muted line under it: <b>\"$10/mo, billed yearly\"</b> (Studio: \"$290\", \"$24.17/mo, billed yearly\"). Hobby always shows \"Free\" with no period. All via <code>formatPrice</code>",
+   "Clicking <b>Choose Creator</b> selects that plan: the card gets a purple border + glow (<code>is-selected</code>) and the button reads <b>Selected ✓</b>. Only one plan is selected at a time",
+   "Each card’s <b>Show all N features</b> expands just that card’s list and becomes <b>Show less</b>. Other cards stay as they are"
+  ],
+  "hints": [
+   "Two kinds of state: shared (<code>billing</code>, <code>selectedId</code> in <code>App</code>) and local (<code>expanded</code> in <code>PlanCard</code>). Ask \"who needs to know?\"",
+   "Type the billing: <code>type Billing = \"monthly\" | \"yearly\";</code> then <code>useState&lt;Billing&gt;(\"monthly\")</code>.",
+   "Decide the price above the return: <code>let amount = formatPrice(plan.monthlyCents); if (!isFree &amp;&amp; billing === \"yearly\") { amount = formatPrice(plan.monthlyCents * 10); ... }</code>",
+   "Per month on yearly: <code>formatPrice(Math.round(yearlyCents / 12))</code>. Search: \"mdn Math.round\" if you want to see why not <code>toFixed</code> here.",
+   "Expand: <code>let shown = plan.features.slice(0, 3); if (expanded) { shown = plan.features; }</code>"
+  ],
+  "rubric": [
+   "Shared state in App, expand state local to the card (said why)",
+   "Prices derived from monthlyCents, nothing duplicated in state",
+   "Reused formatPrice everywhere",
+   "Free plan handled without special-casing in JSX",
+   "Selected stored as an id",
+   "Class names and labels built above the return"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0E0B1A"
+    ],
+    [
+     "--surface",
+     "#17132A"
+    ],
+    [
+     "--border",
+     "#2D2650"
+    ],
+    [
+     "--primary",
+     "#A66BFF"
+    ],
+    [
+     "--accent",
+     "#FF5DA2"
+    ],
+    [
+     "--muted",
+     "#A49CC7"
+    ],
+    [
+     "Selected glow",
+     "rgba(166,107,255,.25)"
+    ]
+   ],
+   "notes": [
+    [
+     "Billing toggle",
+     "pill · pad 4 · options h 36"
+    ],
+    [
+     "Active option",
+     "bg --text · color --bg"
+    ],
+    [
+     "Card",
+     "pad 24 · radius 18"
+    ],
+    [
+     "Price",
+     "38/800 · period 14 muted"
+    ],
+    [
+     "Price note",
+     "13 · muted · mt 4"
+    ],
+    [
+     "Selected card",
+     "border --primary + 1px ring + 0 12 40 glow"
+    ],
+    [
+     "Selected button",
+     "gradient --primary → --accent"
+    ]
+   ]
+  }
+ },
+ "dc13": {
+  "kind": "drill",
+  "level": 2,
+  "order": 13,
+  "minutes": 18,
+  "title": "Courses: loading, error, empty",
+  "focus": "src/App.tsx",
+  "summary": "A learning app’s \"My learning\" page. Load courses per tab with skeleton cards, an error panel with Retry, and an empty state.",
+  "skills": [
+   "useEffect + .then/.catch",
+   "loading / error / empty states",
+   "retry by re-running an effect",
+   "stale-response guard"
+  ],
+  "brief": "<p>Learnloop’s \"My learning\" page has a header, working tabs (<code>In progress</code> / <code>Completed</code> / <code>Wishlist</code>) and a dev-only <b>Simulate failure</b> checkbox. <code>CourseList</code> receives <code>status</code> and <code>shouldFail</code> but renders nothing yet.</p><p>Read <code>api.ts</code>: <code>getCourses(status, shouldFail)</code> takes 0.4–1.2 s, <b>rejects</b> when <code>shouldFail</code> is true, and returns an empty array for the wishlist. <code>components/CourseCard.tsx</code> already renders one course; reuse it.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>CourseList</code> owns <code>courses</code>, <code>loading</code> and <code>error</code>. One effect depends on <code>status</code> and <code>shouldFail</code>: it sets loading, calls the API, and handles <code>.then</code> and <code>.catch</code>, with a <code>cancelled</code> flag so a slow old tab can’t overwrite a new one. For Retry I add an <code>attempt</code> counter to the dependencies and bump it. Rendering is four early returns: loading, error, empty, list.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "On first load and on every tab change, show <b>3 skeleton cards</b> (<code>.skeleton-card</code>, grey shimmering blocks the size of a course card) until the API answers, then a <code>CourseCard</code> per course",
+   "With <b>Simulate failure</b> checked, the request fails and the list shows an error panel: <b>\"Couldn’t load your courses.\"</b>, a short help line, and a <b>Retry</b> button. Retry shows the skeletons again and re-requests (uncheck the box first and it succeeds)",
+   "The <b>Wishlist</b> tab (empty array) shows an empty state: <b>\"No courses here yet\"</b>, a help line and a <b>Browse catalog</b> button. Never a blank area",
+   "Clicking tabs quickly never shows the wrong tab’s courses (ignore responses from an effect that has been cleaned up)"
+  ],
+  "hints": [
+   "Three pieces of state: <code>useState&lt;Course[]&gt;([])</code>, <code>loading</code> (start <code>true</code>) and <code>useState&lt;string | null&gt;(null)</code> for the error.",
+   "Errors from a Promise go to <code>.catch</code>. Search: \"mdn Promise catch\".",
+   "Retry without duplicating the fetch: <code>const [attempt, setAttempt] = useState(0);</code> put <code>attempt</code> in the effect’s dependency array, and Retry does <code>setAttempt((prev) =&gt; { return prev + 1; });</code>",
+   "Start of the effect: <code>let cancelled = false; setLoading(true); setError(null);</code> and in both <code>.then</code> and <code>.catch</code>: <code>if (cancelled) { return; }</code>",
+   "Render with early returns above the main JSX: <code>if (loading) { return &lt;div className=\"course-grid\"&gt;&lt;SkeletonCard /&gt;…&lt;/div&gt;; }</code>, then <code>if (error)</code>, then <code>if (courses.length === 0)</code>."
+  ],
+  "rubric": [
+   "Effect depends on status + shouldFail (+ retry counter)",
+   "Both then and catch end loading",
+   "Error cleared and loading set when re-requesting",
+   "Cancelled flag in cleanup",
+   "Reused CourseCard",
+   "Empty state is distinct from loading and error",
+   "Skeleton matches the card’s shape"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#FF7A1A"
+    ],
+    [
+     "--primary-soft",
+     "#FFEBD9"
+    ],
+    [
+     "--danger",
+     "#D93A2B"
+    ],
+    [
+     "Skeleton",
+     "#F5EDDD → #FBF5EA"
+    ],
+    [
+     "Error bg",
+     "#FFF5F3"
+    ],
+    [
+     "Error border",
+     "#F5C6BF"
+    ],
+    [
+     "Empty border",
+     "#E3D3B4 dashed"
+    ]
+   ],
+   "notes": [
+    [
+     "Skeleton cover",
+     "h 96"
+    ],
+    [
+     "Skeleton lines",
+     "h 14 · radius 8 · second 55% wide"
+    ],
+    [
+     "Shimmer",
+     "1.2s linear infinite"
+    ],
+    [
+     "State panel",
+     "pad 40 24 · centered · radius 16"
+    ],
+    [
+     "State icon",
+     "32px emoji"
+    ],
+    [
+     "Retry / Browse",
+     "h 38 · radius 10 · --primary · 800"
+    ]
+   ]
+  }
+ },
+ "dc14": {
+  "kind": "drill",
+  "level": 2,
+  "order": 14,
+  "minutes": 18,
+  "title": "Shop: category chips",
+  "focus": "src/App.tsx",
+  "summary": "A plant shop grid. Load categories from the API, show filter chips with product counts and an \"All\" chip, and filter the grid.",
+  "skills": [
+   "lifting state up",
+   "Promise.all",
+   "derived counts",
+   "filter chips"
+  ],
+  "brief": "<p>Fernwood’s product grid already loads and renders: <code>ProductGrid</code> fetches with <code>getProducts()</code> and maps to <code>ProductCard</code>. The Figma adds a row of category chips between the heading and the grid.</p><p>Read <code>api.ts</code>: <code>getCategories()</code> returns names but <b>no counts</b> (0.3–0.9 s; products take 0.5–1.2 s). Think about where the products have to live once the chips need to count them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The chips need the products to count them and the grid needs them to render, so the products move up into a parent (<code>Catalog</code>) along with the categories and <code>activeCategory</code>. I load both with <code>Promise.all</code> so there’s one loading state. Counts and the visible list are derived with <code>filter</code>. <code>ProductGrid</code> becomes a plain component that just receives the visible products.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Above the grid, a chip per category from <code>getCategories()</code>, preceded by an <b>All</b> chip. Each chip shows its product count in a small pill: \"All 12\", \"Indoor plants 5\", \"Pots 4\", \"Plant care 3\", \"Gift cards 0\"",
+   "Clicking a chip filters the grid to that category; <b>All</b> shows everything. The active chip is filled dark green with white text (<code>is-active</code>). All is active on load",
+   "Chips and grid appear together after both requests finish (\"Loading the greenhouse…\" until then)",
+   "A chip with a count of 0 (Gift cards) is disabled and faded"
+  ],
+  "hints": [
+   "This is \"lifting state up\": move <code>products</code> out of <code>ProductGrid</code> into a parent that renders both the chips and the grid.",
+   "Two requests, one loading state. Search: \"mdn Promise.all\". <code>Promise.all([getProducts(), getCategories()]).then(([products, categories]) =&gt; { ... })</code>",
+   "Count for a chip: <code>products.filter((p) =&gt; { return p.categoryId === c.id; }).length</code>",
+   "Use a constant for All: <code>const ALL = \"all\";</code> and <code>useState(ALL)</code>. Visible list: <code>let visible = products; if (active !== ALL) { visible = products.filter(...); }</code>",
+   "A small <code>Chip</code> component with <code>label</code>, <code>count</code>, <code>active</code>, <code>onClick</code> keeps the map tidy."
+  ],
+  "rubric": [
+   "Recognised that products must be lifted",
+   "Loaded both endpoints with one loading state",
+   "Counts derived, not fetched or stored",
+   "Active category stored as an id",
+   "Reused ProductCard / formatPrice untouched",
+   "Disabled empty chip",
+   "cancelled guard kept"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#2F5D3A"
+    ],
+    [
+     "--primary-soft",
+     "#E2EBDC"
+    ],
+    [
+     "--surface",
+     "#FFFDF8"
+    ],
+    [
+     "--border",
+     "#E5DDCB"
+    ],
+    [
+     "--bg",
+     "#F7F3EA"
+    ],
+    [
+     "Active count bg",
+     "rgba(255,255,255,.2)"
+    ]
+   ],
+   "notes": [
+    [
+     "Chip row",
+     "wrap · gap 8 · mb 28"
+    ],
+    [
+     "Chip",
+     "h 36 · pill · pad 0 14 · 1px border"
+    ],
+    [
+     "Count pill",
+     "12/600 · pad 1 7 · min-w 22"
+    ],
+    [
+     "Active chip",
+     "bg --primary · white"
+    ],
+    [
+     "Disabled chip",
+     "opacity .45"
+    ]
+   ]
+  }
+ },
+ "dc15": {
+  "kind": "drill",
+  "level": 2,
+  "order": 15,
+  "minutes": 18,
+  "changeAt": 12,
+  "title": "Transactions: sortable table",
+  "focus": "src/App.tsx",
+  "summary": "A business-banking transactions table. Make the headers sort by date, text and amount, asc/desc with arrows, without mutating the data.",
+  "skills": [
+   "sorting without mutation",
+   "comparators (number, date, text)",
+   "sort state",
+   "aria-sort"
+  ],
+  "brief": "<p>Ledgerly’s transactions page loads and renders a table via <code>getTransactions()</code> (0.3–1.0 s). The rows come back in the order the bank posted them. The headers are plain text.</p><p>Read <code>utils/format.ts</code> (<code>formatMoney</code>, <code>formatDate</code>) and the <code>Transaction</code> type: <code>date</code> is an ISO string, <code>amountCents</code> is negative for money out.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Sort state is <code>sortKey</code> (or null) and <code>sortDir</code>, in <code>TransactionsTable</code> next to the data. The sorted list is derived each render from a <b>copy</b> (<code>[...list].sort</code>), so the API order is always still there. One comparator per type: subtraction for amounts, timestamps for dates, <code>localeCompare</code> for text. A <code>SortHeader</code> component renders the button and arrow.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Every header (Date, Description, Category, Amount) is a button. First click sorts that column ascending (▲), the next click descending (▼). Clicking another column starts it at ascending",
+   "Correct per type: Amount numerically (−$14,500.00 is lowest), Date chronologically, Description/Category alphabetically (case-insensitive, <code>localeCompare</code>)",
+   "Inactive headers show a muted <b>↕</b>; the active one is green with its arrow. The <code>&lt;th&gt;</code> has <code>aria-sort</code> (\"ascending\" / \"descending\" / \"none\")"
+  ],
+  "change": {
+   "title": "Third click clears",
+   "html": "<p>\"Finance wants to get back to the bank’s posted order.\"</p><ul><li>A <b>third</b> click on the same column clears sorting: all headers show ↕ and the rows return to the original API order.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">If you sorted the state array in place, the original order is gone. That is exactly what this change tests.</p>"
+  },
+  "hints": [
+   "<code>.sort()</code> sorts <b>in place</b> and returns the same array. Search: \"mdn Array.prototype.sort\" (and look at <code>toSorted</code>).",
+   "Copy first: <code>const sorted = [...list].sort((a, b) =&gt; { return a.amountCents - b.amountCents; });</code>",
+   "Dates: <code>new Date(a.date).getTime() - new Date(b.date).getTime()</code>. Text: <code>a.description.localeCompare(b.description)</code>.",
+   "Descending: sort ascending and then <code>sorted.reverse()</code>. That’s safe because <code>sorted</code> is already your copy.",
+   "Click logic: <code>if (column !== sortKey) { setSortKey(column); setSortDir(\"asc\"); return; } if (sortDir === \"asc\") { setSortDir(\"desc\"); return; } setSortKey(null);</code>"
+  ],
+  "rubric": [
+   "Never mutated the loaded array",
+   "Sorted list derived, not stored",
+   "Right comparator per data type",
+   "Arrow and active class decided above the return",
+   "Header is a real button (keyboard accessible)",
+   "Change done by extending the click logic, not a new flag"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0B6E4F"
+    ],
+    [
+     "--positive",
+     "#0B8A5F"
+    ],
+    [
+     "--sidebar",
+     "#0D1F1A"
+    ],
+    [
+     "--border",
+     "#E1E6E4"
+    ],
+    [
+     "--muted",
+     "#61716C"
+    ],
+    [
+     "Inactive arrow",
+     "#A4B1AC"
+    ]
+   ],
+   "notes": [
+    [
+     "Header button",
+     "inline-flex · gap 4 · inherits font"
+    ],
+    [
+     "Arrow",
+     "10px"
+    ],
+    [
+     "Active header",
+     "--primary (text + arrow)"
+    ],
+    [
+     "Header cell",
+     "pad 10 16 · 12/600 · bg #F8FAF9"
+    ],
+    [
+     "Amount",
+     "right · mono 13"
+    ]
+   ]
+  }
+ },
+ "dc16": {
+  "kind": "drill",
+  "level": 2,
+  "order": 16,
+  "minutes": 18,
+  "title": "Orders: pagination",
+  "focus": "src/App.tsx",
+  "summary": "A bakery’s wholesale admin. Page through 23 orders from a paginated API: Prev/Next, page numbers, \"Showing 6–10 of 23\", disabled at the ends.",
+  "skills": [
+   "effect depends on page",
+   "server-side pagination math",
+   "disabled states",
+   "keeping old rows while loading"
+  ],
+  "brief": "<p>Crumb &amp; Co.’s order table loads, but <code>OrdersTable</code> always asks for page 1. The API is <b>server-paginated</b>: <code>getOrders(page, pageSize)</code> returns <code>{ orders, total }</code> after 0.3–0.9 s. Pages start at 1. There are 23 orders and <code>PAGE_SIZE</code> is 5.</p><p>Read <code>api.ts</code> and the existing effect first. You extend it rather than writing a second one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>page</code> goes in <code>OrdersTable</code> and into the effect’s dependencies, so changing it refetches. <code>pageCount</code>, the first and last row numbers are derived from <code>page</code>, <code>PAGE_SIZE</code> and <code>total</code>. While a new page loads I keep the old rows, dim them, and disable the buttons. A <code>Pagination</code> component gets <code>page</code>, <code>pageCount</code> and <code>onChange</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Under the table, <b>← Prev</b> and <b>Next →</b> load the previous/next page. Prev is disabled on page 1, Next on the last page (5)",
+   "Left of the buttons: <b>\"Showing 6–10 of 23\"</b> for page 2, \"Showing 1–5 of 23\" for page 1, <b>\"Showing 21–23 of 23\"</b> on the last page",
+   "Page number buttons 1–5 between Prev and Next. The current one is filled raspberry and has <code>aria-current=\"page\"</code>. Clicking one jumps there",
+   "While a page loads, the previous rows stay visible but dimmed (<code>.is-loading</code>) and the pagination buttons are disabled. \"Loading orders…\" only shows on the very first load"
+  ],
+  "hints": [
+   "Add <code>const [page, setPage] = useState(1);</code> and change the effect to <code>getOrders(page, PAGE_SIZE)</code> with <code>[page]</code> as dependencies.",
+   "Math: <code>pageCount = Math.ceil(total / PAGE_SIZE)</code>, <code>first = (page - 1) * PAGE_SIZE + 1</code>, <code>last = Math.min(page * PAGE_SIZE, total)</code>.",
+   "The numbers 1..n: <code>Array.from({ length: pageCount }, (_, i) =&gt; { return i + 1; })</code>. Search: \"mdn Array.from length\".",
+   "Set <code>setLoading(true)</code> at the start of the effect but keep <code>orders</code>, so the table doesn’t jump. Only show the full loading message when <code>orders.length === 0</code>.",
+   "Disabled flags above the return: <code>const prevDisabled = loading || page === 1;</code>"
+  ],
+  "rubric": [
+   "Page in the effect dependencies, one effect",
+   "Range text and page count derived",
+   "Last-page range clamps to total",
+   "Prev/Next disabled at the ends",
+   "Old rows kept while loading (no layout jump)",
+   "cancelled guard kept for fast clicking"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#C2185B"
+    ],
+    [
+     "--primary-soft",
+     "#FCE4EE"
+    ],
+    [
+     "--border",
+     "#EEE4DE"
+    ],
+    [
+     "--muted",
+     "#8C7681"
+    ],
+    [
+     "--text",
+     "#2D1B24"
+    ]
+   ],
+   "notes": [
+    [
+     "Footer",
+     "pad 12 16 · top border · space-between"
+    ],
+    [
+     "Range text",
+     "13 · muted · tabular-nums"
+    ],
+    [
+     "Buttons",
+     "h 32 · min-w 32 · radius 8 · gap 4"
+    ],
+    [
+     "Current page",
+     "bg --primary · white"
+    ],
+    [
+     "Disabled Prev/Next",
+     "opacity .4"
+    ],
+    [
+     "Loading rows",
+     "tbody opacity .45"
+    ]
+   ]
+  }
+ },
+ "dc17": {
+  "kind": "drill",
+  "level": 2,
+  "order": 17,
+  "minutes": 20,
+  "title": "Sign-up form validation",
+  "focus": "src/App.tsx",
+  "summary": "An AI writing app’s sign-up. Validate email, show password rules as a live checklist, check confirmation, show errors after blur or submit, then submit async.",
+  "skills": [
+   "derived validation",
+   "touched + submitted",
+   "async submit states",
+   "API error handling"
+  ],
+  "brief": "<p>Northstar’s sign-up page has a brand panel and a form with three controlled inputs inside the existing <code>Field</code> component. Submitting does nothing yet.</p><p>Read <code>components/Field.tsx</code> (pass it an <code>error</code> and it renders the red line and border), <code>utils/validate.ts</code> (<code>isValidEmail</code> and <code>PASSWORD_RULES</code>) and <code>api.ts</code>: <code>createAccount</code> takes 0.6–1.2 s and <b>rejects for <code>taken@example.com</code></b>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Errors are <b>derived</b> from the three values on every render, never stored. Whether to <b>show</b> them is separate state: a <code>touched</code> object set on blur, and a <code>submitted</code> flag set on submit. The checklist maps over <code>PASSWORD_RULES</code>. Submit sets <code>submitted</code>, returns if anything is invalid, otherwise sets status to submitting and calls the API; <code>.catch</code> shows the server message, <code>.then</code> swaps to a success panel.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Email: after the field is blurred (or on submit), show <b>\"Email is required\"</b> when empty or <b>\"Enter a valid email address\"</b> when <code>isValidEmail</code> fails. No errors while the user is still typing in a fresh field",
+   "Under the password, a live checklist of the 3 <code>PASSWORD_RULES</code>: grey <b>○</b> when unmet, green <b>✓</b> (<code>is-met</code>) as soon as it’s met. After blur/submit, the password shows <b>\"Password doesn’t meet all the requirements\"</b> until all 3 are met, and Confirm password shows <b>\"Confirm your password\"</b> when empty or <b>\"Passwords don’t match\"</b>",
+   "Submitting with errors shows every error and does not call the API. A valid submit calls <code>createAccount</code>; the button reads <b>Creating…</b> and is disabled until it settles",
+   "For <code>taken@example.com</code>, the API message appears in a red banner above the fields and the form stays filled. Success replaces the form with <b>\"Check your inbox\"</b> and the email address"
+  ],
+  "hints": [
+   "Don’t put error messages in state. Compute <code>emailError</code>, <code>passwordError</code>, <code>confirmError</code> with plain <code>if</code>s above the return.",
+   "Show-or-not is the state: <code>useState&lt;Record&lt;FieldName, boolean&gt;&gt;({ email: false, password: false, confirm: false })</code> plus <code>submitted</code>. Search: \"mdn blur event\" for <code>onBlur</code>.",
+   "Mark one field touched: <code>setTouched((prev) =&gt; { return { ...prev, [field]: true }; });</code> (computed property name).",
+   "Checklist: <code>PASSWORD_RULES.map((rule) =&gt; { let cls = \"rule\"; if (rule.test(password)) { cls = \"rule is-met\"; } ... })</code>; all met: <code>PASSWORD_RULES.every(...)</code>.",
+   "Submit: <code>e.preventDefault(); setSubmitted(true); if (!isValid) { return; } setStatus(\"submitting\"); createAccount(email, password).then(...).catch((err: Error) =&gt; { setApiError(err.message); setStatus(\"idle\"); });</code>"
+  ],
+  "rubric": [
+   "Errors derived, visibility in state",
+   "Blur and submit both reveal errors",
+   "Reused Field, isValidEmail and PASSWORD_RULES",
+   "No API call when invalid; button disabled while submitting (no double submit)",
+   "Server error shown without clearing the form",
+   "Status modelled as one value (idle / submitting / success)",
+   "e.preventDefault() on submit"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#3E3AE8"
+    ],
+    [
+     "--ring",
+     "rgba(62,58,232,.18)"
+    ],
+    [
+     "--danger",
+     "#D92D20"
+    ],
+    [
+     "--success",
+     "#12A150"
+    ],
+    [
+     "API error bg",
+     "#FEF3F2"
+    ],
+    [
+     "API error border",
+     "#FECDCA"
+    ],
+    [
+     "--muted",
+     "#646A86"
+    ]
+   ],
+   "notes": [
+    [
+     "Input",
+     "h 42 · radius 10 · focus ring 4"
+    ],
+    [
+     "Error line",
+     "13 · --danger · mt 6"
+    ],
+    [
+     "Checklist",
+     "13 · gap 4 · mt 10"
+    ],
+    [
+     "Rule icon",
+     "w 16 · 700"
+    ],
+    [
+     "API banner",
+     "pad 10 12 · radius 10 · mb 16"
+    ],
+    [
+     "Success icon",
+     "56 circle · #E7F8EE"
+    ]
+   ]
+  }
+ },
+ "dc18": {
+  "kind": "drill",
+  "level": 2,
+  "order": 18,
+  "minutes": 20,
+  "title": "Patients: master-detail",
+  "focus": "src/App.tsx",
+  "summary": "A clinic’s day view. Selecting a patient on the left fetches their chart by id into the right panel, with a loading state and no stale responses.",
+  "skills": [
+   "lifting selection state",
+   "effect keyed on an id",
+   "race conditions (cancelled flag)",
+   "loading skeleton"
+  ],
+  "brief": "<p>Carepoint shows today’s patients on the left (<code>PatientList</code>, already loading via <code>getPatients()</code>) and an empty <code>ChartPanel</code> on the right. Rows don’t respond to clicks yet.</p><p>Read <code>api.ts</code>: <code>getPatient(id)</code> returns the full chart. <b>Margaret’s chart is archived and always takes 1.2–1.5 s</b>; the others take 0.3–0.7 s. So clicking Margaret then Daniel quickly is a real race. <code>components/Avatar.tsx</code> and <code>utils/age.ts</code> are there to reuse.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list sets the selection and the chart reads it, so <code>selectedId</code> lives in <code>App</code>. I store the <b>id</b>, not the patient. <code>ChartPanel</code> gets <code>patientId</code> and has an effect on <code>[patientId]</code> that fetches the details. The cleanup sets <code>cancelled = true</code>, so when I click Daniel while Margaret is still loading, Margaret’s late answer is ignored.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking a patient row selects it: light-blue background with a blue left bar (<code>is-selected</code>). Before any click the right panel keeps \"Select a patient to view their chart.\"",
+   "Selecting fetches <code>getPatient(id)</code>. While loading, the panel shows a shimmering skeleton and <b>\"Loading chart…\"</b>; then the chart: avatar, name, \"age y · sex · MRN · phone\", three vitals tiles, Allergies, Conditions and Medications",
+   "Click <b>Margaret Ellison</b> then immediately <b>Daniel Reyes</b>: the panel ends on Daniel and never flashes Margaret’s chart when her slow response arrives",
+   "Empty allergy list shows \"No known allergies\" (Daniel). Age uses <code>ageFrom</code>, avatar uses <code>Avatar</code>"
+  ],
+  "hints": [
+   "State placement: <code>const [selectedId, setSelectedId] = useState&lt;string | null&gt;(null);</code> in <code>App</code>. <code>PatientList</code> gets <code>selectedId</code> + <code>onSelect</code>.",
+   "<code>ChartPanel</code> effect: <code>useEffect(() =&gt; { if (!patientId) { return; } ... }, [patientId]);</code>",
+   "The race: search \"react useEffect race condition fetch\" (react.dev \"You might not need an effect\" → \"Fetching data\" shows the <code>ignore</code> flag).",
+   "Shape: <code>let cancelled = false; setLoading(true); getPatient(patientId).then((data) =&gt; { if (cancelled) { return; } setPatient(data); setLoading(false); }); return () =&gt; { cancelled = true; };</code>",
+   "Decide the panel with early returns: no id → empty, <code>loading || !patient</code> → skeleton, else the chart."
+  ],
+  "rubric": [
+   "Selection lifted to the common parent, stored as an id",
+   "Detail fetch keyed on the id in the dependency array",
+   "Stale responses ignored via cleanup",
+   "Skeleton shown on every switch (no old chart under a new name)",
+   "Reused Avatar and ageFrom",
+   "Empty lists handled"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#1F6FEB"
+    ],
+    [
+     "--primary-soft",
+     "#E6F0FF"
+    ],
+    [
+     "--border",
+     "#DCE5EE"
+    ],
+    [
+     "--muted",
+     "#627D98"
+    ],
+    [
+     "Vital tile",
+     "#F5F8FB"
+    ],
+    [
+     "Skeleton",
+     "#EDF2F7 → #F7FAFC"
+    ]
+   ],
+   "notes": [
+    [
+     "Selected row",
+     "bg --primary-soft · inset 3px left --primary"
+    ],
+    [
+     "Chart pane",
+     "pad 20 24"
+    ],
+    [
+     "Chart head",
+     "avatar 52 · gap 14 · name 22"
+    ],
+    [
+     "Vitals",
+     "3 cols · gap 10 · tile pad 10 12 · radius 10"
+    ],
+    [
+     "Section title",
+     "12/700 · uppercase · muted"
+    ],
+    [
+     "Tag",
+     "pill · 1px border · 13"
+    ]
+   ]
+  }
+ },
+ "dc19": {
+  "kind": "drill",
+  "level": 2,
+  "order": 19,
+  "minutes": 20,
+  "changeAt": 14,
+  "title": "Deploy toasts",
+  "focus": "src/App.tsx",
+  "summary": "A dark deploy dashboard. Show stacked success/error toasts bottom-right for each action, auto-dismissed after 3 s with proper timer cleanup.",
+  "skills": [
+   "list of transient items",
+   "setTimeout + cleanup",
+   "useRef for ids",
+   "useCallback for a stable callback"
+  ],
+  "brief": "<p>Shipyard’s service page has three actions that already work: <b>Deploy to staging</b> (resolves, 0.3–0.8 s), <b>Roll back production</b> (always <b>rejects</b> with a message: change freeze), and <b>Clear cache</b> (instant). They show busy labels but nobody is told the result.</p><p>Read <code>Actions</code> in <code>App.tsx</code> (the TODOs mark where results arrive), <code>api.ts</code>, and <code>components/Button.tsx</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Toasts are a list in <code>App</code>, because they sit outside <code>Actions</code> and outlive it. <code>Actions</code> gets a <code>notify(kind, message)</code> prop. Each toast has an id from a <code>useRef</code> counter. Each <code>Toast</code> owns a <code>setTimeout</code> in an effect and clears it in the cleanup, so closing early doesn’t leave a timer behind. <code>dismiss</code> is wrapped in <code>useCallback</code> so the timers don’t restart on every render.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Deploy shows a green success toast <b>\"Deployed &lt;commit&gt; to staging\"</b>; Roll back shows a red error toast with the API’s message; Clear cache shows <b>\"Cache cleared for api-gateway\"</b>. Toasts stack bottom-right (fixed, 20px from the edges, 340 wide), newest at the bottom",
+   "Each toast disappears on its own after <b>3 seconds</b>. Its <b>✕</b> button removes it immediately. Timers are cleared in an effect cleanup",
+   "Removing one toast doesn’t reset the timers of the others (each toast keeps its own 3 s)"
+  ],
+  "change": {
+   "title": "At most 3",
+   "html": "<p>\"Someone mashed Clear cache and the toasts covered the page.\"</p><ul><li>Show at most <b>3</b> toasts. When a 4th arrives, the oldest one is dropped.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">One line in the updater. Check that the dropped toast’s timer is cleaned up too (it is, if the timer lives in the toast’s effect).</p>"
+  },
+  "hints": [
+   "State: <code>useState&lt;ToastData[]&gt;([])</code> in <code>App</code>, where <code>type ToastData = { id: number; kind: \"success\" | \"error\"; message: string }</code>.",
+   "Ids that don’t need a render: <code>const nextId = useRef(1);</code> then <code>nextId.current += 1</code>. Search: \"react useRef\".",
+   "Timer per toast: <code>useEffect(() =&gt; { const t = setTimeout(() =&gt; { onDismiss(toast.id); }, 3000); return () =&gt; { clearTimeout(t); }; }, [toast.id, onDismiss]);</code>",
+   "If <code>onDismiss</code> is a new function every render, that effect restarts every time. Search: \"react useCallback\". <code>const dismiss = useCallback((id: number) =&gt; { setToasts((prev) =&gt; { return prev.filter(...); }); }, []);</code>",
+   "Change: <code>setToasts((prev) =&gt; { return [...prev, toast].slice(-3); });</code>"
+  ],
+  "rubric": [
+   "Toast list lives above the actions; notify passed down",
+   "Stable ids (ref counter), never array index",
+   "Timer cleared in cleanup",
+   "Explained why dismiss needs to be stable",
+   "Updater form for add and remove",
+   "Change done as a one-line slice",
+   "aria-live region"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0B0D12"
+    ],
+    [
+     "--surface-2",
+     "#1A1E28"
+    ],
+    [
+     "--border",
+     "#252A36"
+    ],
+    [
+     "--success",
+     "#3DD68C"
+    ],
+    [
+     "--danger",
+     "#FF5C5C"
+    ],
+    [
+     "Toast shadow",
+     "rgba(0,0,0,.45)"
+    ]
+   ],
+   "notes": [
+    [
+     "Stack",
+     "fixed · right 20 · bottom 20 · w 340 · gap 10"
+    ],
+    [
+     "Toast",
+     "pad 12 12 12 14 · radius 10 · left border 3"
+    ],
+    [
+     "Icon",
+     "20 circle · 12/800"
+    ],
+    [
+     "Message",
+     "14 · line-height 1.4"
+    ],
+    [
+     "Close",
+     "24×24 · radius 6 · muted"
+    ],
+    [
+     "Enter",
+     "fade + 8px slide · 180ms"
+    ]
+   ]
+  }
+ },
+ "dc20": {
+  "kind": "drill",
+  "level": 2,
+  "order": 20,
+  "minutes": 18,
+  "title": "Files: confirm delete",
+  "focus": "src/App.tsx",
+  "summary": "A cloud-files list. The trash button opens a confirm modal naming the file; Delete calls the API, shows \"Deleting…\", then removes the row.",
+  "skills": [
+   "modal state as an id",
+   "Escape listener + cleanup",
+   "async action states",
+   "immutable remove"
+  ],
+  "brief": "<p>Driftbox lists your files (<code>FileList</code>, loaded via <code>getFiles()</code>). Each row has a 🗑 button that does nothing yet.</p><p>Read <code>api.ts</code> (<code>deleteFile(id)</code> takes 0.4–1.0 s) and <code>components/Button.tsx</code>: it already has a <b>danger</b> variant and supports <code>autoFocus</code> and <code>disabled</code>. Reuse it for the modal’s buttons.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>FileList</code> owns the files, so it also owns <code>pendingId</code> (which file we’re asking about; null means closed) and <code>deleting</code>. <code>FileRow</code> gets an <code>onDelete(id)</code> callback. A <code>ConfirmDeleteModal</code> component gets the name and <code>onCancel</code>/<code>onConfirm</code>, and adds a keydown listener for Escape with a cleanup. Confirm calls the API, then filters the file out and closes.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking a row’s 🗑 opens a centered modal over a dark backdrop: title <b>Delete “Q3 roadmap.pdf”?</b> (the real file name), a warning line, and two buttons: <b>Cancel</b> (secondary) and <b>Delete</b> (red, danger variant)",
+   "<b>Cancel</b>, <b>Escape</b> and clicking the backdrop close the modal without deleting. Clicking inside the panel does not close it",
+   "<b>Delete</b> calls <code>deleteFile(id)</code>; while it runs the button reads <b>Deleting…</b> and both buttons are disabled. When it resolves, the row disappears and the modal closes",
+   "Focus starts on <b>Cancel</b> (the safe choice), the dialog has <code>role=\"alertdialog\"</code> and <code>aria-modal</code>, and Escape is ignored while deleting"
+  ],
+  "hints": [
+   "Store <b>which</b> file, not a copy: <code>const [pendingId, setPendingId] = useState&lt;string | null&gt;(null);</code> Then <code>files.find(...)</code> to get its name.",
+   "Render the modal only when there is a pending file: <code>let modal = null; if (pendingFile) { modal = &lt;ConfirmDeleteModal ... /&gt;; }</code>",
+   "Escape: <code>document.addEventListener(\"keydown\", handleKey)</code> in an effect, and remove it in the cleanup. Search: \"mdn KeyboardEvent key Escape\".",
+   "Backdrop only: <code>if (e.target === e.currentTarget) { onCancel(); }</code>",
+   "Remove after the API: <code>deleteFile(id).then(() =&gt; { setFiles((prev) =&gt; { return prev.filter((f) =&gt; { return f.id !== id; }); }); setDeleting(false); setPendingId(null); });</code>"
+  ],
+  "rubric": [
+   "Modal state is an id; name derived with find",
+   "Reused Button (danger variant)",
+   "Keydown listener cleaned up",
+   "Backdrop vs panel click handled",
+   "Deleting state prevents double delete",
+   "Row removed immutably after the API resolves",
+   "Accessibility: alertdialog, focus on Cancel"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--danger",
+     "#DC2626"
+    ],
+    [
+     "--danger-hover",
+     "#B91C1C"
+    ],
+    [
+     "--primary",
+     "#2563EB"
+    ],
+    [
+     "--muted",
+     "#6B7289"
+    ],
+    [
+     "Backdrop",
+     "rgba(17,24,39,.45)"
+    ],
+    [
+     "Icon circle",
+     "#FDECEC"
+    ]
+   ],
+   "notes": [
+    [
+     "Modal",
+     "max-w 400 · pad 24 · radius 14 · centered"
+    ],
+    [
+     "Icon",
+     "44 circle · mb 14"
+    ],
+    [
+     "Title",
+     "18/700"
+    ],
+    [
+     "Text",
+     "14 · muted · line-height 1.5 · mb 22"
+    ],
+    [
+     "Actions",
+     "right-aligned · gap 10"
+    ],
+    [
+     "Buttons",
+     "h 36 · radius 8 · 14/600"
+    ]
+   ]
+  }
+ }
+}

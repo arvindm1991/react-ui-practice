@@ -1,0 +1,508 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Project = {
+  id: string;
+  name: string;
+  framework: 'Next.js' | 'Vite' | 'Astro' | 'Remix';
+  branch: string;
+  status: 'ready' | 'building' | 'error';
+  deployedMinutesAgo: number;
+};
+
+const PROJECTS: Project[] = [
+  { id: 'prj_1', name: 'Marketing site', framework: 'Next.js', branch: 'main', status: 'ready', deployedMinutesAgo: 12 },
+  { id: 'prj_2', name: 'Docs', framework: 'Astro', branch: 'main', status: 'ready', deployedMinutesAgo: 95 },
+  { id: 'prj_3', name: 'Dashboard', framework: 'Vite', branch: 'release/2.4', status: 'building', deployedMinutesAgo: 1 },
+  { id: 'prj_4', name: 'Checkout', framework: 'Remix', branch: 'main', status: 'error', deployedMinutesAgo: 340 },
+  { id: 'prj_5', name: 'Status page', framework: 'Next.js', branch: 'main', status: 'ready', deployedMinutesAgo: 2880 },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /projects -> Project[]
+export async function getProjects(): Promise<Project[]> {
+  await randomDelay(400, 1000);
+  return PROJECTS.map((p) => ({ ...p }));
+}
+
+// PATCH /projects/:id { name } -> Project
+// Rejects (throws) if another project already has that name (case-insensitive).
+export async function renameProject(id: string, name: string): Promise<Project> {
+  await randomDelay(500, 1000);
+  const clash = PROJECTS.find((p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase());
+  if (clash) {
+    throw new Error('A project named "' + clash.name + '" already exists');
+  }
+  const project = PROJECTS.find((p) => p.id === id);
+  if (!project) {
+    throw new Error('Project not found');
+  }
+  project.name = name;
+  return { ...project };
+}
+@@@ shared src/components/StatusDot.tsx
+import React from 'react';
+import type { Project } from '../api';
+
+const LABELS = { ready: 'Ready', building: 'Building', error: 'Error' };
+
+export function StatusDot({ status }: { status: Project['status'] }) {
+  return (
+    <span className={'status status-' + status}>
+      <span className="status-dot" />
+      {LABELS[status]}
+    </span>
+  );
+}
+@@@ shared src/utils/format.ts
+// formatAgo(12) -> "12m ago", formatAgo(95) -> "1h ago", formatAgo(2880) -> "2d ago"
+export function formatAgo(minutes: number): string {
+  if (minutes < 60) {
+    return minutes + 'm ago';
+  }
+  if (minutes < 1440) {
+    return Math.floor(minutes / 60) + 'h ago';
+  }
+  return Math.floor(minutes / 1440) + 'd ago';
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProjects } from './api';
+import type { Project } from './api';
+import { StatusDot } from './components/StatusDot';
+import { formatAgo } from './utils/format';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="team">
+        <span className="team-mark">▲</span>
+        <span>acme-labs</span>
+      </div>
+      <nav className="side-nav">
+        <button type="button" className="side-link is-active">Projects</button>
+        <button type="button" className="side-link">Deployments</button>
+        <button type="button" className="side-link">Domains</button>
+        <button type="button" className="side-link">Settings</button>
+      </nav>
+    </aside>
+  );
+}
+
+// TODO: inline rename
+function ProjectRow({ project }: { project: Project }) {
+  return (
+    <li className="project-row">
+      <div className="project-main">
+        <span className="project-name">{project.name}</span>
+        <span className="project-sub">{project.framework} · <code>{project.branch}</code></span>
+      </div>
+      <StatusDot status={project.status} />
+      <span className="project-time">{formatAgo(project.deployedMinutesAgo)}</span>
+      <div className="row-actions">
+        <button type="button" className="btn-small">Edit</button>
+      </div>
+    </li>
+  );
+}
+
+function ProjectList() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjects().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProjects(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <p className="empty">Loading projects…</p>;
+  }
+
+  return (
+    <ul className="project-list">
+      {projects.map((p) => {
+        return <ProjectRow key={p.id} project={p} />;
+      })}
+    </ul>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Sidebar />
+      <main className="main">
+        <div className="page-head">
+          <div>
+            <h1>Projects</h1>
+            <p className="page-sub">Double-click a name to rename it.</p>
+          </div>
+          <button type="button" className="btn-primary">New project</button>
+        </div>
+        <ProjectList />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --border: #EAEAEA;
+  --text: #111111;
+  --muted: #6F6F6F;
+  --primary: #111111;
+  --focus: #0070F3;
+  --ok: #0CCE6B;
+  --warn: #F5A623;
+  --danger: #EE0000;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Geist, Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.sidebar { border-right: 1px solid var(--border); background: var(--surface); padding: 18px 12px; }
+.team { display: flex; align-items: center; gap: 8px; padding: 0 8px 18px; font-weight: 600; font-family: var(--mono); font-size: 13px; }
+.team-mark { width: 24px; height: 24px; border-radius: 50%; background: #000; color: #fff; display: grid; place-items: center; font-size: 10px; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-link { height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: inherit; text-align: left; color: var(--muted); cursor: pointer; }
+.side-link:hover { color: var(--text); background: var(--bg); }
+.side-link.is-active { color: var(--text); background: #F2F2F2; font-weight: 500; }
+
+.main { padding: 32px 40px; max-width: 900px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.page-head h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.page-sub { margin: 4px 0 0; color: var(--muted); }
+.btn-primary { height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--primary); color: #fff; font: inherit; font-weight: 500; cursor: pointer; }
+
+.empty { color: var(--muted); }
+.project-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.project-row { display: grid; grid-template-columns: 1fr 100px 80px 150px; align-items: center; gap: 16px; min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.project-row:last-child { border-bottom: 0; }
+.project-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.project-name { font-weight: 600; cursor: text; }
+.project-sub { font-size: 12px; color: var(--muted); }
+.project-sub code { font-family: var(--mono); font-size: 12px; background: #F2F2F2; padding: 1px 4px; border-radius: 4px; }
+.project-time { font-size: 13px; color: var(--muted); }
+.row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.btn-small { height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
+.btn-small:hover:not(:disabled) { border-color: #999; }
+.btn-small:disabled { opacity: 0.5; cursor: default; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-ready .status-dot { background: var(--ok); }
+.status-building .status-dot { background: var(--warn); }
+.status-error .status-dot { background: var(--danger); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProjects, renameProject } from './api';
+import type { Project } from './api';
+import { StatusDot } from './components/StatusDot';
+import { formatAgo } from './utils/format';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="team">
+        <span className="team-mark">▲</span>
+        <span>acme-labs</span>
+      </div>
+      <nav className="side-nav">
+        <button type="button" className="side-link is-active">Projects</button>
+        <button type="button" className="side-link">Deployments</button>
+        <button type="button" className="side-link">Domains</button>
+        <button type="button" className="side-link">Settings</button>
+      </nav>
+    </aside>
+  );
+}
+
+type RowProps = {
+  project: Project;
+  isEditing: boolean;
+  draft: string;
+  error: string;
+  saving: boolean;
+  onStartEdit: (project: Project) => void;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
+
+// The row owns no state: the list decides which row is being edited.
+function ProjectRow({ project, isEditing, draft, error, saving, onStartEdit, onDraftChange, onSave, onCancel }: RowProps) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      onSave();
+    }
+    if (e.key === 'Escape') {
+      onCancel();
+    }
+  }
+
+  let nameEl = (
+    <span className="project-name" onDoubleClick={() => { onStartEdit(project); }}>{project.name}</span>
+  );
+  let actions = <button type="button" className="btn-small" disabled={saving} onClick={() => { onStartEdit(project); }}>Edit</button>;
+  if (isEditing) {
+    let inputCls = 'name-input';
+    if (error) {
+      inputCls = 'name-input has-error';
+    }
+    let message = null;
+    if (error) {
+      message = <span className="name-error">{error}</span>;
+    }
+    let saveLabel = 'Save';
+    if (saving) {
+      saveLabel = 'Saving…';
+    }
+    nameEl = (
+      <span className="name-edit">
+        <input
+          className={inputCls}
+          aria-label="Project name"
+          value={draft}
+          disabled={saving}
+          autoFocus
+          onFocus={(e) => { e.target.select(); }}
+          onChange={(e) => { onDraftChange(e.target.value); }}
+          onKeyDown={handleKeyDown}
+        />
+        {message}
+      </span>
+    );
+    actions = (
+      <>
+        <button type="button" className="btn-small" disabled={saving} onClick={() => { onCancel(); }}>Cancel</button>
+        <button type="button" className="btn-small btn-dark" disabled={saving} onClick={() => { onSave(); }}>{saveLabel}</button>
+      </>
+    );
+  }
+
+  let rowCls = 'project-row';
+  if (isEditing) {
+    rowCls = 'project-row is-editing';
+  }
+
+  return (
+    <li className={rowCls}>
+      <div className="project-main">
+        {nameEl}
+        <span className="project-sub">{project.framework} · <code>{project.branch}</code></span>
+      </div>
+      <StatusDot status={project.status} />
+      <span className="project-time">{formatAgo(project.deployedMinutesAgo)}</span>
+      <div className="row-actions">
+        {actions}
+      </div>
+    </li>
+  );
+}
+
+function ProjectList() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Change: one editingId for the whole list means only one row can be open at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjects().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProjects(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleStartEdit(project: Project) {
+    if (saving) {
+      return;
+    }
+    // Opening another row simply replaces the old draft (the old row cancels).
+    setEditingId(project.id);
+    setDraft(project.name);
+    setError('');
+  }
+
+  function handleCancel() {
+    setEditingId(null);
+    setError('');
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    setError('');
+  }
+
+  function handleSave() {
+    const id = editingId;
+    const name = draft.trim();
+    const current = projects.find((p) => {
+      return p.id === id;
+    });
+    if (!id || !current) {
+      return;
+    }
+    if (name === '') {
+      setError("Name can't be empty");
+      return;
+    }
+    if (name === current.name) {
+      handleCancel();
+      return;
+    }
+    setSaving(true);
+    renameProject(id, name)
+      .then((updated) => {
+        setProjects((prev) => {
+          return prev.map((p) => {
+            if (p.id === updated.id) {
+              return updated;
+            }
+            return p;
+          });
+        });
+        setSaving(false);
+        setEditingId(null);
+      })
+      .catch((err: Error) => {
+        // Server said no (e.g. duplicate name): stay in edit mode and show why.
+        setSaving(false);
+        setError(err.message);
+      });
+  }
+
+  if (loading) {
+    return <p className="empty">Loading projects…</p>;
+  }
+
+  return (
+    <ul className="project-list">
+      {projects.map((p) => {
+        return (
+          <ProjectRow
+            key={p.id}
+            project={p}
+            isEditing={p.id === editingId}
+            draft={draft}
+            error={error}
+            saving={saving}
+            onStartEdit={handleStartEdit}
+            onDraftChange={handleDraftChange}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          />
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Sidebar />
+      <main className="main">
+        <div className="page-head">
+          <div>
+            <h1>Projects</h1>
+            <p className="page-sub">Double-click a name to rename it.</p>
+          </div>
+          <button type="button" className="btn-primary">New project</button>
+        </div>
+        <ProjectList />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --border: #EAEAEA;
+  --text: #111111;
+  --muted: #6F6F6F;
+  --primary: #111111;
+  --focus: #0070F3;
+  --ok: #0CCE6B;
+  --warn: #F5A623;
+  --danger: #EE0000;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Geist, Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.sidebar { border-right: 1px solid var(--border); background: var(--surface); padding: 18px 12px; }
+.team { display: flex; align-items: center; gap: 8px; padding: 0 8px 18px; font-weight: 600; font-family: var(--mono); font-size: 13px; }
+.team-mark { width: 24px; height: 24px; border-radius: 50%; background: #000; color: #fff; display: grid; place-items: center; font-size: 10px; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-link { height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: inherit; text-align: left; color: var(--muted); cursor: pointer; }
+.side-link:hover { color: var(--text); background: var(--bg); }
+.side-link.is-active { color: var(--text); background: #F2F2F2; font-weight: 500; }
+
+.main { padding: 32px 40px; max-width: 900px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.page-head h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.page-sub { margin: 4px 0 0; color: var(--muted); }
+.btn-primary { height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--primary); color: #fff; font: inherit; font-weight: 500; cursor: pointer; }
+
+.empty { color: var(--muted); }
+.project-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.project-row { display: grid; grid-template-columns: 1fr 100px 80px 150px; align-items: center; gap: 16px; min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.project-row:last-child { border-bottom: 0; }
+.project-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.project-name { font-weight: 600; cursor: text; }
+.project-sub { font-size: 12px; color: var(--muted); }
+.project-sub code { font-family: var(--mono); font-size: 12px; background: #F2F2F2; padding: 1px 4px; border-radius: 4px; }
+.project-time { font-size: 13px; color: var(--muted); }
+.row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.btn-small { height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
+.btn-small:hover:not(:disabled) { border-color: #999; }
+.btn-small:disabled { opacity: 0.5; cursor: default; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-ready .status-dot { background: var(--ok); }
+.status-building .status-dot { background: var(--warn); }
+.status-error .status-dot { background: var(--danger); }
+
+/* ---- Added: inline rename ---- */
+.project-row.is-editing { background: #FCFCFC; }
+.name-edit { display: flex; flex-direction: column; gap: 4px; }
+.name-input { height: 32px; width: 100%; max-width: 320px; padding: 0 10px; border: 1px solid #999; border-radius: 6px; font: inherit; font-weight: 600; color: var(--text); background: var(--surface); }
+.name-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.15); }
+.name-input:disabled { color: var(--muted); background: #F5F5F5; }
+.name-input.has-error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(238, 0, 0, 0.1); }
+.name-error { font-size: 12px; color: var(--danger); }
+.btn-dark { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-dark:hover:not(:disabled) { border-color: var(--primary); background: #333; }

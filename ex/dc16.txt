@@ -1,0 +1,399 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type OrderStatus = 'Paid' | 'Baking' | 'Out for delivery' | 'Delivered';
+
+export type Order = {
+  id: string;
+  number: number;
+  customer: string;
+  items: number;
+  totalCents: number;
+  status: OrderStatus;
+};
+
+export type OrdersPage = {
+  orders: Order[];
+  total: number; // total number of orders across ALL pages
+};
+
+const CUSTOMERS = ['Blue Door Café', 'Hotel Marlowe', 'Greenleaf Market', 'Oak & Ember', 'Little Fern Daycare', 'Sunday Social', 'Pier 9 Kitchen', 'The Reading Room'];
+const STATUSES: OrderStatus[] = ['Paid', 'Baking', 'Out for delivery', 'Delivered'];
+
+// 23 orders, newest first: #1123 down to #1101.
+const ORDERS: Order[] = [];
+for (let i = 0; i < 23; i++) {
+  ORDERS.push({
+    id: 'o' + (1123 - i),
+    number: 1123 - i,
+    customer: CUSTOMERS[i % CUSTOMERS.length],
+    items: 4 + ((i * 7) % 19),
+    totalCents: 4200 + ((i * 3517) % 26000),
+    status: STATUSES[Math.min(3, Math.floor(i / 3))],
+  });
+}
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /orders?page=2&pageSize=5 -> { orders, total }
+// Pages start at 1. A page past the end returns an empty list.
+export async function getOrders(page: number, pageSize: number): Promise<OrdersPage> {
+  await randomDelay(300, 900);
+  const start = (page - 1) * pageSize;
+  return {
+    orders: ORDERS.slice(start, start + pageSize).map((o) => ({ ...o })),
+    total: ORDERS.length,
+  };
+}
+@@@ shared src/components/StatusBadge.tsx
+import React from 'react';
+import type { OrderStatus } from '../api';
+
+const CLASS_BY_STATUS: Record<OrderStatus, string> = {
+  'Paid': 'badge is-paid',
+  'Baking': 'badge is-baking',
+  'Out for delivery': 'badge is-out',
+  'Delivered': 'badge is-done',
+};
+
+export function StatusBadge({ status }: { status: OrderStatus }) {
+  return <span className={CLASS_BY_STATUS[status]}>{status}</span>;
+}
+@@@ shared src/utils/format.ts
+// formatPrice(4200) -> "$42.00"
+export function formatPrice(cents: number): string {
+  return '$' + (cents / 100).toFixed(2);
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getOrders } from './api';
+import type { Order } from './api';
+import { StatusBadge } from './components/StatusBadge';
+import { formatPrice } from './utils/format';
+
+const PAGE_SIZE = 5;
+
+function TopNav() {
+  return (
+    <header className="topnav">
+      <span className="logo">🥐 Crumb &amp; Co.</span>
+      <span className="env">Wholesale admin</span>
+    </header>
+  );
+}
+
+function OrderRow({ order }: { order: Order }) {
+  return (
+    <tr>
+      <td className="order-no">#{order.number}</td>
+      <td>{order.customer}</td>
+      <td>{order.items} items</td>
+      <td><StatusBadge status={order.status} /></td>
+      <td className="num">{formatPrice(order.totalCents)}</td>
+    </tr>
+  );
+}
+
+// TODO: only page 1 is ever loaded. Add pagination below the table.
+function OrdersTable() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getOrders(1, PAGE_SIZE).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setOrders(data.orders);
+      setTotal(data.total);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading && orders.length === 0) {
+    return <p className="msg">Loading orders…</p>;
+  }
+
+  return (
+    <div className="card">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Status</th>
+            <th className="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => {
+            return <OrderRow key={o.id} order={o} />;
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopNav />
+      <main className="main">
+        <div className="page-head">
+          <h1>Orders</h1>
+          <button type="button" className="btn">Export CSV</button>
+        </div>
+        <OrdersTable />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FBF7F4;
+  --surface: #FFFFFF;
+  --border: #EEE4DE;
+  --text: #2D1B24;
+  --muted: #8C7681;
+  --primary: #C2185B;
+  --primary-soft: #FCE4EE;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.topnav { display: flex; align-items: center; gap: 12px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; font-size: 17px; }
+.env { padding: 3px 8px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; }
+
+.main { max-width: 860px; margin: 0 auto; padding: 28px; }
+.page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.page-head h1 { margin: 0; font-size: 24px; }
+.btn { height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.msg { color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { padding: 11px 16px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.table td { height: 52px; padding: 0 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.order-no { font-weight: 700; }
+
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge.is-paid { background: #EEF2FF; color: #4338CA; }
+.badge.is-baking { background: #FFF4E5; color: #B45309; }
+.badge.is-out { background: #E0F2FE; color: #0369A1; }
+.badge.is-done { background: #ECFDF3; color: #067647; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getOrders } from './api';
+import type { Order } from './api';
+import { StatusBadge } from './components/StatusBadge';
+import { formatPrice } from './utils/format';
+
+const PAGE_SIZE = 5;
+
+function TopNav() {
+  return (
+    <header className="topnav">
+      <span className="logo">🥐 Crumb &amp; Co.</span>
+      <span className="env">Wholesale admin</span>
+    </header>
+  );
+}
+
+function OrderRow({ order }: { order: Order }) {
+  return (
+    <tr>
+      <td className="order-no">#{order.number}</td>
+      <td>{order.customer}</td>
+      <td>{order.items} items</td>
+      <td><StatusBadge status={order.status} /></td>
+      <td className="num">{formatPrice(order.totalCents)}</td>
+    </tr>
+  );
+}
+
+type PaginationProps = {
+  page: number;
+  pageCount: number;
+  disabled: boolean;
+  onChange: (page: number) => void;
+};
+
+function Pagination({ page, pageCount, disabled, onChange }: PaginationProps) {
+  // [1, 2, ..., pageCount]
+  const pages = Array.from({ length: pageCount }, (_, i) => {
+    return i + 1;
+  });
+
+  const prevDisabled = disabled || page === 1;
+  const nextDisabled = disabled || page === pageCount;
+
+  return (
+    <nav className="pager" aria-label="Pagination">
+      <button type="button" className="pager-btn" disabled={prevDisabled} onClick={() => { onChange(page - 1); }}>← Prev</button>
+      {pages.map((n) => {
+        let cls = 'page-num';
+        let current: 'page' | undefined = undefined;
+        if (n === page) {
+          cls = 'page-num is-current';
+          current = 'page';
+        }
+        return (
+          <button key={n} type="button" className={cls} aria-current={current} disabled={disabled} onClick={() => { onChange(n); }}>
+            {n}
+          </button>
+        );
+      })}
+      <button type="button" className="pager-btn" disabled={nextDisabled} onClick={() => { onChange(page + 1); }}>Next →</button>
+    </nav>
+  );
+}
+
+function OrdersTable() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+
+  // Re-runs whenever the page changes. The old rows stay on screen (dimmed) until the new ones arrive.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getOrders(page, PAGE_SIZE).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setOrders(data.orders);
+      setTotal(data.total);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
+
+  function goTo(next: number) {
+    setPage(next);
+  }
+
+  // derived
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const first = (page - 1) * PAGE_SIZE + 1;
+  const last = Math.min(page * PAGE_SIZE, total);
+
+  if (loading && orders.length === 0) {
+    return <p className="msg">Loading orders…</p>;
+  }
+
+  let tableCls = 'table';
+  if (loading) {
+    tableCls = 'table is-loading';
+  }
+
+  return (
+    <div className="card">
+      <table className={tableCls} aria-busy={loading}>
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Status</th>
+            <th className="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => {
+            return <OrderRow key={o.id} order={o} />;
+          })}
+        </tbody>
+      </table>
+      <footer className="table-foot">
+        <span className="range">Showing {first}–{last} of {total}</span>
+        <Pagination page={page} pageCount={pageCount} disabled={loading} onChange={(n) => { goTo(n); }} />
+      </footer>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopNav />
+      <main className="main">
+        <div className="page-head">
+          <h1>Orders</h1>
+          <button type="button" className="btn">Export CSV</button>
+        </div>
+        <OrdersTable />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FBF7F4;
+  --surface: #FFFFFF;
+  --border: #EEE4DE;
+  --text: #2D1B24;
+  --muted: #8C7681;
+  --primary: #C2185B;
+  --primary-soft: #FCE4EE;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.topnav { display: flex; align-items: center; gap: 12px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; font-size: 17px; }
+.env { padding: 3px 8px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; }
+
+.main { max-width: 860px; margin: 0 auto; padding: 28px; }
+.page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.page-head h1 { margin: 0; font-size: 24px; }
+.btn { height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.msg { color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { padding: 11px 16px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.table td { height: 52px; padding: 0 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.order-no { font-weight: 700; }
+
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge.is-paid { background: #EEF2FF; color: #4338CA; }
+.badge.is-baking { background: #FFF4E5; color: #B45309; }
+.badge.is-out { background: #E0F2FE; color: #0369A1; }
+.badge.is-done { background: #ECFDF3; color: #067647; }
+
+/* ---- Added: pagination ---- */
+.table.is-loading tbody { opacity: 0.45; transition: opacity 0.15s; }
+.table-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.range { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pager { display: flex; align-items: center; gap: 4px; }
+.pager-btn, .page-num { height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+.pager-btn:hover:not(:disabled), .page-num:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.page-num.is-current { background: var(--primary); border-color: var(--primary); color: #fff; }
+.pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-num:disabled:not(.is-current) { opacity: 0.6; cursor: wait; }

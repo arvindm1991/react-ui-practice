@@ -1,0 +1,338 @@
+<template id="tpl-st-arch">
+  <h1>Architecting a React app that grows</h1>
+  <p class="lede">Any folder structure works for five components. This lesson follows one app, Lexi, from a weekend prototype to 200 components and three teams. At each stage it shows what breaks and the idea that fixes it, so you can see why staff engineers set things up the way they do.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain what goes wrong when a React app grows, and why organizing by feature fixes most of it</li>
+    <li>Sort any piece of state into one of four kinds and say where each kind belongs</li>
+    <li>Choose between props, context and a store, and name what each one costs</li>
+    <li>Decide when to extract a component or hook, and when to leave the duplication alone</li>
+    <li>Review a folder structure the way a staff engineer would</li>
+  </ul></div>
+
+  <h2>1. The running example: Lexi at 5 components and at 200</h2>
+  <p><b>Lexi</b> is a reading app for schools. Students do reading sessions: they read a passage aloud and the app scores their fluency. Teachers have a dashboard that shows their class. District admins get reports across many schools.</p>
+  <p><b>Month 1.</b> One developer builds the student reading screen. There are five components: <code>App</code>, <code>PassageView</code>, <code>RecordButton</code>, <code>ScoreCard</code> and <code>Header</code>. Everything sits in <code>src/components/</code>. State lives in <code>App</code> and goes down as props. This is the right design for this size. It is small and easy to read.</p>
+  <p><b>Month 9.</b> There are now teacher dashboards, assignments, class rosters, district reports, settings and billing. There are 200 components, 40 hooks and 3 teams. Nobody planned the structure, it just grew. Here is what the team starts to notice:</p>
+  <ul>
+    <li><b>Nobody can find anything.</b> <code>src/components/</code> has 140 files. <code>Table.tsx</code>, <code>ClassTable.tsx</code>, <code>RosterTable.tsx</code> and <code>StudentTable2.tsx</code> all exist, and nobody knows which one to use.</li>
+    <li><b>Changes leak.</b> A developer on the reports team changes <code>formatScore()</code> in <code>utils/</code> to show one decimal place. The student score card, which uses the same function, now shows "87.0%" to eight-year-olds.</li>
+    <li><b>Everything re-renders.</b> All the app's data ended up in one big context "so everyone can reach it". Typing in the roster search box re-renders the whole dashboard.</li>
+    <li><b>Nobody can delete code.</b> Is <code>useStudentStats</code> still used? It's imported in 11 places and some of them might be dead. Deleting it feels risky, so nobody does.</li>
+    <li><b>Data is copied everywhere.</b> The class list is fetched in three places and stored in two contexts and one Redux slice. Rename a class in one screen and another screen still shows the old name.</li>
+  </ul>
+  <p>None of these are bugs in a single component. They are <b>structure problems</b>: where code lives, who is allowed to import what, and where data is kept. The rest of the lesson takes them one at a time.</p>
+
+  <h2>2. Organizing by type vs by feature</h2>
+  <p>There are two common ways to sort files into folders.</p>
+  <p><b>By type</b> means you group by what kind of file it is: all components in one folder, all hooks in another, all API calls in a third. <b>By feature</b> means you group by what part of the product it serves: everything for the roster in one folder, everything for reports in another.</p>
+  <div class="ba"><div><span>By type (month 1 default)</span><pre>src/
+  components/
+    ClassTable.tsx
+    RosterTable.tsx
+    ScoreCard.tsx
+    ReportChart.tsx
+    ... 136 more
+  hooks/
+    useRoster.ts
+    useReport.ts
+    ... 38 more
+  api/
+    roster.ts
+    reports.ts
+  utils/
+    formatScore.ts</pre></div><i>→</i><div><span>By feature (month 9 fix)</span><pre>src/
+  app/            routes / pages
+  features/
+    roster/
+      RosterPage.tsx
+      RosterTable.tsx
+      useRoster.ts
+      api.ts
+      index.ts    public interface
+    reading-session/
+    reports/
+    assignments/
+  shared/
+    ui/           Button, Table, Modal
+    lib/          dates, http client</pre></div></div>
+  <p>Why does by-feature win once the app is big? Think about what a real change looks like. "Add a 'last active' column to the roster" touches the roster table, the roster hook, and the roster API call. Sorted by type, those three files are in three different folders, next to 180 files that have nothing to do with the roster. Sorted by feature, they sit next to each other in <code>features/roster/</code>.</p>
+  <p>There is a deeper reason too. Feature folders give you a <b>unit of ownership</b>. The reports team owns <code>features/reports/</code>. They can rename, rewrite or delete anything inside it without asking anyone, as long as they keep its public interface (section 6) working. With by-type folders, nobody owns <code>utils/</code>, so everyone edits it and nobody cleans it up.</p>
+  <p>By-type is not wrong. It is the right choice for a small app, and it is still the right choice <em>inside</em> <code>shared/</code>, where the files really are generic. The rule of thumb is: <b>group by how often things change together.</b> Files that change in the same pull request should live near each other.</p>
+
+  <h2>3. Three layers: routes, feature containers, reusable UI</h2>
+  <p>Folders are half the story. The other half is which code is allowed to depend on which. Most large React apps settle into three layers.</p>
+  <svg viewBox="0 0 680 330" width="100%" role="img" aria-label="Three layers. Routes import feature containers, which import reusable UI. Arrows only point downward." style="max-width:680px;display:block;margin:18px auto;color:var(--ink);font-family:var(--font-body)">
+    <defs>
+      <marker id="st1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    </defs>
+    <rect x="20" y="16" width="640" height="76" rx="10" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="36" y="42" style="fill:currentColor;font-size:15px;font-weight:600">1. Routes / pages</text>
+    <text x="36" y="64" style="fill:var(--muted);font-size:13px">/teacher/classes/:classId  ·  /district/reports  ·  /session/:id</text>
+    <text x="36" y="82" style="fill:var(--muted);font-size:13px">Reads the URL, picks the layout, puts features on the page. Little logic.</text>
+
+    <rect x="20" y="126" width="640" height="76" rx="10" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="36" y="152" style="fill:currentColor;font-size:15px;font-weight:600">2. Feature containers</text>
+    <text x="36" y="174" style="fill:var(--muted);font-size:13px">RosterPanel  ·  ReadingSession  ·  DistrictReport</text>
+    <text x="36" y="192" style="fill:var(--muted);font-size:13px">Fetch data, own the feature's state, know the business rules.</text>
+
+    <rect x="20" y="236" width="640" height="76" rx="10" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="36" y="262" style="fill:currentColor;font-size:15px;font-weight:600">3. Reusable UI</text>
+    <text x="36" y="284" style="fill:var(--muted);font-size:13px">Button  ·  Table  ·  Modal  ·  ScoreBadge</text>
+    <text x="36" y="302" style="fill:var(--muted);font-size:13px">Props in, events out. Knows nothing about students, classes or the API.</text>
+
+    <line x1="560" y1="92" x2="560" y2="124" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st1-arrow)"/>
+    <line x1="560" y1="202" x2="560" y2="234" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st1-arrow)"/>
+    <text x="574" y="113" style="fill:var(--accent);font-size:12px">imports</text>
+    <text x="574" y="223" style="fill:var(--accent);font-size:12px">imports</text>
+  </svg>
+  <p><b>Routes</b> (also called pages) are the top. A route reads the URL, picks a layout, and places features on the screen. It should be thin: if a route file is 400 lines, the feature logic has leaked into it.</p>
+  <p><b>Feature containers</b> are the middle. A container is a component that knows about the product: it fetches the roster, holds the "which students are selected" state, and decides what happens when a teacher clicks "Assign". It is the only layer that talks to the API.</p>
+  <p><b>Reusable UI</b> is the bottom. A <code>Table</code> takes rows and columns as props and calls <code>onRowClick</code>. It has no idea what a student is. This is what lets the same table appear in the roster, the reports and the billing page.</p>
+  <p>The important rule is the direction of the arrows: <b>imports only point down</b>. A <code>Button</code> never imports from <code>features/roster</code>. A feature never imports from a route. When an arrow points up, the bottom layer stops being reusable, because it now drags product code along with it.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="the three layers in Lexi">
+// app/teacher/classes/[classId]/page.tsx  (route: thin)
+// (In current Next.js, params arrive as a Promise, so the page awaits them.)
+export default async function ClassPage({ params }: { params: Promise<{ classId: string }> }) {
+  const { classId } = await params;
+  return (
+    <TeacherLayout>
+      <RosterPanel classId={classId} />
+    </TeacherLayout>
+  );
+}
+
+// features/roster/RosterPanel.tsx  (container: data + rules)
+export function RosterPanel({ classId }: { classId: string }) {
+  const { data: students, isPending, error } = useRoster(classId);
+
+  if (isPending) return <TableSkeleton rows={8} />;
+  if (error) return <ErrorState message="Couldn't load this class." />;
+
+  const rows = students.map(toRosterRow);
+  return <Table columns={ROSTER_COLUMNS} rows={rows} />;
+}
+
+// shared/ui/Table.tsx  (reusable: props in, events out)
+export function Table<Row extends { id: string }>({ columns, rows, onRowClick }: TableProps<Row>) {
+  // knows nothing about students
+}
+</script>
+
+  <h2>4. The four kinds of state</h2>
+  <p>The single biggest cause of the "data copied everywhere" problem is treating all state as the same thing. It isn't. There are four kinds, and each has a natural home.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Kind</th><th>Lexi example</th><th>Who really owns it</th><th>Where it belongs</th></tr>
+    <tr><td><b>Server data</b></td><td>The class roster, a student's past scores</td><td>The database. Your copy is a snapshot that can go out of date.</td><td>A server-state cache such as TanStack Query, or server components. Not <code>useState</code>, not Redux.</td></tr>
+    <tr><td><b>URL state</b></td><td>Which class is open, the report's date range, the current page of results</td><td>The address bar</td><td>Route params and search params (<code>?from=2026-09-01&amp;grade=3</code>)</td></tr>
+    <tr><td><b>Local UI / form state</b></td><td>Is the "Add student" dialog open? What's typed in the name field?</td><td>One component</td><td><code>useState</code> or <code>useReducer</code> in that component, or a form library for big forms</td></tr>
+    <tr><td><b>Global client state</b></td><td>The signed-in teacher, theme, a session's live recording status shown in the header</td><td>The browser, for the whole app</td><td>Context for rarely changing values; a small store (Zustand, Redux Toolkit) for values that change often</td></tr>
+  </table></div>
+  <p>Once you sort state this way, most of what used to be "global" turns out not to be. In month-9 Lexi, the big <code>AppContext</code> held the roster, the selected class, the report filters, the current user and whether a modal was open. Sorted:</p>
+  <ul>
+    <li>Roster: <b>server data</b>, goes to the query cache. (The next lesson is all about this.)</li>
+    <li>Selected class and report filters: <b>URL state</b>. Now a teacher can bookmark the report, share it with the principal, and hit the back button.</li>
+    <li>Modal open: <b>local state</b>, back inside the component that shows the modal.</li>
+    <li>Current user: genuinely <b>global</b>. It stays in context, alone.</li>
+  </ul>
+  <p>Four values were in the wrong place, and only one actually belonged there. That's a typical result.</p>
+  <p>URL state is the one people forget most. A simple test: <b>if the user refreshes the page, should this still be selected?</b> If yes, it belongs in the URL.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="report filters as URL state">
+// features/reports/useReportFilters.ts
+import { useSearchParams } from 'react-router'; // or next/navigation in Next.js
+
+export function useReportFilters() {
+  const [params, setParams] = useSearchParams();
+
+  const filters = {
+    grade: params.get('grade') ?? 'all',
+    from: params.get('from') ?? defaultFrom(),
+  };
+
+  function setFilter(key: 'grade' | 'from', value: string) {
+    setParams((prev) => {
+      prev.set(key, value);
+      return prev;
+    });
+  }
+
+  return { filters, setFilter };
+}
+</script>
+  <p>The component that uses this hook doesn't know or care that the values live in the URL. That's the point of wrapping it in a hook: if you later move filters somewhere else, only this file changes.</p>
+
+  <h2>5. Colocation: keep things close to where they're used</h2>
+  <p><b>Colocation</b> means putting code, state, styles and tests as close as possible to the place that uses them. It applies at every level.</p>
+  <ul>
+    <li><b>State:</b> keep it in the lowest component that covers everyone who reads it. Only lift it when a second component needs it.</li>
+    <li><b>Files:</b> <code>RosterTable.tsx</code>, <code>RosterTable.test.tsx</code> and <code>RosterTable.module.css</code> sit side by side, not in three distant <code>tests/</code> and <code>styles/</code> folders.</li>
+    <li><b>Helpers:</b> a function used by one feature lives in that feature, not in <code>shared/lib</code>.</li>
+  </ul>
+  <p>Why it matters at scale: colocated code is <b>easy to delete</b>. When the product team kills the "reading streaks" feature, you delete <code>features/streaks/</code> and you're done. If streak logic was spread across <code>utils/</code>, <code>hooks/</code> and a global store, you'd be hunting for leftovers for a week, and some would survive forever.</p>
+  <p>Colocation also explains the <code>formatScore</code> accident from section 1. The function was shared too early. The student card wanted "87%" and the district report wanted "87.0%". They were two different functions that happened to start out identical.</p>
+
+  <h2>6. Prop drilling vs context vs a store</h2>
+  <p>When a value lives high in the tree and something deep down needs it, you have three options. Each one costs something different.</p>
+  <svg viewBox="0 0 680 300" width="100%" role="img" aria-label="Three ways to get a value from the top of the tree to a deep component: props through every level, context that skips levels, and a store that components subscribe to directly." style="max-width:680px;display:block;margin:18px auto;color:var(--ink);font-family:var(--font-body)">
+    <defs>
+      <marker id="st1-arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+    </defs>
+    <text x="113" y="22" text-anchor="middle" style="fill:currentColor;font-size:14px;font-weight:600">Props</text>
+    <text x="340" y="22" text-anchor="middle" style="fill:currentColor;font-size:14px;font-weight:600">Context</text>
+    <text x="567" y="22" text-anchor="middle" style="fill:currentColor;font-size:14px;font-weight:600">Store</text>
+    <!-- props column -->
+    <rect x="58" y="38" width="110" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="113" y="60" text-anchor="middle" style="fill:currentColor;font-size:13px">Page (owns it)</text>
+    <rect x="58" y="98" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="113" y="120" text-anchor="middle" style="fill:currentColor;font-size:13px">Layout</text>
+    <rect x="58" y="158" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="113" y="180" text-anchor="middle" style="fill:currentColor;font-size:13px">Panel</text>
+    <rect x="58" y="218" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="113" y="240" text-anchor="middle" style="fill:currentColor;font-size:13px">Badge (reads)</text>
+    <line x1="113" y1="72" x2="113" y2="96" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st1-arrow2)"/>
+    <line x1="113" y1="132" x2="113" y2="156" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st1-arrow2)"/>
+    <line x1="113" y1="192" x2="113" y2="216" style="stroke:var(--accent);stroke-width:2" marker-end="url(#st1-arrow2)"/>
+    <text x="113" y="280" text-anchor="middle" style="fill:var(--muted);font-size:12px">every level passes it on</text>
+    <!-- context column -->
+    <rect x="285" y="38" width="110" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="340" y="60" text-anchor="middle" style="fill:currentColor;font-size:13px">Provider</text>
+    <rect x="285" y="98" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="340" y="120" text-anchor="middle" style="fill:currentColor;font-size:13px">Layout</text>
+    <rect x="285" y="158" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="340" y="180" text-anchor="middle" style="fill:currentColor;font-size:13px">Panel</text>
+    <rect x="285" y="218" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="340" y="240" text-anchor="middle" style="fill:currentColor;font-size:13px">Badge (reads)</text>
+    <path d="M395,55 C440,55 440,235 397,235" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4" marker-end="url(#st1-arrow2)"/>
+    <text x="340" y="280" text-anchor="middle" style="fill:var(--muted);font-size:12px">skips the middle levels</text>
+    <!-- store column -->
+    <rect x="512" y="38" width="110" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="567" y="60" text-anchor="middle" style="fill:currentColor;font-size:13px">Store</text>
+    <rect x="512" y="98" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="567" y="120" text-anchor="middle" style="fill:currentColor;font-size:13px">Header (reads)</text>
+    <rect x="512" y="158" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="567" y="180" text-anchor="middle" style="fill:currentColor;font-size:13px">Panel</text>
+    <rect x="512" y="218" width="110" height="34" rx="8" style="fill:var(--surface);stroke:var(--line)"/><text x="567" y="240" text-anchor="middle" style="fill:currentColor;font-size:13px">Badge (reads)</text>
+    <path d="M622,55 C660,55 660,115 624,115" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4" marker-end="url(#st1-arrow2)"/>
+    <path d="M622,62 C672,62 672,235 624,235" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4" marker-end="url(#st1-arrow2)"/>
+    <text x="567" y="280" text-anchor="middle" style="fill:var(--muted);font-size:12px">each reader subscribes to its slice</text>
+  </svg>
+  <p><b>Prop drilling</b> means passing a value through components that don't use it, just so a deeper one can. It's explicit: you can trace exactly where data comes from by following the props. Its cost is noise and coupling. Every middle component has to know about the value, and adding a new one means editing every level. For two or three levels it's fine, and often the best choice.</p>
+  <p>Before reaching for anything else, try <b>composition</b>: let the parent pass the finished child down as <code>children</code>. Then the middle levels never touch the data at all.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="composition removes the drilling">
+// Before: Layout and Panel only pass `teacher` along
+<ClassLayout teacher={teacher}>…</ClassLayout>
+
+// After: the page builds the badge itself and hands it down ready-made
+function ClassPage({ classId }: { classId: string }) {
+  const teacher = useCurrentTeacher();
+  const badge = <TeacherBadge teacher={teacher} />;
+  return (
+    <ClassLayout headerRight={badge}>
+      <RosterPanel classId={classId} />
+    </ClassLayout>
+  );
+}
+</script>
+  <p><b>Context</b> lets any component below a <code>Provider</code> read a value without the middle levels passing it. Its cost is in two places. First, it's less visible: you can't see from a component's props what it depends on. Second, when the context value changes, <b>every component that reads that context re-renders</b>, even if it only cares about one field. That's what made month-9 Lexi slow: the roster search text lived in the same context as everything else. Context is best for values that rarely change: the current user, theme, locale, feature flags.</p>
+  <p>A <b>store</b> (Zustand, Redux Toolkit, Jotai and others) keeps state outside React. Components subscribe to just the slice they need, using a <b>selector</b> (a function that picks the part you want), and only re-render when that slice changes. Its cost is another library, another concept for new hires, and a temptation to put everything in it. Use it for client state that changes often and is read in many distant places: in Lexi, the live recording status of a reading session, shown in the header, the passage view and the controls at once.</p>
+  <script type="text/x-code" data-lang="ts" data-title="a small store with a selector (Zustand)">
+// features/reading-session/sessionStore.ts
+import { create } from 'zustand';
+
+type SessionState = {
+  status: 'idle' | 'recording' | 'scoring';
+  elapsedMs: number;
+  start: () => void;
+  stop: () => void;
+};
+
+export const useSessionStore = create<SessionState>()((set) => ({
+  status: 'idle',
+  elapsedMs: 0,
+  start: () => set({ status: 'recording', elapsedMs: 0 }),
+  stop: () => set({ status: 'scoring' }),
+}));
+
+// In the header: re-renders only when status changes, not every tick of elapsedMs
+const status = useSessionStore((s) => s.status);
+</script>
+  <div class="table-wrap"><table>
+    <tr><th>Option</th><th>Gives you</th><th>Costs you</th><th>Choose it when</th></tr>
+    <tr><td>Props</td><td>Explicit, traceable data flow</td><td>Boilerplate in middle layers</td><td>2 to 3 levels, or you can use composition</td></tr>
+    <tr><td>Context</td><td>No drilling, built into React</td><td>Hidden dependencies; all readers re-render on change</td><td>The value is app-wide and rarely changes</td></tr>
+    <tr><td>Store</td><td>Fine-grained subscriptions, logic outside components</td><td>A dependency, a pattern to teach, risk of a junk drawer</td><td>Client state changes often and is read far apart</td></tr>
+  </table></div>
+  <p>Notice what's not in this table: server data. Putting the roster in context or Redux is how Lexi ended up with three copies. Server data goes in a server-state cache, which is the next lesson.</p>
+
+  <h2>7. Module boundaries and public interfaces</h2>
+  <p>A <b>module boundary</b> is a line around a folder that says "outside code may only use these things". The list of allowed things is the folder's <b>public interface</b>. In TypeScript projects, this is usually an <code>index.ts</code> file that re-exports what's public.</p>
+  <script type="text/x-code" data-lang="ts" data-title="features/roster/index.ts">
+// The only things other features may import from roster
+export { RosterPanel } from './RosterPanel';
+export { useRoster } from './useRoster';
+export type { Student } from './types';
+
+// NOT exported: RosterTable, toRosterRow, api.ts, rosterColumns.
+// Those are internal. The roster team can change them freely.
+</script>
+  <p>Why bother? Go back to "nobody can delete code". If the reports feature imports <code>features/roster/internal/toRosterRow</code> directly, the roster team can't rename that function without breaking reports, and they may not even know reports uses it. With a boundary, the roster team knows exactly what they've promised: three exports. Everything else is theirs to change.</p>
+  <p>A boundary only works if it's enforced, because under deadline pressure people will import whatever works. Teams enforce it with a lint rule that bans "deep imports" into another feature's folder (ESLint's <code>no-restricted-imports</code>, or a dedicated boundaries plugin), and with the same rule for the layers in section 3: <code>shared/</code> may not import from <code>features/</code>, and features may not import from each other's internals.</p>
+  <p>A useful extra rule: <b>features don't import from other features at all</b>, except through their public interface, and ideally only the route composes them. When two features need the same thing, that's a signal to move it down into <code>shared/</code>, or to accept a small duplicate.</p>
+
+  <h2>8. When to extract a component or hook</h2>
+  <p>Extracting means pulling code out into its own component or hook. There are good reasons and bad reasons to do it.</p>
+  <p><b>Good reasons to extract a component:</b></p>
+  <ul>
+    <li>It has <b>its own state</b> that the parent doesn't need. A roster row with an inline "edit name" mode should be its own <code>RosterRow</code>, so the edit state lives per row.</li>
+    <li>It's a <b>separate idea</b> you can name in a few words, and naming it makes the parent easier to read.</li>
+    <li>It needs to be <b>tested or reused</b> on its own, and you have an actual second use, not an imagined one.</li>
+  </ul>
+  <p><b>Good reasons to extract a hook:</b> the component mixes "how we get and shape data" with "how it looks". A custom hook like <code>useRoster(classId)</code> or <code>useReportFilters()</code> hides the how, and gives the rest of the code one place to change. Hooks are for <em>logic with state or effects</em>. A pure calculation with no hooks inside should just be a plain function.</p>
+  <p><b>Bad reasons:</b> "this file is long" by itself (a long, flat, readable component can be fine), or "we might need this somewhere else one day".</p>
+
+  <h3>The rule of three and premature abstraction</h3>
+  <p>A <b>premature abstraction</b> is a shared component or function created before you know what the uses have in common. It's the most expensive mistake in large frontends, because it's hard to undo.</p>
+  <p>Here's how it plays out in Lexi. Developer A builds the roster table. Developer B needs a table for reports, sees the roster one, and generalizes it into <code>DataTable</code>. Then billing needs one. Six months later <code>DataTable</code> has 31 props, including <code>hideScoreColumnForDistrictAdmins</code> and <code>billingMode</code>. Every change risks breaking three screens, and nobody dares touch it.</p>
+  <p>The <b>rule of three</b>: tolerate duplication until you have three real copies. With two, you're guessing what's shared. With three, you can see which parts actually stayed the same and which drifted apart. Then extract only the parts that are truly the same. A popular summary of this idea is "duplication is far cheaper than the wrong abstraction".</p>
+  <p>A good shared component has a <b>small, boring interface</b>: <code>Table</code> takes <code>columns</code> and <code>rows</code>. If you notice yourself adding boolean props for one caller's special case, stop. Either let callers pass in content through <code>children</code> or render props, or split the component.</p>
+
+  <h2>9. How a staff engineer approaches this</h2>
+  <p>When a staff engineer is asked to review Lexi's structure, they don't start with "by feature is better". They start with questions about how the code is <em>changed</em>, because structure exists to make changes cheap.</p>
+  <div class="trace"><b>The questions they ask</b>
+    <ol>
+      <li><b>Pick a recent feature request. How many folders did it touch?</b> If "add a column to the roster" touched six top-level folders, the structure is fighting the work.</li>
+      <li><b>Who owns each folder?</b> Can every folder be mapped to a team? Folders with no owner (often <code>utils/</code>, <code>common/</code>, <code>helpers/</code>) become junk drawers.</li>
+      <li><b>Which way do the imports point?</b> Does anything in <code>shared/ui</code> import product code? Do features reach into each other's internals? A quick import graph usually answers this in minutes.</li>
+      <li><b>Where does each kind of state live?</b> Is server data copied into client stores? Are filters in state that should be in the URL? How big is the biggest context?</li>
+      <li><b>Could we delete a feature cleanly?</b> Imagine removing reading streaks. Is it one folder, or a scavenger hunt?</li>
+      <li><b>What do the shared components look like?</b> Count props on the most-used ones. Lots of booleans named after specific screens means premature abstraction.</li>
+    </ol>
+  </div>
+  <p>Then they state trade-offs plainly, in the form "X gives you A at the cost of B; choose it when C":</p>
+  <ul>
+    <li><b>Feature folders</b> give you ownership and easy deletion at the cost of some duplication between features. Choose them once more than one team works in the app, or past roughly 50 components.</li>
+    <li><b>Enforced boundaries</b> give you safe refactoring at the cost of occasional friction ("I just want to import that one helper"). Choose them when teams are stepping on each other.</li>
+    <li><b>A client store</b> gives you fine-grained updates at the cost of a dependency and a concept to teach. Choose it only after you've moved server data and URL state out, and still have fast-changing shared client state.</li>
+    <li><b>A shared component</b> gives you consistency at the cost of coupling every caller to it. Choose it after the third real use, with a small interface.</li>
+  </ul>
+  <p>Finally, they <b>don't propose a big-bang rewrite</b>. They propose a migration path: new code goes in feature folders starting now; add the lint rule in "warn" mode; move one feature per sprint, starting with the one that changes most often; move filters to the URL as each screen is touched.</p>
+
+  <h2>10. Common mistakes</h2>
+  <div class="mistake"><b>Server data in a global store or context</b><p>Creates copies that go stale. Use a server-state cache instead.</p></div>
+  <div class="mistake"><b>One giant context for "app state"</b><p>Every reader re-renders on every change. Split by kind of state; most of it doesn't belong there anyway.</p></div>
+  <div class="mistake"><b>Filters, tabs and selected IDs in useState</b><p>Refresh loses them, back button doesn't work, links can't be shared. Put them in the URL.</p></div>
+  <div class="mistake"><b>Generalizing on the second use</b><p>You're guessing what's common. Wait for the third, then extract only what is truly the same.</p></div>
+  <div class="mistake"><b>Shared UI that imports product code</b><p>The arrow points up, so the "reusable" component can't be reused. Keep <code>shared/</code> ignorant of features.</p></div>
+  <div class="mistake"><b>Deep imports into another feature</b><p>Freezes that feature's internals. Import only from its <code>index.ts</code>, and enforce it with a lint rule.</p></div>
+  <div class="mistake"><b>Reorganizing everything at once</b><p>A giant move PR conflicts with every open branch. Migrate feature by feature.</p></div>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"I'd organize by feature, with three layers: thin routes, feature containers that own data and rules, and a shared UI layer that knows nothing about the product. Imports only point down, and each feature has a small public interface enforced by a lint rule. For state, I first sort it into four kinds: server data goes in a query cache, anything that should survive a refresh goes in the URL, UI state stays local, and only truly global client state goes in context or a small store. I'd tolerate duplication until there are three real uses before building a shared abstraction. And I'd migrate one feature at a time rather than reorganizing in one big PR."</p>
+  </div>
+
+  <h2>11. Recap</h2>
+  <ul>
+    <li>Small apps don't need architecture. Big ones break on structure: findability, leaking changes, re-renders, undeletable code, duplicated data.</li>
+    <li>Group by how things change together: by feature at scale, by type inside <code>shared/</code>.</li>
+    <li>Three layers (routes → feature containers → reusable UI), with imports only pointing down.</li>
+    <li>Four kinds of state: server data (query cache), URL state (address bar), local UI state (the component), global client state (context or store). Most "global" state isn't.</li>
+    <li>Colocate, so features can be found and deleted in one place.</li>
+    <li>Props first, composition second, context for rarely changing values, a store for fast-changing shared client state.</li>
+    <li>Public interfaces protect internals. Enforce them with lint, not willpower.</li>
+    <li>Rule of three: wrong abstractions cost more than duplication.</li>
+  </ul>
+
+  <h3>Check yourself</h3>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">1. A teacher picks "Grade 3" and "last 30 days" on the district report. Which kind of state is that, and where should it live?</summary><p style="margin:10px 0 0;color:var(--muted)">URL state, in search params. Refreshing should keep it, the principal should be able to open the same link, and the back button should undo a filter change.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">2. Typing in the roster search box makes the whole dashboard sluggish. The search text is in AppContext. What's going on and what's the fix?</summary><p style="margin:10px 0 0;color:var(--muted)">Every component that reads AppContext re-renders on every keystroke. The search text is local UI state (or URL state if it should survive a refresh), so move it into the roster panel or the URL, and keep the context for rarely changing values.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">3. The reports team wants to reuse RosterTable. It's not exported from features/roster/index.ts. What are their options?</summary><p style="margin:10px 0 0;color:var(--muted)">Ask the roster team to make it public (they then own that promise), build their own table on top of the shared UI Table, or, if this is the third similar table, extract the truly common part into shared/ui. Not: deep-import the internal file.</p></details>
+  <details class="q" style="cursor:pointer;margin:10px 0"><summary class="q-text" style="margin:0">4. You see a shared Button with props isRosterAction and isBillingDanger. What does that tell you?</summary><p style="margin:10px 0 0;color:var(--muted)">Product knowledge has leaked into the reusable layer: a premature or overstretched abstraction. Replace screen-specific booleans with general variants (for example variant="danger"), or let callers compose what they need.</p></details>
+</template>

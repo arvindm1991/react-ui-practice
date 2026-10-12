@@ -1,0 +1,318 @@
+<template id="tpl-st-lead">
+  <h1>Thinking like a staff engineer</h1>
+  <p class="lede">Staff engineer is the level where your job stops being "write the best code on the team" and becomes "make the whole system of people and code produce better results". You already do a version of this as a product and engineering leader. This lesson follows one real problem in a reading app from first symptom to finished migration, and shows what a staff engineer does at each step, and which technical depth you need to add on top of the leadership you already have.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Describe what staff engineers actually spend their time on</li>
+    <li>Frame a technical decision with options, trade-offs and reversibility (one-way vs two-way doors)</li>
+    <li>Write a short design doc (RFC) and run an incremental migration instead of a rewrite</li>
+    <li>Explain the frontend reliability toolkit: error boundaries, monitoring, feature flags, gradual rollouts, rollbacks</li>
+    <li>Use code review to teach, argue for tech debt with numbers, and lead without formal authority</li>
+  </ul></div>
+
+  <h2>1. The running example: three teams, three ways to fetch data</h2>
+  <p><b>Lexi</b> is a reading app for schools: a <b>teacher dashboard</b> (class roster, who's falling behind), <b>student reading sessions</b> (a timed passage, then questions), and <b>district reports</b> (accuracy and minutes across schools). Three teams of three to four engineers, one React 19 / Next.js App Router frontend.</p>
+  <p>Two years in, each team fetches data its own way. The dashboard team wrote custom <code>useEffect</code> + <code>useState</code> hooks. The sessions team uses a homemade cache in context. The reports team calls <code>fetch</code> in components and keeps <code>isLoading</code> flags. Symptoms the business sees:</p>
+  <ul>
+    <li>A teacher assigns a book, goes back to the roster, and it still shows the old assignment until a hard refresh (<b>stale data</b>: data on screen that no longer matches the server).</li>
+    <li>The district report occasionally shows a spinner forever on top of old numbers.</li>
+    <li>Every new screen needs a day of loading/error/retry plumbing before any feature work starts.</li>
+  </ul>
+  <p>Nobody's code is "wrong". No single team owns the problem. That combination, a problem that's <b>cross-team, technical, and nobody's job</b>, is exactly where staff engineers live.</p>
+
+  <h2>2. What staff engineers actually do</h2>
+  <p>Strip away the titles and the work comes down to four verbs. Here's each one in the Lexi story.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Verb</th><th>What it means</th><th>In Lexi</th></tr>
+    <tr><td><b>Set direction</b></td><td>Decide where the technical system should be in 6–18 months, and write it down so teams can make local choices that add up</td><td>"All server data goes through one cache library with one loading/error model."</td></tr>
+    <tr><td><b>Make cross-team decisions</b></td><td>Own the decisions that no single team can make alone, and make them stick</td><td>Picking the library, the query-key convention, and who migrates what, when</td></tr>
+    <tr><td><b>Raise the bar</b></td><td>Make the default way of doing things better: patterns, reviews, tooling, examples</td><td>A <code>useClassRoster</code> example hook every team copies; a lint rule against <code>fetch</code> in components</td></tr>
+    <tr><td><b>Unblock</b></td><td>Find the stuck thing and remove it, often by writing the hardest code yourself</td><td>Writing the adapter that lets old and new fetching run side by side, so no team has to stop feature work</td></tr>
+  </table></div>
+  <p>Notice what's missing: "write the most code". Staff engineers do still write code, and it matters that they can, but it's usually the <em>leverage</em> code: the prototype that proves an approach, the shared primitive, the migration tooling.</p>
+
+  <h3>How your current strengths map</h3>
+  <p>You've run a company and you run product and engineering now. A lot transfers directly. Some doesn't, and the gap is specific.</p>
+  <div class="table-wrap"><table>
+    <tr><th>You already have</th><th>How it shows up as staff</th><th>The technical depth to add</th></tr>
+    <tr><td>Prioritising against business goals</td><td>Arguing for tech debt in terms leaders accept (section 7)</td><td>Estimating engineering cost accurately: knowing that the "small" migration touches 140 call sites</td></tr>
+    <tr><td>Writing specs and PRDs</td><td>Writing RFCs (section 4)</td><td>Naming the real technical options and their failure modes, not just the user outcome</td></tr>
+    <tr><td>Aligning stakeholders</td><td>Leading without authority (section 8)</td><td>Earning trust from senior engineers by being right on details: cache invalidation, render cost, error paths</td></tr>
+    <tr><td>Shipping under deadlines</td><td>Gradual rollouts and safe deploys (section 6)</td><td>Knowing how frontend breaks in production and how to see it: error rates, Web Vitals, version skew</td></tr>
+    <tr><td>Hiring and coaching</td><td>Code review as teaching (section 5)</td><td>Reading a diff and spotting the bug, the missing test, the pattern that won't scale</td></tr>
+  </table></div>
+  <div class="callout"><span class="callout-label">The honest version</span>
+    <p>Directors are trusted for judgement about people and priorities. Staff engineers are trusted for judgement about systems, and that trust is earned in code review and design review, one correct technical call at a time. Your edge is that you already think in outcomes and trade-offs; the work is making sure the technical half of each trade-off is as solid as the business half.</p>
+  </div>
+
+  <h2>3. Making a technical decision</h2>
+  <p>The tempting move is to say "let's use TanStack Query" in a Slack thread and start. The staff move has four steps.</p>
+
+  <h3>Step 1: frame the problem, not the solution</h3>
+  <p>Write one paragraph about the problem with evidence. "Server data is fetched three different ways. In the last quarter, 11 bugs were caused by stale or stuck loading state (links). New screens take about a day of fetch plumbing. Teachers have reported stale rosters 9 times." If the framing names a library, it's not a framing.</p>
+
+  <h3>Step 2: list real options, including "do nothing"</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Option</th><th>Gives you</th><th>Costs you</th></tr>
+    <tr><td>A. Do nothing, fix bugs as they come</td><td>Zero migration cost</td><td>The 11 bugs/quarter continue; every new screen still pays the plumbing tax</td></tr>
+    <tr><td>B. Standardise on our own shared hook</td><td>Full control, no dependency</td><td>We'd be building and maintaining a cache: dedupe, invalidation, retries, refetch on focus. That's a product, not a hook.</td></tr>
+    <tr><td>C. Adopt TanStack Query (v5) across client components</td><td>Caching, deduping, retries, invalidation, devtools, a typed <code>status</code> union; widely known so hiring is easier</td><td>A dependency, a learning curve for query keys and invalidation, a migration</td></tr>
+    <tr><td>D. Move reads to React Server Components</td><td>Data fetched on the server, less client JS, no client loading state for first paint</td><td>Doesn't cover the interactive, frequently-refetched parts (live session progress, filters); bigger architectural change</td></tr>
+  </table></div>
+  <p>Often the answer is a combination. For Lexi: <b>C for interactive client data, plus D for the static parts of district reports</b>, which barely change during a visit and are ideal for server rendering.</p>
+
+  <h3>Step 3: state the trade-off in one sentence</h3>
+  <p>"TanStack Query gives us a single, well-tested cache and loading model at the cost of a dependency and a few weeks of migration; choose it because we already have three half-built caches and the bug rate shows they aren't working."</p>
+
+  <h3>Step 4: check reversibility</h3>
+  <p>Some decisions are <b>two-way doors</b>: if they're wrong you walk back through cheaply. Others are <b>one-way doors</b>: expensive or impossible to undo. (The phrase comes from Amazon's leadership writing.) The amount of process a decision deserves depends on which kind it is.</p>
+
+  <svg viewBox="0 0 720 230" width="100%" role="img" aria-label="Spectrum of Lexi decisions from easy to undo to hard to undo" style="font-family: var(--font-body); font-size: 13px; color: var(--ink)">
+    <defs><marker id="st8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill: currentColor"/></marker></defs>
+    <text x="20" y="26" style="fill: var(--ok); font-weight: 600">Two-way doors: decide fast, in the PR</text>
+    <text x="700" y="26" text-anchor="end" style="fill: var(--accent); font-weight: 600">One-way doors: slow down, write an RFC</text>
+    <line x1="20" y1="110" x2="700" y2="110" style="stroke: currentColor; stroke-width: 2" marker-end="url(#st8a)"/>
+    <text x="20" y="134" style="fill: var(--muted)">cheap to undo</text>
+    <text x="700" y="134" text-anchor="end" style="fill: var(--muted)">expensive to undo</text>
+    <rect x="20" y="44" width="150" height="48" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/>
+    <text x="30" y="64" style="fill: currentColor">Button copy, a</text><text x="30" y="82" style="fill: currentColor">flagged UI tweak</text>
+    <rect x="190" y="44" width="160" height="48" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/>
+    <text x="200" y="64" style="fill: currentColor">Library inside one</text><text x="200" y="82" style="fill: currentColor">hook (hidden by adapter)</text>
+    <rect x="370" y="150" width="160" height="48" rx="6" style="fill: var(--warn-soft); stroke: var(--warn)"/>
+    <text x="380" y="170" style="fill: currentColor">Query-key convention</text><text x="380" y="188" style="fill: currentColor">used by 3 teams</text>
+    <rect x="545" y="44" width="155" height="48" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+    <text x="555" y="64" style="fill: currentColor">Public URL structure,</text><text x="555" y="82" style="fill: currentColor">data model, framework</text>
+    <rect x="545" y="150" width="155" height="48" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+    <text x="555" y="170" style="fill: currentColor">Deleting student data,</text><text x="555" y="188" style="fill: currentColor">district API contract</text>
+    <text x="20" y="222" style="fill: var(--muted)">Good design moves decisions left: an adapter turns "which library" from a one-way door into a two-way door.</text>
+  </svg>
+
+  <p>That last line is the subtle staff insight. You can often <b>make a one-way door two-way</b>. If every component calls <code>useClassRoster()</code> and only that hook knows about TanStack Query, swapping the library later touches one file, not 140.</p>
+
+  <h2>4. Writing a short design doc (RFC)</h2>
+  <p>An <b>RFC</b> ("request for comments") is a short written proposal that others review before work starts. Its job isn't paperwork; it's to surface the objection that would otherwise appear in week three of the migration. Two to four pages. Here's a compact outline for the Lexi decision.</p>
+  <div class="callout"><span class="callout-label">RFC: Migrate Lexi's client data fetching to TanStack Query</span>
+    <ol>
+      <li><b>Context.</b> Three fetching patterns; 11 stale/stuck-state bugs last quarter; ~1 day of plumbing per new screen. Links to bugs.</li>
+      <li><b>Goals.</b> One cache and one loading/error model for client-side server data. Stale roster after an assignment: fixed by invalidation, not refresh.</li>
+      <li><b>Non-goals.</b> Not changing the API. Not moving global UI state (theme, open modals) into the cache. Not migrating everything this quarter.</li>
+      <li><b>Options considered.</b> A–D from the table above, one paragraph each, and why C + D.</li>
+      <li><b>Proposal.</b> One <code>QueryClient</code> at the root. Domain hooks (<code>useClassRoster</code>, <code>useSession</code>, <code>useDistrictReport</code>) are the only callers of <code>useQuery</code>. Query-key convention: <code>['class', classId, 'roster']</code>. Mutations invalidate by key prefix. Responses validated with schemas at the fetch function.</li>
+      <li><b>Migration plan.</b> Adapter hooks behind a flag, one screen at a time, starting with the roster (highest bug count). Old code deleted per screen once flag is at 100% for two weeks.</li>
+      <li><b>Rollout and rollback.</b> Flag per screen; 5% → 25% → 100% of teachers; guardrails: error rate, roster load time (p75), support tickets. Rollback = flip the flag.</li>
+      <li><b>Risks and open questions.</b> Over-fetching from refetch-on-focus on school Chromebooks? Default <code>staleTime</code>? Who owns the key convention?</li>
+      <li><b>Cost.</b> ~4 engineer-weeks, spread over 6 weeks at ~20% of each team's time.</li>
+    </ol>
+  </div>
+  <p>Two habits make RFCs work. Send it to the <em>skeptics</em> first, privately, and fold their objections in before the wide review. And give it a <b>decision date</b>, so "comments" doesn't become "forever".</p>
+
+  <h2>5. Incremental migrations, not rewrites</h2>
+  <p>The rewrite pitch is always the same: "it'll be faster to start fresh". It almost never is. A rewrite stops feature work, has to re-discover every edge case the old code quietly handled, and delivers no value until it's 100% done. The alternative is the <b>strangler pattern</b> (named after the strangler fig, which grows around a tree until it replaces it): put a stable interface in front of the old code, route a little traffic to the new implementation behind it, grow that share, then delete the old one.</p>
+
+  <svg viewBox="0 0 720 220" width="100%" role="img" aria-label="Strangler migration: an adapter hook sits in front of old and new implementations, and traffic shifts from old to new over three phases" style="font-family: var(--font-body); font-size: 13px; color: var(--ink)">
+    <text x="20" y="22" style="fill: currentColor; font-weight: 600">Week 1</text>
+    <text x="260" y="22" style="fill: currentColor; font-weight: 600">Weeks 2–4</text>
+    <text x="500" y="22" style="fill: currentColor; font-weight: 600">Week 6</text>
+    <g>
+      <rect x="20" y="36" width="200" height="34" rx="6" style="fill: var(--surface-2); stroke: currentColor"/><text x="34" y="58" style="fill: currentColor">components (unchanged)</text>
+      <rect x="20" y="86" width="200" height="34" rx="6" style="fill: var(--warn-soft); stroke: var(--warn)"/><text x="34" y="108" style="fill: currentColor">useClassRoster() adapter</text>
+      <rect x="20" y="136" width="200" height="34" rx="6" style="fill: var(--surface); stroke: var(--line)"/><text x="34" y="158" style="fill: currentColor">old useEffect fetch: 100%</text>
+      <line x1="120" y1="70" x2="120" y2="86" style="stroke: var(--muted)"/><line x1="120" y1="120" x2="120" y2="136" style="stroke: var(--muted)"/>
+    </g>
+    <g>
+      <rect x="260" y="36" width="200" height="34" rx="6" style="fill: var(--surface-2); stroke: currentColor"/><text x="274" y="58" style="fill: currentColor">components (unchanged)</text>
+      <rect x="260" y="86" width="200" height="34" rx="6" style="fill: var(--warn-soft); stroke: var(--warn)"/><text x="274" y="108" style="fill: currentColor">adapter reads flag</text>
+      <rect x="260" y="136" width="95" height="34" rx="6" style="fill: var(--surface); stroke: var(--line)"/><text x="268" y="158" style="fill: currentColor">old: 75%</text>
+      <rect x="365" y="136" width="95" height="34" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="373" y="158" style="fill: currentColor">query: 25%</text>
+      <line x1="360" y1="70" x2="360" y2="86" style="stroke: var(--muted)"/><line x1="310" y1="120" x2="310" y2="136" style="stroke: var(--muted)"/><line x1="410" y1="120" x2="410" y2="136" style="stroke: var(--muted)"/>
+    </g>
+    <g>
+      <rect x="500" y="36" width="200" height="34" rx="6" style="fill: var(--surface-2); stroke: currentColor"/><text x="514" y="58" style="fill: currentColor">components (unchanged)</text>
+      <rect x="500" y="86" width="200" height="34" rx="6" style="fill: var(--warn-soft); stroke: var(--warn)"/><text x="514" y="108" style="fill: currentColor">useClassRoster()</text>
+      <rect x="500" y="136" width="200" height="34" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="514" y="158" style="fill: currentColor">TanStack Query: 100%</text>
+      <line x1="600" y1="70" x2="600" y2="86" style="stroke: var(--muted)"/><line x1="600" y1="120" x2="600" y2="136" style="stroke: var(--muted)"/>
+    </g>
+    <text x="20" y="196" style="fill: var(--muted)">The interface (the hook and its return type) never changes, so 140 call sites never change.</text>
+    <text x="20" y="214" style="fill: var(--muted)">Old code is deleted only after the new path has run at 100% without incident.</text>
+  </svg>
+
+  <p>The adapter is the piece a staff engineer often writes personally, because it's the risky, leveraged part. It returns the same <code>status</code> union the old hook did, so callers can't tell which path is running.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="useClassRoster.ts: the strangler adapter">
+import { useQuery } from '@tanstack/react-query';
+
+export type RosterState =
+  | { status: 'loading' }
+  | { status: 'error'; error: Error }
+  | { status: 'success'; data: Roster };
+
+export function useClassRoster(classId: string): RosterState {
+  const useNewPath = useFlag('tq-class-roster');          // per-teacher flag from our flag provider
+
+  // Both hooks are always called (rules of hooks); only one is enabled.
+  const legacy = useLegacyRoster(classId, { enabled: !useNewPath });
+  const query = useQuery({
+    queryKey: ['class', classId, 'roster'],
+    queryFn: () => fetchRoster(classId),                  // validates with a schema inside
+    enabled: useNewPath,
+  });
+
+  if (!useNewPath) {
+    return legacy;
+  }
+  if (query.status === 'pending') {
+    return { status: 'loading' };
+  }
+  if (query.status === 'error') {
+    return { status: 'error', error: query.error };
+  }
+  return { status: 'success', data: query.data };
+}
+</script>
+  <p>The stale-roster bug then gets fixed in one line in the assign-book mutation: on success, invalidate <code>['class', classId]</code>, and every query under that prefix refetches.</p>
+
+  <h2>6. Frontend reliability</h2>
+  <p>A migration is a change to code that thousands of teachers use every school day. Reliability is the set of tools that let you change things often without breaking things often.</p>
+
+  <h3>Error boundaries: contain the blast radius</h3>
+  <p>When a component throws during render, React unmounts the whole tree above it, unless an <b>error boundary</b> catches it. A boundary is a component that shows a fallback for its subtree instead. In React 19 you still write them as class components or, more commonly, use the small <code>react-error-boundary</code> package. Put them around <em>independent regions</em>, so a broken chart doesn't take the roster with it.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="TeacherDashboard.tsx: one boundary per region">
+import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
+
+function PanelError({ resetErrorBoundary }: FallbackProps) {
+  return (
+    <div role="alert" className="panel-error">
+      <p>This panel couldn't load.</p>
+      <button onClick={resetErrorBoundary}>Try again</button>
+    </div>
+  );
+}
+
+export function TeacherDashboard({ classId }: { classId: string }) {
+  return (
+    <div className="dashboard">
+      <ErrorBoundary FallbackComponent={PanelError} onError={logError} resetKeys={[classId]}>
+        <RosterPanel classId={classId} />
+      </ErrorBoundary>
+      <ErrorBoundary FallbackComponent={PanelError} onError={logError} resetKeys={[classId]}>
+        <ProgressChart classId={classId} />
+      </ErrorBoundary>
+    </div>
+  );
+}
+</script>
+  <p>Boundaries don't catch errors in event handlers or async code; those you catch yourself, or let your data library surface as an <code>error</code> status.</p>
+
+  <h3>Logging and monitoring: know before the email arrives</h3>
+  <p>The district admin's screenshot in Monday's inbox is the worst monitoring system. You want three signals: <b>errors</b> (an error-tracking service collecting JS exceptions with the release version and the user's route), <b>performance</b> (real-user Core Web Vitals: LCP for load, INP for responsiveness, CLS for layout shift, ideally at the 75th percentile), and <b>product health</b> (did roster loads succeed? did sessions submit?). Tag everything with the release and the flag variants, so you can compare "teachers on the new path" vs "old path" directly.</p>
+
+  <h3>Feature flags and gradual rollouts</h3>
+  <p>A <b>feature flag</b> is a runtime switch that decides which code path a user gets, without a deploy. It separates <b>deploy</b> (code is on the servers) from <b>release</b> (users see it). That separation is what makes the rest safe.</p>
+
+  <svg viewBox="0 0 720 200" width="100%" role="img" aria-label="Rollout pipeline: deploy dark, then 5, 25, 100 percent of teachers, with guardrail checks and a rollback path to off" style="font-family: var(--font-body); font-size: 13px; color: var(--ink)">
+    <defs><marker id="st8b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--muted)"/></marker></defs>
+    <rect x="10" y="40" width="110" height="50" rx="8" style="fill: var(--surface-2); stroke: currentColor"/><text x="22" y="62" style="fill: currentColor">Deploy dark</text><text x="22" y="80" style="fill: var(--muted)">flag off: 0%</text>
+    <rect x="160" y="40" width="110" height="50" rx="8" style="fill: var(--surface); stroke: currentColor"/><text x="172" y="62" style="fill: currentColor">Staff + pilot</text><text x="172" y="80" style="fill: var(--muted)">schools: 5%</text>
+    <rect x="310" y="40" width="110" height="50" rx="8" style="fill: var(--surface); stroke: currentColor"/><text x="322" y="62" style="fill: currentColor">25% of</text><text x="322" y="80" style="fill: var(--muted)">teachers</text>
+    <rect x="460" y="40" width="110" height="50" rx="8" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="472" y="62" style="fill: currentColor">100%</text><text x="472" y="80" style="fill: var(--muted)">for 2 weeks</text>
+    <rect x="610" y="40" width="100" height="50" rx="8" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="622" y="62" style="fill: currentColor">Delete old</text><text x="622" y="80" style="fill: var(--muted)">code + flag</text>
+    <line x1="120" y1="65" x2="156" y2="65" style="stroke: var(--muted)" marker-end="url(#st8b)"/>
+    <line x1="270" y1="65" x2="306" y2="65" style="stroke: var(--muted)" marker-end="url(#st8b)"/>
+    <line x1="420" y1="65" x2="456" y2="65" style="stroke: var(--muted)" marker-end="url(#st8b)"/>
+    <line x1="570" y1="65" x2="606" y2="65" style="stroke: var(--muted)" marker-end="url(#st8b)"/>
+    <text x="160" y="24" style="fill: var(--muted)">between every step: guardrails (error rate, p75 load time, tickets)</text>
+    <path d="M215 92 C 215 150, 65 150, 65 94" style="fill: none; stroke: var(--accent); stroke-dasharray: 5 4" marker-end="url(#st8b)"/>
+    <path d="M365 92 C 365 168, 65 168, 65 94" style="fill: none; stroke: var(--accent); stroke-dasharray: 5 4" marker-end="url(#st8b)"/>
+    <text x="230" y="190" style="fill: var(--accent)">guardrail breached → flip flag off (seconds, no deploy)</text>
+  </svg>
+
+  <p>Two cautions. Flags are debt: each one doubles the paths to test, so every flag gets an owner and a removal date. And for a school product, choose the rollout unit with care: rolling out by <em>school</em> or <em>teacher</em> (not random page loads) means a teacher doesn't see the roster flip between old and new behaviour mid-lesson.</p>
+
+  <h3>Safe deploys and rollbacks</h3>
+  <p>Platforms like Vercel and most modern pipelines give you <b>immutable deploys</b>: every build gets its own URL, and "rollback" means pointing traffic back to the previous build, in seconds. That's the safety net for things flags don't cover (a broken build, a bad dependency upgrade). One frontend-specific trap: <b>version skew</b>. A teacher who loaded the page an hour ago is still running the old JavaScript, talking to your new server. API changes must be backwards-compatible for at least that window, and lazy-loaded chunks from the old build must stay available or the app will break when a teacher clicks into a new tab.</p>
+
+  <h2>7. Code review as teaching</h2>
+  <p>During the migration, every team sends PRs that touch the new hooks. Review is where the conventions actually get adopted, or don't. The staff skill is <b>choosing what to comment on</b>.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Comment on (and explain why)</th><th>Let go (or let the linter say it)</th></tr>
+    <tr><td>Correctness: a mutation that doesn't invalidate the roster key</td><td>Formatting, import order: automate it</td></tr>
+    <tr><td>Conventions other teams depend on: query-key shape, calling <code>useQuery</code> outside a domain hook</td><td>Naming taste when the name is clear enough</td></tr>
+    <tr><td>Missing error and empty states; a test for the bug being fixed</td><td>A different-but-fine way to structure a component</td></tr>
+    <tr><td>Things that are expensive to change later: public props of a shared component, API contracts</td><td>Micro-optimisations without a measurement</td></tr>
+  </table></div>
+  <p>Label your comments so the author knows the weight: <b>blocking</b>, <b>suggestion</b>, <b>nit</b>, <b>question</b>. And write comments that teach the principle, not just the fix:</p>
+  <div class="ba"><div><span>Fixes this PR</span><pre>Add invalidateQueries here.</pre></div><i>vs</i><div><span>Fixes the next ten PRs</span><pre>blocking: assigning a book changes the
+roster, so the cached roster is now
+stale. Invalidate ['class', classId]
+on success; every query under that
+prefix refetches. (This is the bug
+in LEX-412.)</pre></div></div>
+  <p>When the same comment appears three times, it's not a review problem: write the example, the doc section, or the lint rule.</p>
+
+  <h2>8. Deadlines vs tech debt, with numbers</h2>
+  <p>The district reports team has a hard deadline: a new report for the spring board meetings, due in 6 weeks. The product lead asks, reasonably, why anyone should spend time on a migration now. "It's cleaner" will lose that argument. Numbers win it.</p>
+  <div class="trace"><b>The arithmetic</b>
+    <ol>
+      <li>Last quarter: 11 stale/stuck-state bugs × ~1.5 engineer-days each = <b>16.5 engineer-days</b> fixing them.</li>
+      <li>New screens: ~6 per quarter × ~1 day of fetch plumbing = <b>6 engineer-days</b>.</li>
+      <li>Total tax: about <b>22 engineer-days per quarter</b>, about 3% of the three teams' combined time, plus 9 teacher-facing complaints.</li>
+      <li>Migration cost: <b>~20 engineer-days</b> (4 weeks), spread at ~20% so no team stops feature work.</li>
+      <li>If it removes even 70% of the tax (~15 days/quarter), it <b>pays back in about 4 months</b>, and keeps paying.</li>
+    </ol>
+  </div>
+  <p>Then make the deadline and the debt help each other: <b>"The new district report is the first screen built on the new hooks."</b> It needs fetching anyway; building it on the new path costs about the same as the old path, and it becomes the reference example. The deadline is protected, and the migration gets a real customer. Staff engineers rarely win by asking for a "tech debt sprint"; they win by attaching debt work to product work and showing the payback.</p>
+
+  <h2>9. Leading without authority</h2>
+  <p>A staff engineer can't assign work to the three teams. You know this situation well from the other side: as a director you had authority, and you probably noticed the best outcomes still came from persuasion. Here's how it works when persuasion is all you have:</p>
+  <ul>
+    <li><b>Make the right thing the easy thing.</b> The adapter, the example hook, the codemod, the docs. If adopting the new pattern is less work than not adopting it, you don't need to argue.</li>
+    <li><b>Go first, and take the worst part.</b> Migrate the roster, the gnarliest screen, yourself. Credibility comes from doing the hard part, not delegating it.</li>
+    <li><b>Give credit loudly.</b> When the sessions team finishes their migration, it's their win in the demo, not yours.</li>
+    <li><b>Disagree in private, commit in public.</b> If the RFC lands on a key convention you didn't prefer, defend it as if it were yours.</li>
+    <li><b>Find the sponsor.</b> A director or VP who agrees the problem matters gives teams permission to spend the 20%. Your product background makes that conversation natural: bring the numbers from section 8.</li>
+  </ul>
+
+  <h2>10. How a staff engineer approaches this</h2>
+  <p>The questions, in order, for any cross-team technical problem:</p>
+  <ol>
+    <li><b>What's the evidence?</b> Bugs, tickets, time lost, metrics. No evidence, no project.</li>
+    <li><b>Is this a one-way or two-way door?</b> Match the process to the reversibility. Can an interface make it two-way?</li>
+    <li><b>What are the real options, including doing nothing?</b> State each as "X gives you A at the cost of B; choose it when C".</li>
+    <li><b>What's the smallest step that delivers value and teaches us something?</b> One screen, behind a flag.</li>
+    <li><b>How will we know it's working, and how do we undo it?</b> Guardrail metrics and a rollback that takes seconds.</li>
+    <li><b>Who needs to say yes, and who needs to do the work?</b> Sponsor, skeptics, owning teams.</li>
+  </ol>
+  <p>Two trade-offs that come up constantly. A rewrite gives you a clean design at the cost of months with no value delivered and rediscovered edge cases; choose it only when the old system can't be put behind an interface at all. Strict cross-team standards give you consistency at the cost of team autonomy; choose them for things teams share (data layer, design system, error handling), and leave the rest to teams.</p>
+
+  <h2>11. Common mistakes</h2>
+  <ul>
+    <li><b>Solution-first framing.</b> "We should use X" before "here's what's broken and what it costs".</li>
+    <li><b>The big-bang rewrite.</b> Feature freeze, a branch that lives for months, and a launch day that breaks everything at once.</li>
+    <li><b>Treating every decision as a one-way door.</b> RFCs for button colours slow everyone down and burn your credibility for the decisions that matter.</li>
+    <li><b>Flags that never die.</b> Each permanent flag doubles a code path. Owner and removal date, always.</li>
+    <li><b>Reviewing everything equally.</b> Fifty nits hide the one blocking comment. Pick what matters, automate the rest.</li>
+    <li><b>Staying too high-level.</b> For someone coming from leadership, this is the big one: if you can't read the adapter PR and spot the missing invalidation, your RFC won't be trusted. Keep writing real code on the critical path.</li>
+  </ul>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"Before choosing a library I'd frame the cost: we had 11 stale-state bugs last quarter and about a day of plumbing per screen. I'd compare doing nothing, building our own, TanStack Query, and server components, and I'd probably combine the last two. I'd hide the library behind domain hooks, which turns it from a one-way door into a two-way one. Then I'd migrate one screen at a time behind a per-teacher flag, with error rate and load time as guardrails and a flag flip as rollback, and attach the work to the next product deadline so it pays for itself."</p>
+  </div>
+
+  <h2>12. Recap</h2>
+  <ul>
+    <li>Staff engineers set direction, make cross-team decisions, raise the bar and unblock, mostly through leverage, not volume of code.</li>
+    <li>Decisions: frame the problem with evidence, list options including "do nothing", state the trade-off in one sentence, match process to reversibility.</li>
+    <li>RFCs are short, go to skeptics first, and have a decision date.</li>
+    <li>Migrate with the strangler pattern: a stable interface, a flag, one screen at a time, delete the old path last.</li>
+    <li>Reliability: error boundaries per region, monitoring tagged by release and flag, gradual rollouts with guardrails, instant rollbacks, care with version skew.</li>
+    <li>Review to teach; argue for debt with payback numbers; lead by making the right thing easy. Your leadership transfers; keep your technical judgement sharp enough that engineers trust it.</li>
+  </ul>
+
+  <details class="callout"><summary><b>Check yourself</b></summary>
+    <ol>
+      <li><p><b>What makes "which data library" a two-way door instead of a one-way door?</b><br>Hiding it behind domain hooks, so swapping it changes one file per domain instead of every component.</p></li>
+      <li><p><b>Why migrate behind a flag instead of in one big PR?</b><br>Each step is small and reviewable, you can compare old vs new in production, and rollback is a flag flip instead of a revert and redeploy.</p></li>
+      <li><p><b>A product lead asks why you should spend 4 weeks on a migration before a deadline. What's your answer?</b><br>The cost of not doing it in engineer-days per quarter, the payback period, and a plan that builds the deadline feature on the new path so the deadline is protected.</p></li>
+      <li><p><b>What doesn't an error boundary catch?</b><br>Errors in event handlers and async code; those need their own handling or an error status from the data layer.</p></li>
+      <li><p><b>You've left the same review comment three times this week. What now?</b><br>Turn it into an example, a doc section or a lint rule, so the convention teaches itself.</p></li>
+    </ol>
+  </details>
+</template>

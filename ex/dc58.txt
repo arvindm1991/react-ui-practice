@@ -1,0 +1,664 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Status = 'Concept' | 'Design' | 'Permitting' | 'Construction' | 'On hold' | 'Complete';
+
+export const STATUSES: Status[] = ['Concept', 'Design', 'Permitting', 'Construction', 'On hold', 'Complete'];
+
+export type Project = {
+  id: string;
+  name: string;
+  client: string;
+  status: Status;
+  owner: string;
+  area: number; // m²
+};
+
+const PROJECTS: Project[] = [
+  { id: 'pr1', name: 'Harbourside Library', client: 'City of Aalborg', status: 'Construction', owner: 'Ines Varga', area: 4200 },
+  { id: 'pr2', name: 'Kestrel House', client: 'Private', status: 'Design', owner: 'Tomás Ruiz', area: 380 },
+  { id: 'pr3', name: 'Northgate Primary School', client: 'Leeds Council', status: 'Permitting', owner: 'Hana Sato', area: 6100 },
+  { id: 'pr4', name: 'Orchard Lane Housing', client: 'Greenhome Trust', status: 'Concept', owner: 'Ines Varga', area: 9800 },
+  { id: 'pr5', name: 'Pavilion at Ferry Point', client: 'Ferry Point Park', status: 'Complete', owner: 'Leo Brandt', area: 640 },
+  { id: 'pr6', name: 'Studio Loft Conversion', client: 'Private', status: 'On hold', owner: 'Amara Okoye', area: 210 },
+  { id: 'pr7', name: 'Riverside Clinic', client: 'NHS Calder', status: 'Design', owner: 'Hana Sato', area: 2300 },
+  { id: 'pr8', name: 'The Malthouse Offices', client: 'Brewer & Co.', status: 'Construction', owner: 'Leo Brandt', area: 3500 },
+  { id: 'pr9', name: 'Coastal Research Station', client: 'Marine Institute', status: 'Permitting', owner: 'Lena Fischer', area: 1800 },
+  { id: 'pr10', name: 'Hillcrest Chapel Restoration', client: 'Diocese of Wells', status: 'Design', owner: 'Tomás Ruiz', area: 520 },
+  { id: 'pr11', name: 'Market Hall Canopy', client: 'City of Ghent', status: 'Concept', owner: 'Amara Okoye', area: 1200 },
+  { id: 'pr12', name: 'Birchwood Eco Cabins', client: 'Birchwood Retreats', status: 'Complete', owner: 'Lena Fischer', area: 450 },
+  { id: 'pr13', name: 'Dockside Lofts', client: 'Quayline Homes', status: 'Construction', owner: 'Noah Williams', area: 7600 },
+  { id: 'pr14', name: 'Museum Annex', client: 'Moderna Museet', status: 'On hold', owner: 'Ines Varga', area: 2900 },
+  { id: 'pr15', name: 'Garden Room', client: 'Private', status: 'Complete', owner: 'Noah Williams', area: 45 },
+  { id: 'pr16', name: 'Tram Depot Masterplan', client: 'Metro Transit', status: 'Concept', owner: 'Leonie Haas', area: 15000 },
+  { id: 'pr17', name: 'Courtyard Townhouses', client: 'Lindell Estates', status: 'Design', owner: 'Leonie Haas', area: 3100 },
+  { id: 'pr18', name: 'Observatory Visitor Centre', client: 'Dark Sky Trust', status: 'Permitting', owner: 'Leo Brandt', area: 980 },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /projects -> Project[]
+export async function getProjects(): Promise<Project[]> {
+  await randomDelay(400, 1000);
+  return PROJECTS.map((p) => ({ ...p }));
+}
+@@@ shared src/utils/list.ts
+// Add the value if it's missing, remove it if it's there. Returns a new array.
+// toggleInList(['a'], 'b') -> ['a', 'b'];  toggleInList(['a', 'b'], 'a') -> ['b']
+export function toggleInList(list: string[], value: string): string[] {
+  if (list.includes(value)) {
+    return list.filter((v) => v !== value);
+  }
+  return [...list, value];
+}
+
+// Sorted unique values: uniqueSorted(['b', 'a', 'b']) -> ['a', 'b']
+export function uniqueSorted(values: string[]): string[] {
+  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+}
+@@@ shared src/components/StatusBadge.tsx
+import React from 'react';
+import type { Status } from '../api';
+
+export default function StatusBadge({ status }: { status: Status }) {
+  const slug = status.toLowerCase().replace(' ', '-');
+  return <span className={'badge badge-' + slug}>{status}</span>;
+}
+@@@ shared src/components/Initials.tsx
+import React from 'react';
+
+export default function Initials({ name }: { name: string }) {
+  const parts = name.split(' ');
+  return <span className="initials" aria-hidden="true">{parts[0][0] + parts[parts.length - 1][0]}</span>;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getProjects } from './api';
+import type { Project } from './api';
+import StatusBadge from './components/StatusBadge';
+import Initials from './components/Initials';
+
+function ProjectList({ projects }: { projects: Project[] }) {
+  return (
+    <ul className="project-list">
+      {projects.map((p) => {
+        return (
+          <li key={p.id} className="project">
+            <div className="project-main">
+              <span className="project-name">{p.name}</span>
+              <span className="project-client">{p.client} · {p.area.toLocaleString('en-US')} m²</span>
+            </div>
+            <StatusBadge status={p.status} />
+            <span className="project-owner"><Initials name={p.owner} />{p.owner}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function App() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjects().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProjects(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="muted-msg">Loading projects…</p>;
+  } else {
+    body = <ProjectList projects={projects} />;
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <span className="studio">Studio Varga</span>
+        <h1>Projects</h1>
+      </header>
+      <div className="toolbar">
+        {/* TODO: the filter popover (see the task) */}
+        <button type="button" className="filter-btn">
+          <span aria-hidden="true">☰</span> Filter
+        </button>
+        <span className="result-count">{projects.length} projects</span>
+      </div>
+      {body}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F4EF;
+  --surface: #FFFFFF;
+  --border: #E4E0D6;
+  --text: #1C1B19;
+  --muted: #7D786C;
+  --ink: #1C1B19;
+  --accent: #B5562B;
+  --accent-soft: #F6E7DF;
+  --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 820px; margin: 0 auto; padding: 36px 24px 60px; }
+.header { margin-bottom: 18px; }
+.studio { font-size: 12px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--muted); }
+.header h1 { margin: 2px 0 0; font: 500 38px/1.1 var(--serif); letter-spacing: -0.5px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.filter-btn { height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-weight: 500; color: var(--text); cursor: pointer; }
+.filter-btn:hover { border-color: #CFC9BB; }
+.result-count { margin-left: auto; font-size: 13px; color: var(--muted); }
+
+.muted-msg { padding: 30px; text-align: center; color: var(--muted); }
+
+.project-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.project { display: grid; grid-template-columns: 1fr 110px 160px; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #EFECE5; }
+.project:last-child { border-bottom: 0; }
+.project-main { display: flex; flex-direction: column; min-width: 0; }
+.project-name { font-weight: 600; }
+.project-client { font-size: 12.5px; color: var(--muted); }
+.project-owner { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.initials { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #E9E4D8; color: #5A5446; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+.badge { justify-self: start; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.badge-concept { background: #EEF0FA; color: #3E4C8A; }
+.badge-design { background: #F3EAF8; color: #6B3D8A; }
+.badge-permitting { background: #FFF3D6; color: #8A6100; }
+.badge-construction { background: #F6E7DF; color: #9A4520; }
+.badge-on-hold { background: #EEEDE9; color: #6B675D; }
+.badge-complete { background: #E3F2E8; color: #2D6A43; }
+
+@media (max-width: 600px) {
+  .project { grid-template-columns: 1fr auto; }
+  .project-owner { display: none; }
+}
+@@@ solution src/components/FilterPopover.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { toggleInList } from '../utils/list';
+
+export type Filters = { statuses: string[]; owners: string[] };
+
+type SectionHeadProps = {
+  title: string;
+  onSelectAll: () => void;
+  onClear: () => void;
+};
+
+function SectionHead({ title, onSelectAll, onClear }: SectionHeadProps) {
+  return (
+    <div className="pop-section-head">
+      <h3>{title}</h3>
+      <button type="button" className="pop-link" onClick={() => { onSelectAll(); }}>Select all</button>
+      <button type="button" className="pop-link" onClick={() => { onClear(); }}>Clear</button>
+    </div>
+  );
+}
+
+type CheckListProps = {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+};
+
+function CheckList({ options, selected, onToggle }: CheckListProps) {
+  return (
+    <ul className="pop-options">
+      {options.map((opt) => {
+        return (
+          <li key={opt}>
+            <label className="pop-option">
+              <input type="checkbox" checked={selected.includes(opt)} onChange={() => { onToggle(opt); }} />
+              <span>{opt}</span>
+            </label>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+type FilterPopoverProps = {
+  applied: Filters;
+  statusOptions: string[];
+  ownerOptions: string[];
+  anchorRef: React.RefObject<HTMLButtonElement>;
+  onApply: (filters: Filters) => void;
+  onCancel: () => void;
+};
+
+// Mounted only while open, so the draft starts as a fresh copy of `applied`
+// every time, and Cancel is just "unmount without applying".
+export default function FilterPopover({ applied, statusOptions, ownerOptions, anchorRef, onApply, onCancel }: FilterPopoverProps) {
+  const [draft, setDraft] = useState<Filters>(applied);
+  const [ownerQuery, setOwnerQuery] = useState('');
+  const popRef = useRef<HTMLDivElement>(null);
+
+  // Escape or a click outside (but not on the Filter button itself) cancels.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    }
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (popRef.current && popRef.current.contains(target)) {
+        return;
+      }
+      if (anchorRef.current && anchorRef.current.contains(target)) {
+        return;
+      }
+      onCancel();
+    }
+    document.addEventListener('keydown', handleKey);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [onCancel, anchorRef]);
+
+  // Move focus into the popover when it opens.
+  useEffect(() => {
+    if (popRef.current) {
+      const first = popRef.current.querySelector<HTMLElement>('input');
+      if (first) {
+        first.focus();
+      }
+    }
+  }, []);
+
+  // derived: owners matching the search box
+  const q = ownerQuery.trim().toLowerCase();
+  const visibleOwners = ownerOptions.filter((o) => {
+    return o.toLowerCase().includes(q);
+  });
+
+  function toggleStatus(value: string) {
+    setDraft((prev) => {
+      return { ...prev, statuses: toggleInList(prev.statuses, value) };
+    });
+  }
+
+  function toggleOwner(value: string) {
+    setDraft((prev) => {
+      return { ...prev, owners: toggleInList(prev.owners, value) };
+    });
+  }
+
+  // "Select all" / "Clear" act on what you can see.
+  function selectVisibleOwners() {
+    setDraft((prev) => {
+      const extra = visibleOwners.filter((o) => {
+        return !prev.owners.includes(o);
+      });
+      return { ...prev, owners: [...prev.owners, ...extra] };
+    });
+  }
+
+  function clearVisibleOwners() {
+    setDraft((prev) => {
+      return {
+        ...prev,
+        owners: prev.owners.filter((o) => {
+          return !visibleOwners.includes(o);
+        }),
+      };
+    });
+  }
+
+  let ownerList = <CheckList options={visibleOwners} selected={draft.owners} onToggle={toggleOwner} />;
+  if (visibleOwners.length === 0) {
+    ownerList = <p className="pop-empty">No one matches “{ownerQuery}”</p>;
+  }
+
+  return (
+    <div className="popover" role="dialog" aria-label="Filter projects" ref={popRef}>
+      <section className="pop-section">
+        <SectionHead
+          title="Status"
+          onSelectAll={() => { setDraft((prev) => { return { ...prev, statuses: [...statusOptions] }; }); }}
+          onClear={() => { setDraft((prev) => { return { ...prev, statuses: [] }; }); }}
+        />
+        <CheckList options={statusOptions} selected={draft.statuses} onToggle={toggleStatus} />
+      </section>
+      <section className="pop-section">
+        <SectionHead title="Owner" onSelectAll={selectVisibleOwners} onClear={clearVisibleOwners} />
+        <input
+          className="pop-search"
+          type="search"
+          placeholder="Search people"
+          aria-label="Search owners"
+          value={ownerQuery}
+          onChange={(e) => { setOwnerQuery(e.target.value); }}
+        />
+        {ownerList}
+      </section>
+      <footer className="pop-footer">
+        <button type="button" className="btn-ghost" onClick={() => { onCancel(); }}>Cancel</button>
+        <button type="button" className="btn-dark" onClick={() => { onApply(draft); }}>Apply</button>
+      </footer>
+    </div>
+  );
+}
+@@@ solution src/App.tsx
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getProjects, STATUSES } from './api';
+import type { Project } from './api';
+import StatusBadge from './components/StatusBadge';
+import Initials from './components/Initials';
+import FilterPopover from './components/FilterPopover';
+import type { Filters } from './components/FilterPopover';
+import { uniqueSorted } from './utils/list';
+
+const EMPTY: Filters = { statuses: [], owners: [] };
+
+// Change: the URL is the source of truth on load (shareable links).
+function readFiltersFromUrl(): Filters {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return { statuses: params.getAll('status'), owners: params.getAll('owner') };
+  } catch (e) {
+    return EMPTY;
+  }
+}
+
+function ProjectList({ projects }: { projects: Project[] }) {
+  return (
+    <ul className="project-list">
+      {projects.map((p) => {
+        return (
+          <li key={p.id} className="project">
+            <div className="project-main">
+              <span className="project-name">{p.name}</span>
+              <span className="project-client">{p.client} · {p.area.toLocaleString('en-US')} m²</span>
+            </div>
+            <StatusBadge status={p.status} />
+            <span className="project-owner"><Initials name={p.owner} />{p.owner}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+type ChipsProps = {
+  filters: Filters;
+  onRemove: (kind: 'statuses' | 'owners', value: string) => void;
+  onClearAll: () => void;
+};
+
+function FilterChips({ filters, onRemove, onClearAll }: ChipsProps) {
+  const chips: { kind: 'statuses' | 'owners'; label: string; value: string }[] = [];
+  filters.statuses.forEach((s) => {
+    chips.push({ kind: 'statuses', label: 'Status', value: s });
+  });
+  filters.owners.forEach((o) => {
+    chips.push({ kind: 'owners', label: 'Owner', value: o });
+  });
+  if (chips.length === 0) {
+    return null;
+  }
+  return (
+    <div className="chips">
+      {chips.map((c) => {
+        return (
+          <span key={c.kind + ':' + c.value} className="chip">
+            <span className="chip-label">{c.label}:</span> {c.value}
+            <button type="button" className="chip-x" aria-label={'Remove ' + c.label + ' ' + c.value} onClick={() => { onRemove(c.kind, c.value); }}>✕</button>
+          </span>
+        );
+      })}
+      <button type="button" className="clear-all" onClick={() => { onClearAll(); }}>Clear all</button>
+    </div>
+  );
+}
+
+export default function App() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [applied, setApplied] = useState<Filters>(readFiltersFromUrl); // lazy: read once
+  const [open, setOpen] = useState(false);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjects().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setProjects(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Change: mirror applied filters into the query string, keeping any other params and the hash.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('status');
+      url.searchParams.delete('owner');
+      applied.statuses.forEach((s) => {
+        url.searchParams.append('status', s);
+      });
+      applied.owners.forEach((o) => {
+        url.searchParams.append('owner', o);
+      });
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      // sandboxed iframes can block history: filters still work without the URL
+    }
+  }, [applied]);
+
+  // useCallback: the popover's document listeners depend on it
+  const closePopover = useCallback(() => {
+    setOpen(false);
+    if (filterBtnRef.current) {
+      filterBtnRef.current.focus();
+    }
+  }, []);
+
+  function handleApply(next: Filters) {
+    setApplied(next);
+    closePopover();
+  }
+
+  function handleRemove(kind: 'statuses' | 'owners', value: string) {
+    setApplied((prev) => {
+      return {
+        ...prev,
+        [kind]: prev[kind].filter((v) => {
+          return v !== value;
+        }),
+      };
+    });
+  }
+
+  // derived
+  const ownerOptions = uniqueSorted(projects.map((p) => {
+    return p.owner;
+  }));
+  const visible = projects.filter((p) => {
+    const statusOk = applied.statuses.length === 0 || applied.statuses.includes(p.status);
+    const ownerOk = applied.owners.length === 0 || applied.owners.includes(p.owner);
+    return statusOk && ownerOk;
+  });
+  const activeCount = applied.statuses.length + applied.owners.length;
+
+  let badge = null;
+  if (activeCount > 0) {
+    badge = <span className="count-badge">{activeCount}</span>;
+  }
+
+  let btnCls = 'filter-btn';
+  if (open || activeCount > 0) {
+    btnCls = 'filter-btn is-active';
+  }
+
+  let popover = null;
+  if (open) {
+    popover = (
+      <FilterPopover
+        applied={applied}
+        statusOptions={STATUSES}
+        ownerOptions={ownerOptions}
+        anchorRef={filterBtnRef}
+        onApply={handleApply}
+        onCancel={closePopover}
+      />
+    );
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="muted-msg">Loading projects…</p>;
+  } else if (visible.length === 0) {
+    body = (
+      <div className="empty">
+        <p>No projects match these filters.</p>
+        <button type="button" className="clear-all" onClick={() => { setApplied(EMPTY); }}>Clear all filters</button>
+      </div>
+    );
+  } else {
+    body = <ProjectList projects={visible} />;
+  }
+
+  let countText = projects.length + ' projects';
+  if (activeCount > 0) {
+    countText = visible.length + ' of ' + projects.length + ' projects';
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <span className="studio">Studio Varga</span>
+        <h1>Projects</h1>
+      </header>
+      <div className="toolbar">
+        <div className="filter-anchor">
+          <button
+            type="button"
+            className={btnCls}
+            ref={filterBtnRef}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            onClick={() => { setOpen((o) => { return !o; }); }}
+          >
+            <span aria-hidden="true">☰</span> Filter
+            {badge}
+          </button>
+          {popover}
+        </div>
+        <span className="result-count">{countText}</span>
+      </div>
+      <FilterChips filters={applied} onRemove={handleRemove} onClearAll={() => { setApplied(EMPTY); }} />
+      {body}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F4EF;
+  --surface: #FFFFFF;
+  --border: #E4E0D6;
+  --text: #1C1B19;
+  --muted: #7D786C;
+  --ink: #1C1B19;
+  --accent: #B5562B;
+  --accent-soft: #F6E7DF;
+  --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 820px; margin: 0 auto; padding: 36px 24px 60px; }
+.header { margin-bottom: 18px; }
+.studio { font-size: 12px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--muted); }
+.header h1 { margin: 2px 0 0; font: 500 38px/1.1 var(--serif); letter-spacing: -0.5px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.filter-btn { height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-weight: 500; color: var(--text); cursor: pointer; }
+.filter-btn:hover { border-color: #CFC9BB; }
+.result-count { margin-left: auto; font-size: 13px; color: var(--muted); }
+
+.muted-msg { padding: 30px; text-align: center; color: var(--muted); }
+
+.project-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.project { display: grid; grid-template-columns: 1fr 110px 160px; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #EFECE5; }
+.project:last-child { border-bottom: 0; }
+.project-main { display: flex; flex-direction: column; min-width: 0; }
+.project-name { font-weight: 600; }
+.project-client { font-size: 12.5px; color: var(--muted); }
+.project-owner { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.initials { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #E9E4D8; color: #5A5446; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+.badge { justify-self: start; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.badge-concept { background: #EEF0FA; color: #3E4C8A; }
+.badge-design { background: #F3EAF8; color: #6B3D8A; }
+.badge-permitting { background: #FFF3D6; color: #8A6100; }
+.badge-construction { background: #F6E7DF; color: #9A4520; }
+.badge-on-hold { background: #EEEDE9; color: #6B675D; }
+.badge-complete { background: #E3F2E8; color: #2D6A43; }
+
+@media (max-width: 600px) {
+  .project { grid-template-columns: 1fr auto; }
+  .project-owner { display: none; }
+}
+
+/* ---- Added: filter popover, chips, badge ---- */
+.filter-anchor { position: relative; }
+.filter-btn.is-active { border-color: var(--ink); }
+.count-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+
+.popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 290px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 18px 40px rgba(28, 27, 25, 0.16); }
+.pop-section { padding: 12px 14px 8px; border-bottom: 1px solid #EFECE5; }
+.pop-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pop-section-head h3 { margin: 0 auto 0 0; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.pop-link { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; }
+.pop-link:hover { text-decoration: underline; }
+.pop-search { width: 100%; height: 30px; margin: 2px 0 6px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 13px; }
+.pop-search:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+.pop-options { list-style: none; margin: 0; padding: 0; max-height: 186px; overflow-y: auto; }
+.pop-option { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
+.pop-option:hover { background: #F7F5F0; }
+.pop-option input { width: 15px; height: 15px; margin: 0; accent-color: var(--ink); }
+.pop-empty { margin: 4px 0 8px; font-size: 12.5px; color: var(--muted); }
+.pop-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; }
+.btn-ghost, .btn-dark { height: 32px; padding: 0 14px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-ghost { border: 1px solid var(--border); background: #fff; color: var(--text); }
+.btn-dark { border: 1px solid var(--ink); background: var(--ink); color: #fff; }
+
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 12.5px; }
+.chip-label { color: var(--muted); }
+.chip-x { width: 20px; height: 20px; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 10px; cursor: pointer; }
+.chip-x:hover { background: var(--accent-soft); color: var(--accent); }
+.clear-all { padding: 0 4px; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+.empty { padding: 36px; text-align: center; background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
+.empty p { margin: 0 0 6px; }

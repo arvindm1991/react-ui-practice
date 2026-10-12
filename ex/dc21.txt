@@ -1,0 +1,421 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type ActivityKind = 'deploy' | 'commit' | 'comment' | 'alert';
+
+export type Activity = {
+  id: string;
+  kind: ActivityKind;
+  actor: string;
+  message: string;     // e.g. "deployed to production"
+  target: string;      // e.g. "api-gateway"
+  minutesAgo: number;
+};
+
+export type ActivityPage = {
+  items: Activity[];
+  nextPage: number | null; // null means there are no more pages
+};
+
+const ACTIVITY: Activity[] = [
+  { id: 'a1', kind: 'deploy', actor: 'Maya Chen', message: 'deployed v2.14.0 to production', target: 'api-gateway', minutesAgo: 3 },
+  { id: 'a2', kind: 'commit', actor: 'Leo Park', message: 'pushed 3 commits to', target: 'main', minutesAgo: 18 },
+  { id: 'a3', kind: 'alert', actor: 'Monitor', message: 'p95 latency above 800ms on', target: 'checkout-svc', minutesAgo: 41 },
+  { id: 'a4', kind: 'comment', actor: 'Sara Ali', message: 'commented on PR #482 in', target: 'web-app', minutesAgo: 66 },
+  { id: 'a5', kind: 'deploy', actor: 'Leo Park', message: 'rolled back to v2.13.2 on', target: 'checkout-svc', minutesAgo: 95 },
+  { id: 'a6', kind: 'commit', actor: 'Maya Chen', message: 'opened PR #483 against', target: 'main', minutesAgo: 140 },
+  { id: 'a7', kind: 'comment', actor: 'Jon Reyes', message: 'approved PR #479 in', target: 'billing', minutesAgo: 210 },
+  { id: 'a8', kind: 'deploy', actor: 'Sara Ali', message: 'deployed v1.8.1 to staging', target: 'billing', minutesAgo: 300 },
+  { id: 'a9', kind: 'alert', actor: 'Monitor', message: 'error rate recovered on', target: 'api-gateway', minutesAgo: 420 },
+  { id: 'a10', kind: 'commit', actor: 'Jon Reyes', message: 'pushed 7 commits to', target: 'feat/invoices', minutesAgo: 600 },
+  { id: 'a11', kind: 'deploy', actor: 'Maya Chen', message: 'deployed v2.13.2 to production', target: 'checkout-svc', minutesAgo: 1500 },
+  { id: 'a12', kind: 'comment', actor: 'Leo Park', message: 'resolved incident INC-221 in', target: 'checkout-svc', minutesAgo: 2900 },
+  { id: 'a13', kind: 'commit', actor: 'Sara Ali', message: 'created branch', target: 'chore/deps-oct', minutesAgo: 4300 },
+];
+
+const PAGE_SIZE = 5;
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /activity?page=1 -> { items, nextPage }
+// Pages start at 1. Each page has up to 5 items. nextPage is null on the last page.
+export async function getActivity(page: number): Promise<ActivityPage> {
+  await randomDelay(500, 1200);
+  const start = (page - 1) * PAGE_SIZE;
+  const items = ACTIVITY.slice(start, start + PAGE_SIZE).map((a) => ({ ...a }));
+  let nextPage: number | null = null;
+  if (start + PAGE_SIZE < ACTIVITY.length) {
+    nextPage = page + 1;
+  }
+  return { items, nextPage };
+}
+@@@ shared src/utils/time.ts
+// timeAgo(3) -> "3m ago", timeAgo(95) -> "1h ago", timeAgo(2900) -> "2d ago"
+export function timeAgo(minutes: number): string {
+  if (minutes < 1) {
+    return 'just now';
+  }
+  if (minutes < 60) {
+    return minutes + 'm ago';
+  }
+  if (minutes < 60 * 24) {
+    return Math.floor(minutes / 60) + 'h ago';
+  }
+  return Math.floor(minutes / (60 * 24)) + 'd ago';
+}
+@@@ shared src/components/ActivityItem.tsx
+import React from 'react';
+import type { Activity } from '../api';
+import { timeAgo } from '../utils/time';
+
+const ICONS: Record<string, string> = {
+  deploy: '▲',
+  commit: '◆',
+  comment: '✎',
+  alert: '!',
+};
+
+// One row in the activity feed. Already styled: just render it with an item.
+export default function ActivityItem({ item }: { item: Activity }) {
+  return (
+    <li className="activity-item">
+      <span className={'activity-icon kind-' + item.kind}>{ICONS[item.kind]}</span>
+      <div className="activity-body">
+        <p className="activity-text">
+          <b>{item.actor}</b> {item.message} <code>{item.target}</code>
+        </p>
+        <span className="activity-time">{timeAgo(item.minutesAgo)}</span>
+      </div>
+    </li>
+  );
+}
+@@@ starter src/App.tsx
+import React from 'react';
+
+const NAV = ['Overview', 'Deployments', 'Services', 'Incidents', 'Settings'];
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark">S</span> Shipyard</div>
+      <nav className="nav">
+        {NAV.map((label) => {
+          let cls = 'nav-link';
+          if (label === 'Overview') {
+            cls = 'nav-link is-active';
+          }
+          return <a key={label} className={cls} href="#">{label}</a>;
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
+      <span className="stat-note">{note}</span>
+    </div>
+  );
+}
+
+// TODO: load the first page of activity from getActivity(1) when this mounts,
+// render each item with <ActivityItem />, and add a "Load more" button.
+function ActivityFeed() {
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Recent activity</h2>
+        <span className="card-sub">All services</span>
+      </div>
+      <p className="feed-message">Activity will appear here.</p>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <header className="page-head">
+          <h1>Overview</h1>
+          <span className="env-pill">production</span>
+        </header>
+        <div className="stats">
+          <StatCard label="Deploys today" value="12" note="+3 vs yesterday" />
+          <StatCard label="Uptime (30d)" value="99.97%" note="SLO 99.9%" />
+          <StatCard label="Open incidents" value="1" note="checkout-svc" />
+        </div>
+        <ActivityFeed />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #5B5BD6;
+  --primary-soft: #EEEEFC;
+  --sidebar: #111827;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; flex-shrink: 0; background: var(--sidebar); color: #D0D5DD; padding: 18px 12px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; padding: 0 8px 18px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); display: grid; place-items: center; font-size: 14px; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-link { padding: 8px 10px; border-radius: 6px; color: inherit; text-decoration: none; font-size: 14px; }
+.nav-link:hover { background: rgba(255, 255, 255, 0.06); }
+.nav-link.is-active { background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 600; }
+
+.main { flex: 1; min-width: 0; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+.page-head { display: flex; align-items: center; gap: 10px; }
+.page-head h1 { margin: 0; font-size: 22px; }
+.env-pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #ECFDF3; color: #067647; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-note { font-size: 12px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.card-head h2 { margin: 0; font-size: 15px; }
+.card-sub { font-size: 13px; color: var(--muted); }
+.feed-message { margin: 0; padding: 28px 18px; text-align: center; color: var(--muted); font-size: 14px; }
+
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-item { display: flex; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.activity-icon { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.kind-deploy { background: var(--primary-soft); color: var(--primary); }
+.kind-commit { background: #F2F4F7; color: #344054; }
+.kind-comment { background: #FEF6E7; color: #B54708; }
+.kind-alert { background: #FEF3F2; color: #D92D20; }
+.activity-body { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.activity-text { margin: 0; font-size: 14px; line-height: 1.45; }
+.activity-text code { font-size: 12.5px; background: #F2F4F7; padding: 1px 6px; border-radius: 4px; }
+.activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getActivity } from './api';
+import type { Activity } from './api';
+import ActivityItem from './components/ActivityItem';
+
+const NAV = ['Overview', 'Deployments', 'Services', 'Incidents', 'Settings'];
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark">S</span> Shipyard</div>
+      <nav className="nav">
+        {NAV.map((label) => {
+          let cls = 'nav-link';
+          if (label === 'Overview') {
+            cls = 'nav-link is-active';
+          }
+          return <a key={label} className={cls} href="#">{label}</a>;
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
+      <span className="stat-note">{note}</span>
+    </div>
+  );
+}
+
+function ActivityFeed() {
+  const [items, setItems] = useState<Activity[]>([]);
+  // The API tells us the next page. null = no more pages.
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // First page on mount.
+  useEffect(() => {
+    let cancelled = false;
+    getActivity(1).then((page) => {
+      if (cancelled) {
+        return;
+      }
+      setItems(page.items);
+      setNextPage(page.nextPage);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleLoadMore() {
+    // Guard: a second click while loading must not fetch the same page twice.
+    if (loading || nextPage === null) {
+      return;
+    }
+    setLoading(true);
+    getActivity(nextPage).then((page) => {
+      // Append with the updater form: never replace what's already shown.
+      setItems((prev) => {
+        return [...prev, ...page.items];
+      });
+      setNextPage(page.nextPage);
+      setLoading(false);
+    });
+  }
+
+  // decisions
+  let body;
+  if (items.length === 0 && loading) {
+    body = <p className="feed-message">Loading activity…</p>;
+  } else {
+    body = (
+      <ul className="activity-list">
+        {items.map((item) => {
+          return <ActivityItem key={item.id} item={item} />;
+        })}
+      </ul>
+    );
+  }
+
+  let footer = null;
+  if (items.length > 0 && nextPage !== null) {
+    let label = 'Load more';
+    if (loading) {
+      label = 'Loading…';
+    }
+    footer = (
+      <div className="feed-footer">
+        <button type="button" className="load-more" disabled={loading} onClick={() => { handleLoadMore(); }}>
+          {label}
+        </button>
+      </div>
+    );
+  } else if (items.length > 0) {
+    footer = <p className="feed-end">You're all caught up · {items.length} events</p>;
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Recent activity</h2>
+        <span className="card-sub">All services</span>
+      </div>
+      {body}
+      {footer}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <header className="page-head">
+          <h1>Overview</h1>
+          <span className="env-pill">production</span>
+        </header>
+        <div className="stats">
+          <StatCard label="Deploys today" value="12" note="+3 vs yesterday" />
+          <StatCard label="Uptime (30d)" value="99.97%" note="SLO 99.9%" />
+          <StatCard label="Open incidents" value="1" note="checkout-svc" />
+        </div>
+        <ActivityFeed />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #5B5BD6;
+  --primary-soft: #EEEEFC;
+  --sidebar: #111827;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; flex-shrink: 0; background: var(--sidebar); color: #D0D5DD; padding: 18px 12px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; padding: 0 8px 18px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); display: grid; place-items: center; font-size: 14px; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-link { padding: 8px 10px; border-radius: 6px; color: inherit; text-decoration: none; font-size: 14px; }
+.nav-link:hover { background: rgba(255, 255, 255, 0.06); }
+.nav-link.is-active { background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 600; }
+
+.main { flex: 1; min-width: 0; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+.page-head { display: flex; align-items: center; gap: 10px; }
+.page-head h1 { margin: 0; font-size: 22px; }
+.env-pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #ECFDF3; color: #067647; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-note { font-size: 12px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.card-head h2 { margin: 0; font-size: 15px; }
+.card-sub { font-size: 13px; color: var(--muted); }
+.feed-message { margin: 0; padding: 28px 18px; text-align: center; color: var(--muted); font-size: 14px; }
+
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-item { display: flex; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.activity-icon { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.kind-deploy { background: var(--primary-soft); color: var(--primary); }
+.kind-commit { background: #F2F4F7; color: #344054; }
+.kind-comment { background: #FEF6E7; color: #B54708; }
+.kind-alert { background: #FEF3F2; color: #D92D20; }
+.activity-body { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.activity-text { margin: 0; font-size: 14px; line-height: 1.45; }
+.activity-text code { font-size: 12.5px; background: #F2F4F7; padding: 1px 6px; border-radius: 4px; }
+.activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ---- Added: load more ---- */
+.feed-footer { padding: 14px 18px; display: flex; justify-content: center; }
+.load-more {
+  height: 34px;
+  min-width: 120px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.load-more:hover:not(:disabled) { background: var(--primary-soft); border-color: #C7C7F5; color: var(--primary); }
+.load-more:disabled { color: var(--muted); cursor: progress; }
+.feed-end { margin: 0; padding: 16px 18px; text-align: center; font-size: 13px; color: var(--muted); }

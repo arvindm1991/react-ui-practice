@@ -1,0 +1,530 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type User = {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+};
+
+export type Comment = {
+  id: string;
+  author: string;
+  text: string;
+  time: string;
+};
+
+const USERS: User[] = [
+  { id: 'u1', name: 'Priya Shah', role: 'Finance lead', color: '#10B981' },
+  { id: 'u2', name: 'Marcus Lee', role: 'Controller', color: '#6366F1' },
+  { id: 'u3', name: 'Dana Okafor', role: 'CFO', color: '#F59E0B' },
+  { id: 'u4', name: 'Tom Becker', role: 'AP specialist', color: '#EC4899' },
+  { id: 'u5', name: 'Paula Reyes', role: 'Travel manager', color: '#0EA5E9' },
+  { id: 'u6', name: 'Peter Nguyen', role: 'Auditor', color: '#8B5CF6' },
+];
+
+const COMMENTS: Comment[] = [
+  { id: 'c1', author: 'Tom Becker', text: 'Hotel receipt is attached. The conference rate was already applied.', time: 'Oct 8, 4:12 PM' },
+  { id: 'c2', author: 'Priya Shah', text: 'Looks fine to me. @Marcus Lee can you confirm the client dinner is under the per-head limit?', time: 'Oct 9, 9:40 AM' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /workspace/users -> User[] (everyone you can @mention)
+export async function getUsers(): Promise<User[]> {
+  await randomDelay(400, 900);
+  return USERS.map((u) => ({ ...u }));
+}
+
+// GET /expenses/EXP-2041/comments -> Comment[]
+export async function getComments(): Promise<Comment[]> {
+  await randomDelay(300, 700);
+  return COMMENTS.map((c) => ({ ...c }));
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+export function Avatar({ name, color, size = 32 }: { name: string; color: string; size?: number }) {
+  const initials = name
+    .split(' ')
+    .map((part) => {
+      return part[0];
+    })
+    .join('');
+  return <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.38, background: color }}>{initials}</span>;
+}
+@@@ shared src/components/CommentList.tsx
+import React from 'react';
+import type { Comment } from '../api';
+import { Avatar } from './Avatar';
+import { splitMentions } from '../utils/mentions';
+
+function CommentBody({ text }: { text: string }) {
+  return (
+    <p className="comment-text">
+      {splitMentions(text).map((part, i) => {
+        if (part.isMention) {
+          return <span key={i} className="mention">{part.text}</span>;
+        }
+        return <span key={i}>{part.text}</span>;
+      })}
+    </p>
+  );
+}
+
+export function CommentList({ comments }: { comments: Comment[] }) {
+  return (
+    <ul className="comments">
+      {comments.map((c) => {
+        return (
+          <li key={c.id} className="comment">
+            <Avatar name={c.author} color="#94A3B8" />
+            <div className="comment-main">
+              <p className="comment-meta"><b>{c.author}</b> · {c.time}</p>
+              <CommentBody text={c.text} />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+@@@ shared src/utils/mentions.ts
+export type TextPart = { text: string; isMention: boolean };
+
+// splitMentions("Thanks @Priya Shah!") ->
+//   [{ text: "Thanks ", isMention: false }, { text: "@Priya Shah", isMention: true }, { text: "!", isMention: false }]
+// A mention is "@" + one or two capitalized words.
+export function splitMentions(text: string): TextPart[] {
+  return text
+    .split(/(@[A-Z][a-z]+(?: [A-Z][a-z]+)?)/)
+    .filter((piece) => {
+      return piece !== '';
+    })
+    .map((piece) => {
+      return { text: piece, isMention: piece.startsWith('@') };
+    });
+}
+@@@ starter src/components/CommentBox.tsx
+import React, { useState } from 'react';
+
+type CommentBoxProps = {
+  onSubmit: (text: string) => void;
+};
+
+// TODO: @mentions (type "@" + letters -> user dropdown -> insert "@Name ")
+export function CommentBox({ onSubmit }: CommentBoxProps) {
+  const [text, setText] = useState('');
+
+  function handleSubmit() {
+    if (text.trim() === '') {
+      return;
+    }
+    onSubmit(text.trim());
+    setText('');
+  }
+
+  return (
+    <div className="comment-box">
+      <div className="textarea-wrap">
+        <textarea
+          className="comment-input"
+          placeholder="Add a comment. Type @ to mention someone"
+          value={text}
+          onChange={(e) => { setText(e.target.value); }}
+        />
+      </div>
+      <div className="comment-actions">
+        <span className="hint">Visible to everyone on this report</span>
+        <button type="button" className="btn-primary" disabled={text.trim() === ''} onClick={() => { handleSubmit(); }}>Comment</button>
+      </div>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getComments } from './api';
+import type { Comment } from './api';
+import { CommentList } from './components/CommentList';
+import { CommentBox } from './components/CommentBox';
+
+const LINE_ITEMS = [
+  { id: 'l1', label: 'Flight SFO → JFK', category: 'Travel', amount: 486.2 },
+  { id: 'l2', label: 'Hotel, 3 nights', category: 'Lodging', amount: 897.0 },
+  { id: 'l3', label: 'Client dinner (4)', category: 'Meals', amount: 312.45 },
+  { id: 'l4', label: 'Rideshare', category: 'Travel', amount: 64.8 },
+];
+
+function money(n: number): string {
+  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function ReportSummary() {
+  const total = LINE_ITEMS.reduce((sum, item) => {
+    return sum + item.amount;
+  }, 0);
+  return (
+    <section className="card">
+      <div className="report-head">
+        <div>
+          <p className="report-id">EXP-2041</p>
+          <h1 className="report-title">NYC client visit</h1>
+        </div>
+        <span className="status-pill">Pending approval</span>
+      </div>
+      <table className="items">
+        <tbody>
+          {LINE_ITEMS.map((item) => {
+            return (
+              <tr key={item.id}>
+                <td>{item.label}</td>
+                <td className="cat">{item.category}</td>
+                <td className="amt">{money(item.amount)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="total"><span>Total</span><b>{money(total)}</b></div>
+    </section>
+  );
+}
+
+function Discussion() {
+  const [comments, setComments] = useState<Comment[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getComments().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setComments(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleAdd(text: string) {
+    setComments((prev) => {
+      return [...prev, { id: 'c' + Date.now(), author: 'Arvind Murali', text, time: 'Just now' }];
+    });
+  }
+
+  return (
+    <section className="card">
+      <h2 className="card-title">Discussion</h2>
+      <CommentList comments={comments} />
+      <CommentBox onSubmit={handleAdd} />
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">◈ Ledgerly</span>
+        <span className="crumb">Expenses / Reports / EXP-2041</span>
+      </header>
+      <main className="layout">
+        <ReportSummary />
+        <Discussion />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F5F2;
+  --surface: #FFFFFF;
+  --border: #E3E8E2;
+  --text: #16241C;
+  --muted: #677A6E;
+  --primary: #047857;
+  --primary-dark: #065F46;
+  --primary-soft: #E7F6EF;
+  --amber: #B45309;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter Tight', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.topbar { display: flex; align-items: center; gap: 20px; height: 54px; padding: 0 24px; background: #0B2B20; color: #D1FAE5; }
+.logo { font-weight: 800; font-size: 17px; color: #fff; }
+.crumb { font-size: 13px; opacity: 0.7; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 20px; align-items: start; max-width: 1040px; margin: 0 auto; padding: 24px 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.card-title { margin: 0 0 14px; font-size: 16px; }
+
+.report-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.report-id { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.report-title { margin: 2px 0 0; font-size: 20px; }
+.status-pill { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #FEF3C7; color: var(--amber); }
+.items { width: 100%; border-collapse: collapse; }
+.items td { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.items .cat { color: var(--muted); font-size: 13px; }
+.items .amt { text-align: right; font-variant-numeric: tabular-nums; }
+.total { display: flex; justify-content: space-between; padding-top: 12px; font-size: 15px; }
+
+.comments { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.comment { display: flex; gap: 10px; }
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 700; }
+.comment-main { min-width: 0; }
+.comment-meta { margin: 0; font-size: 12px; color: var(--muted); }
+.comment-meta b { color: var(--text); }
+.comment-text { margin: 3px 0 0; line-height: 1.5; }
+.mention { color: var(--primary); font-weight: 600; background: var(--primary-soft); border-radius: 4px; padding: 0 2px; }
+
+.comment-box { border: 1px solid var(--border); border-radius: 10px; }
+.comment-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.textarea-wrap { position: relative; }
+.comment-input { display: block; width: 100%; min-height: 90px; padding: 12px; border: 0; border-radius: 10px 10px 0 0; font: inherit; color: var(--text); resize: vertical; outline: none; }
+.comment-actions { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-top: 1px solid var(--border); background: #FAFBFA; border-radius: 0 0 10px 10px; }
+.hint { font-size: 12px; color: var(--muted); }
+.btn-primary { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+@@@ solution src/components/CommentBox.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getUsers } from '../api';
+import type { User } from '../api';
+import { Avatar } from './Avatar';
+
+type CommentBoxProps = {
+  onSubmit: (text: string) => void;
+};
+
+// Where the "@fragment" being typed starts, and the letters after the "@".
+type Mention = { start: number; query: string };
+
+// Looks at the text BEFORE the caret: does it end in "@letters" (at the start or after a space)?
+function findMention(value: string, caret: number): Mention | null {
+  const before = value.slice(0, caret);
+  const match = /(^|\s)@([a-zA-Z]*)$/.exec(before);
+  if (!match) {
+    return null;
+  }
+  return { start: caret - match[2].length - 1, query: match[2] };
+}
+
+const MAX_SUGGESTIONS = 5;
+
+export function CommentBox({ onSubmit }: CommentBoxProps) {
+  const [text, setText] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [mention, setMention] = useState<Mention | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getUsers().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setUsers(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived: suggestions for the current fragment (any word of the name starts with it)
+  let suggestions: User[] = [];
+  if (mention) {
+    const q = mention.query.toLowerCase();
+    suggestions = users
+      .filter((u) => {
+        return u.name.toLowerCase().split(' ').some((word) => {
+          return word.startsWith(q);
+        });
+      })
+      .slice(0, MAX_SUGGESTIONS);
+  }
+  const open = mention !== null && suggestions.length > 0;
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    setText(value);
+    // selectionStart = caret position right after this keystroke
+    setMention(findMention(value, e.target.selectionStart));
+    setActiveIndex(0);
+  }
+
+  function insertMention(user: User) {
+    if (!mention) {
+      return;
+    }
+    const before = text.slice(0, mention.start);
+    const after = text.slice(mention.start + 1 + mention.query.length);
+    const inserted = '@' + user.name + ' ';
+    const caret = before.length + inserted.length;
+    setText(before + inserted + after);
+    setMention(null);
+    // React re-renders the value, which would put the caret at the end.
+    // Put it back right after the inserted name once the DOM has updated.
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(caret, caret);
+      }
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!open) {
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((prev) => {
+        return (prev + 1) % suggestions.length;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((prev) => {
+        if (prev === 0) {
+          return suggestions.length - 1;
+        }
+        return prev - 1;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault(); // no newline
+      insertMention(suggestions[Math.min(activeIndex, suggestions.length - 1)]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setMention(null);
+    }
+  }
+
+  function handleSubmit() {
+    if (text.trim() === '') {
+      return;
+    }
+    onSubmit(text.trim());
+    setText('');
+    setMention(null);
+  }
+
+  let dropdown = null;
+  if (open) {
+    dropdown = (
+      <ul className="mention-menu" role="listbox" aria-label="Mention someone">
+        {suggestions.map((u, i) => {
+          let cls = 'mention-option';
+          if (i === activeIndex) {
+            cls = 'mention-option is-active';
+          }
+          return (
+            <li
+              key={u.id}
+              role="option"
+              aria-selected={i === activeIndex}
+              className={cls}
+              onMouseEnter={() => { setActiveIndex(i); }}
+              onMouseDown={(e) => { e.preventDefault(); }}
+              onClick={() => { insertMention(u); }}
+            >
+              <Avatar name={u.name} color={u.color} size={26} />
+              <span className="mention-name">{u.name}</span>
+              <span className="mention-role">{u.role}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="comment-box">
+      <div className="textarea-wrap">
+        <textarea
+          ref={inputRef}
+          className="comment-input"
+          placeholder="Add a comment. Type @ to mention someone"
+          value={text}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { setMention(null); }}
+        />
+        {dropdown}
+      </div>
+      <div className="comment-actions">
+        <span className="hint">Visible to everyone on this report</span>
+        <button type="button" className="btn-primary" disabled={text.trim() === ''} onClick={() => { handleSubmit(); }}>Comment</button>
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F5F2;
+  --surface: #FFFFFF;
+  --border: #E3E8E2;
+  --text: #16241C;
+  --muted: #677A6E;
+  --primary: #047857;
+  --primary-dark: #065F46;
+  --primary-soft: #E7F6EF;
+  --amber: #B45309;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter Tight', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.topbar { display: flex; align-items: center; gap: 20px; height: 54px; padding: 0 24px; background: #0B2B20; color: #D1FAE5; }
+.logo { font-weight: 800; font-size: 17px; color: #fff; }
+.crumb { font-size: 13px; opacity: 0.7; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 20px; align-items: start; max-width: 1040px; margin: 0 auto; padding: 24px 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.card-title { margin: 0 0 14px; font-size: 16px; }
+
+.report-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.report-id { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.report-title { margin: 2px 0 0; font-size: 20px; }
+.status-pill { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #FEF3C7; color: var(--amber); }
+.items { width: 100%; border-collapse: collapse; }
+.items td { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.items .cat { color: var(--muted); font-size: 13px; }
+.items .amt { text-align: right; font-variant-numeric: tabular-nums; }
+.total { display: flex; justify-content: space-between; padding-top: 12px; font-size: 15px; }
+
+.comments { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.comment { display: flex; gap: 10px; }
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 700; }
+.comment-main { min-width: 0; }
+.comment-meta { margin: 0; font-size: 12px; color: var(--muted); }
+.comment-meta b { color: var(--text); }
+.comment-text { margin: 3px 0 0; line-height: 1.5; }
+.mention { color: var(--primary); font-weight: 600; background: var(--primary-soft); border-radius: 4px; padding: 0 2px; }
+
+.comment-box { border: 1px solid var(--border); border-radius: 10px; }
+.comment-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.textarea-wrap { position: relative; }
+.comment-input { display: block; width: 100%; min-height: 90px; padding: 12px; border: 0; border-radius: 10px 10px 0 0; font: inherit; color: var(--text); resize: vertical; outline: none; }
+.comment-actions { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-top: 1px solid var(--border); background: #FAFBFA; border-radius: 0 0 10px 10px; }
+.hint { font-size: 12px; color: var(--muted); }
+.btn-primary { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- Added: @mention dropdown ---- */
+.mention-menu { position: absolute; left: 12px; top: calc(100% - 6px); z-index: 10; width: 280px; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 14px 32px rgba(11, 43, 32, 0.16); }
+.mention-option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 7px; cursor: pointer; }
+.mention-option.is-active { background: var(--primary-soft); }
+.mention-name { font-weight: 600; }
+.mention-role { margin-left: auto; font-size: 12px; color: var(--muted); }
+.mention-option.is-active .mention-name { color: var(--primary-dark); }

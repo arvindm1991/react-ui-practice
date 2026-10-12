@@ -1,0 +1,513 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Track = {
+  id: string;
+  title: string;
+  artist: string;
+  seconds: number;
+  color: string; // album art stand-in
+};
+
+export type Playlist = {
+  id: string;
+  name: string;
+  owner: string;
+  tracks: Track[];
+};
+
+let TRACKS: Track[] = [
+  { id: 't1', title: 'Paper Lanterns', artist: 'Juniper Fields', seconds: 214, color: '#E8664F' },
+  { id: 't2', title: 'Slow Orbit', artist: 'Kaito Mori', seconds: 251, color: '#5B8DEF' },
+  { id: 't3', title: 'Glasshouse', artist: 'The Lowlands', seconds: 187, color: '#53B69E' },
+  { id: 't4', title: 'Velvet Static', artist: 'Noor', seconds: 302, color: '#B15FD6' },
+  { id: 't5', title: 'Coastline', artist: 'Elle Marsh', seconds: 198, color: '#F2B544' },
+  { id: 't6', title: 'Night Bus', artist: 'Juniper Fields', seconds: 233, color: '#3B1F4A' },
+  { id: 't7', title: 'Halftone', artist: 'Osei', seconds: 176, color: '#E0567E' },
+  { id: 't8', title: 'Weather Report', artist: 'The Lowlands', seconds: 265, color: '#2E9CCA' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /playlists/sunday -> Playlist
+export async function getPlaylist(): Promise<Playlist> {
+  await randomDelay(400, 1000);
+  return { id: 'sunday', name: 'Sunday Slow Mornings', owner: 'Arvind', tracks: TRACKS.map((t) => ({ ...t })) };
+}
+
+// PUT /playlists/sunday/order { trackIds } -> { ok: true }
+export async function savePlaylistOrder(trackIds: string[]): Promise<{ ok: true }> {
+  console.log('PUT /playlists/sunday/order', trackIds.join(','));
+  await randomDelay(600, 1200);
+  TRACKS = trackIds.map((id) => {
+    const t = TRACKS.find((x) => x.id === id);
+    return { ...(t as Track) };
+  });
+  return { ok: true };
+}
+@@@ shared src/utils/time.ts
+// formatDuration(214) -> "3:34"
+export function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+// formatTotal(1826) -> "30 min", formatTotal(3900) -> "1 hr 5 min"
+export function formatTotal(seconds: number): string {
+  const totalMin = Math.round(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) {
+    return m + ' min';
+  }
+  return h + ' hr ' + m + ' min';
+}
+@@@ shared src/components/Cover.tsx
+import React from 'react';
+
+type CoverProps = { color: string; size: number; label: string };
+
+// Square album-art placeholder.
+export default function Cover({ color, size, label }: CoverProps) {
+  const style = { width: size, height: size, background: 'linear-gradient(135deg, ' + color + ', #1B1024)' };
+  return <div className="cover" style={style} role="img" aria-label={label} />;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPlaylist } from './api';
+import type { Playlist, Track } from './api';
+import { formatDuration } from './utils/time';
+import Cover from './components/Cover';
+
+function PlaylistHeader({ playlist }: { playlist: Playlist }) {
+  return (
+    <header className="pl-header">
+      <Cover color="#E8664F" size={112} label="Playlist cover" />
+      <div>
+        <p className="pl-kicker">Playlist</p>
+        <h1>{playlist.name}</h1>
+        <p className="pl-meta">{playlist.owner} · {playlist.tracks.length} songs</p>
+      </div>
+    </header>
+  );
+}
+
+function TrackRow({ track, index }: { track: Track; index: number }) {
+  return (
+    <li className="track">
+      <span className="track-index">{index + 1}</span>
+      <Cover color={track.color} size={40} label={track.title + ' cover'} />
+      <div className="track-main">
+        <p className="track-title">{track.title}</p>
+        <p className="track-artist">{track.artist}</p>
+      </div>
+      <span className="track-time">{formatDuration(track.seconds)}</span>
+    </li>
+  );
+}
+
+function TrackList({ tracks }: { tracks: Track[] }) {
+  return (
+    <ol className="tracks">
+      {tracks.map((t, i) => {
+        return <TrackRow key={t.id} track={t} index={i} />;
+      })}
+    </ol>
+  );
+}
+
+export default function App() {
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPlaylist().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPlaylist(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!playlist) {
+    return <div className="app"><p className="loading">Loading playlist…</p></div>;
+  }
+
+  return (
+    <div className="app">
+      <PlaylistHeader playlist={playlist} />
+      <div className="actions">
+        <button type="button" className="play-btn" aria-label="Play">▶</button>
+        <span className="actions-spacer" />
+      </div>
+      <TrackList tracks={playlist.tracks} />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FBF7F0;
+  --surface: #FFFFFF;
+  --plum: #3B1F4A;
+  --coral: #E8664F;
+  --text: #24152C;
+  --muted: #85768C;
+  --line: #EDE4D8;
+  --hover: #F5EEE3;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 720px; margin: 0 auto; padding: 28px 20px 48px; }
+.loading { color: var(--muted); text-align: center; margin-top: 60px; }
+
+.pl-header { display: flex; align-items: flex-end; gap: 20px; padding-bottom: 20px; }
+.pl-kicker { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); }
+.pl-header h1 { margin: 4px 0 6px; font-family: Georgia, 'Times New Roman', serif; font-size: 32px; font-weight: 700; color: var(--plum); line-height: 1.1; }
+.pl-meta { margin: 0; font-size: 14px; color: var(--muted); }
+.cover { border-radius: 8px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(59, 31, 74, 0.18); }
+
+.actions { display: flex; align-items: center; gap: 12px; padding: 12px 0 16px; border-bottom: 1px solid var(--line); }
+.actions-spacer { flex: 1; }
+.play-btn { width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--coral); color: #fff; font-size: 18px; cursor: pointer; box-shadow: 0 6px 16px rgba(232, 102, 79, 0.35); }
+
+.tracks { list-style: none; margin: 8px 0 0; padding: 0; }
+.track { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-radius: 10px; }
+.track:hover { background: var(--hover); }
+.track-index { width: 20px; text-align: right; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.track-main { flex: 1; min-width: 0; }
+.track-main p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-title { font-size: 15px; font-weight: 600; }
+.track-artist { font-size: 13px; color: var(--muted); }
+.track-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPlaylist, savePlaylistOrder } from './api';
+import type { Playlist, Track } from './api';
+import { formatDuration, formatTotal } from './utils/time';
+import Cover from './components/Cover';
+
+type DropTarget = { id: string; position: 'before' | 'after' };
+
+// Pure helper: returns a new array with the item at `from` moved to `to`.
+function moveItem<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function PlaylistHeader({ playlist, tracks }: { playlist: Playlist; tracks: Track[] }) {
+  // derived: never stored in state
+  const totalSeconds = tracks.reduce((sum, t) => {
+    return sum + t.seconds;
+  }, 0);
+  return (
+    <header className="pl-header">
+      <Cover color="#E8664F" size={112} label="Playlist cover" />
+      <div>
+        <p className="pl-kicker">Playlist</p>
+        <h1>{playlist.name}</h1>
+        <p className="pl-meta">{playlist.owner} · {tracks.length} songs · <span className="pl-total">{formatTotal(totalSeconds)}</span></p>
+      </div>
+    </header>
+  );
+}
+
+type TrackRowProps = {
+  track: Track;
+  index: number;
+  count: number;
+  startsAt: number;
+  isDragging: boolean;
+  dropPosition: 'before' | 'after' | null;
+  onMove: (from: number, to: number) => void;
+  onDragStart: (e: React.DragEvent<HTMLLIElement>, id: string) => void;
+  onDragOver: (e: React.DragEvent<HTMLLIElement>, id: string) => void;
+  onDrop: (e: React.DragEvent<HTMLLIElement>) => void;
+  onDragEnd: () => void;
+};
+
+function TrackRow({ track, index, count, startsAt, isDragging, dropPosition, onMove, onDragStart, onDragOver, onDrop, onDragEnd }: TrackRowProps) {
+  let cls = 'track';
+  if (isDragging) {
+    cls = cls + ' is-dragging';
+  }
+  if (dropPosition === 'before') {
+    cls = cls + ' drop-before';
+  }
+  if (dropPosition === 'after') {
+    cls = cls + ' drop-after';
+  }
+
+  return (
+    <li
+      className={cls}
+      draggable={true}
+      onDragStart={(e) => { onDragStart(e, track.id); }}
+      onDragOver={(e) => { onDragOver(e, track.id); }}
+      onDrop={(e) => { onDrop(e); }}
+      onDragEnd={() => { onDragEnd(); }}
+    >
+      <span className="drag-handle" aria-hidden="true">⋮⋮</span>
+      <span className="track-index">{index + 1}</span>
+      <Cover color={track.color} size={40} label={track.title + ' cover'} />
+      <div className="track-main">
+        <p className="track-title">{track.title}</p>
+        <p className="track-artist">{track.artist}</p>
+      </div>
+      <span className="track-start">starts {formatDuration(startsAt)}</span>
+      <span className="track-time">{formatDuration(track.seconds)}</span>
+      <div className="move-btns">
+        <button type="button" className="move-btn" aria-label={'Move ' + track.title + ' up'} disabled={index === 0} onClick={() => { onMove(index, index - 1); }}>▲</button>
+        <button type="button" className="move-btn" aria-label={'Move ' + track.title + ' down'} disabled={index === count - 1} onClick={() => { onMove(index, index + 1); }}>▼</button>
+      </div>
+    </li>
+  );
+}
+
+export default function App() {
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [savedIds, setSavedIds] = useState<string[]>([]); // order the server has
+  const [saving, setSaving] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getPlaylist().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPlaylist(data);
+      setTracks(data.tracks);
+      setSavedIds(data.tracks.map((t) => {
+        return t.id;
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleMove(from: number, to: number) {
+    if (to < 0 || to >= tracks.length) {
+      return;
+    }
+    const moved = tracks[from];
+    setTracks((prev) => {
+      return moveItem(prev, from, to);
+    });
+    setAnnouncement(moved.title + ' moved to position ' + (to + 1) + ' of ' + tracks.length);
+  }
+
+  function handleDragStart(e: React.DragEvent<HTMLLIElement>, id: string) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id); // Firefox needs data to start a drag
+    setDragId(id);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLLIElement>, id: string) {
+    e.preventDefault(); // required, or drop never fires
+    const rect = e.currentTarget.getBoundingClientRect();
+    let position: 'before' | 'after' = 'before';
+    if (e.clientY > rect.top + rect.height / 2) {
+      position = 'after';
+    }
+    if (!dropTarget || dropTarget.id !== id || dropTarget.position !== position) {
+      setDropTarget({ id: id, position: position });
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLLIElement>) {
+    e.preventDefault();
+    if (dragId && dropTarget && dragId !== dropTarget.id) {
+      const from = tracks.findIndex((t) => {
+        return t.id === dragId;
+      });
+      let to = tracks.findIndex((t) => {
+        return t.id === dropTarget.id;
+      });
+      if (dropTarget.position === 'after') {
+        to = to + 1;
+      }
+      if (from < to) {
+        to = to - 1; // removing the dragged item shifts everything after it up by one
+      }
+      handleMove(from, to);
+    }
+    handleDragEnd();
+  }
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDropTarget(null);
+  }
+
+  function handleSave() {
+    const ids = tracks.map((t) => {
+      return t.id;
+    });
+    setSaving(true);
+    savePlaylistOrder(ids).then(() => {
+      setSavedIds(ids);
+      setSaving(false);
+      setAnnouncement('Playlist order saved');
+    });
+  }
+
+  function handleDiscard() {
+    setTracks((prev) => {
+      return savedIds.map((id) => {
+        return prev.find((t) => {
+          return t.id === id;
+        }) as Track;
+      });
+    });
+  }
+
+  if (!playlist) {
+    return <div className="app"><p className="loading">Loading playlist…</p></div>;
+  }
+
+  // derived
+  const currentIds = tracks.map((t) => {
+    return t.id;
+  });
+  const dirty = currentIds.join(',') !== savedIds.join(',');
+
+  let saveLabel = 'Save order';
+  if (saving) {
+    saveLabel = 'Saving…';
+  }
+
+  let statusEl = <span className="save-state is-saved">✓ All changes saved</span>;
+  if (dirty) {
+    statusEl = <span className="save-state is-dirty">● Unsaved changes</span>;
+  }
+
+  let discardBtn = null;
+  if (dirty && !saving) {
+    discardBtn = <button type="button" className="ghost-btn" onClick={() => { handleDiscard(); }}>Discard</button>;
+  }
+
+  // derived: each track's start time in the playlist (recalculates on every reorder)
+  const starts: number[] = [];
+  let running = 0;
+  tracks.forEach((t) => {
+    starts.push(running);
+    running = running + t.seconds;
+  });
+
+  return (
+    <div className="app">
+      <PlaylistHeader playlist={playlist} tracks={tracks} />
+      <div className="actions">
+        <button type="button" className="play-btn" aria-label="Play">▶</button>
+        <span className="actions-spacer" />
+        {statusEl}
+        {discardBtn}
+        <button type="button" className="save-btn" disabled={!dirty || saving} onClick={() => { handleSave(); }}>{saveLabel}</button>
+      </div>
+      <ol className="tracks">
+        {tracks.map((t, i) => {
+          let dropPosition: 'before' | 'after' | null = null;
+          if (dropTarget && dropTarget.id === t.id && dragId !== t.id) {
+            dropPosition = dropTarget.position;
+          }
+          return (
+            <TrackRow
+              key={t.id}
+              track={t}
+              index={i}
+              count={tracks.length}
+              startsAt={starts[i]}
+              isDragging={dragId === t.id}
+              dropPosition={dropPosition}
+              onMove={handleMove}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+            />
+          );
+        })}
+      </ol>
+      <p className="sr-only" aria-live="polite">{announcement}</p>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FBF7F0;
+  --surface: #FFFFFF;
+  --plum: #3B1F4A;
+  --coral: #E8664F;
+  --text: #24152C;
+  --muted: #85768C;
+  --line: #EDE4D8;
+  --hover: #F5EEE3;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { max-width: 720px; margin: 0 auto; padding: 28px 20px 48px; }
+.loading { color: var(--muted); text-align: center; margin-top: 60px; }
+
+.pl-header { display: flex; align-items: flex-end; gap: 20px; padding-bottom: 20px; }
+.pl-kicker { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); }
+.pl-header h1 { margin: 4px 0 6px; font-family: Georgia, 'Times New Roman', serif; font-size: 32px; font-weight: 700; color: var(--plum); line-height: 1.1; }
+.pl-meta { margin: 0; font-size: 14px; color: var(--muted); }
+.cover { border-radius: 8px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(59, 31, 74, 0.18); }
+
+.actions { display: flex; align-items: center; gap: 12px; padding: 12px 0 16px; border-bottom: 1px solid var(--line); }
+.actions-spacer { flex: 1; }
+.play-btn { width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--coral); color: #fff; font-size: 18px; cursor: pointer; box-shadow: 0 6px 16px rgba(232, 102, 79, 0.35); }
+
+.tracks { list-style: none; margin: 8px 0 0; padding: 0; }
+.track { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-radius: 10px; }
+.track:hover { background: var(--hover); }
+.track-index { width: 20px; text-align: right; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.track-main { flex: 1; min-width: 0; }
+.track-main p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-title { font-size: 15px; font-weight: 600; }
+.track-artist { font-size: 13px; color: var(--muted); }
+.track-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---- Added: reorder + save ---- */
+.pl-total { color: var(--plum); font-weight: 600; }
+.track { position: relative; cursor: grab; }
+.track.is-dragging { opacity: 0.4; }
+.track.drop-before { box-shadow: inset 0 3px 0 var(--coral); }
+.track.drop-after { box-shadow: inset 0 -3px 0 var(--coral); }
+.drag-handle { color: #C9BBC9; font-size: 12px; letter-spacing: -2px; }
+.track-start { font-size: 12px; color: #B3A6B8; font-variant-numeric: tabular-nums; }
+.move-btns { display: flex; gap: 4px; }
+.move-btn { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--plum); font-size: 10px; cursor: pointer; }
+.move-btn:hover:not(:disabled) { border-color: var(--plum); }
+.move-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.move-btn:focus-visible, .save-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+.save-state { font-size: 13px; font-weight: 600; }
+.save-state.is-dirty { color: var(--coral); }
+.save-state.is-saved { color: #4E9B7A; }
+.save-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ghost-btn { height: 36px; padding: 0 12px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.ghost-btn:hover { color: var(--text); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -1,0 +1,325 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Staff = {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  ext: string;
+  onCall: boolean;
+};
+
+const STAFF: Staff[] = [
+  { id: 's1', name: 'Dr. Amara Okafor', role: 'Cardiologist', department: 'Cardiology', ext: '4410', onCall: true },
+  { id: 's2', name: 'Liam Chen', role: 'Charge Nurse', department: 'Emergency', ext: '2201', onCall: true },
+  { id: 's3', name: 'Dr. Sofia Marquez', role: 'Pediatrician', department: 'Pediatrics', ext: '3150', onCall: false },
+  { id: 's4', name: 'Noah Patel', role: 'Pharmacist', department: 'Pharmacy', ext: '1188', onCall: false },
+  { id: 's5', name: 'Dr. Hannah Weiss', role: 'Emergency Physician', department: 'Emergency', ext: '2207', onCall: true },
+  { id: 's6', name: 'Grace Kim', role: 'Physical Therapist', department: 'Rehabilitation', ext: '5302', onCall: false },
+  { id: 's7', name: 'Omar Haddad', role: 'Radiology Technician', department: 'Imaging', ext: '6021', onCall: false },
+  { id: 's8', name: 'Dr. Priya Nair', role: 'Neurologist', department: 'Neurology', ext: '4702', onCall: false },
+  { id: 's9', name: 'Ethan Brooks', role: 'Registered Nurse', department: 'Pediatrics', ext: '3166', onCall: true },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /directory/staff -> Staff[]
+export async function getStaff(): Promise<Staff[]> {
+  await randomDelay(400, 1300);
+  return STAFF.map((s) => {
+    return { ...s };
+  });
+}
+@@@ shared src/components/StaffCard.tsx
+import React from 'react';
+import type { Staff } from '../api';
+
+function initials(name: string): string {
+  const parts = name.replace('Dr. ', '').split(' ');
+  return parts[0][0] + parts[parts.length - 1][0];
+}
+
+// Already built: one person in the directory.
+export function StaffCard({ person }: { person: Staff }) {
+  let status = null;
+  if (person.onCall) {
+    status = <span className="on-call">On call</span>;
+  }
+  const avatarText = initials(person.name);
+  return (
+    <li className="staff-card">
+      <div className="staff-avatar">{avatarText}</div>
+      <div className="staff-info">
+        <p className="staff-name">{person.name}</p>
+        <p className="staff-role">{person.role} · {person.department}</p>
+      </div>
+      <div className="staff-side">
+        {status}
+        <span className="ext">ext. {person.ext}</span>
+      </div>
+    </li>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getStaff } from './api';
+import type { Staff } from './api';
+import { StaffCard } from './components/StaffCard';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="cross">+</span>
+      <span className="org">Cedar Health</span>
+      <span className="unit">North Campus</span>
+    </header>
+  );
+}
+
+function Directory() {
+  // TODO: load these from getStaff() in api.ts
+  const staff: Staff[] = [];
+
+  return (
+    <main className="directory">
+      <div className="dir-head">
+        <h1>Care team directory</h1>
+        <p className="sub">Find a colleague by name or role.</p>
+      </div>
+      <div className="toolbar">
+        <input className="search" type="search" placeholder="Search name or role" />
+      </div>
+      <ul className="staff-list">
+        {staff.map((person) => {
+          return <StaffCard key={person.id} person={person} />;
+        })}
+      </ul>
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <Directory />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F2F6F8;
+  --surface: #FFFFFF;
+  --text: #13293D;
+  --muted: #5F7385;
+  --line: #DCE5EB;
+  --primary: #0A7EA4;
+  --primary-soft: #E3F2F8;
+  --oncall: #1F9D63;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+
+.topbar { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--text); color: #fff; }
+.cross { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: #E0525F; font-weight: 800; font-size: 18px; }
+.org { font-weight: 700; }
+.unit { margin-left: auto; font-size: 13px; color: #9FB4C6; }
+
+.directory { max-width: 720px; margin: 0 auto; padding: 28px 20px; }
+.dir-head h1 { margin: 0; font-size: 24px; }
+.sub { margin: 4px 0 18px; color: var(--muted); font-size: 14px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.search { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font: inherit; font-size: 15px; color: var(--text); }
+.search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+.staff-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.staff-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.staff-card + .staff-card { border-top: 1px solid var(--line); }
+.staff-avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-weight: 700; font-size: 14px; }
+.staff-info { flex: 1; min-width: 0; }
+.staff-info p { margin: 0; }
+.staff-name { font-weight: 600; font-size: 15px; }
+.staff-role { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staff-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.on-call { font-size: 11px; font-weight: 700; color: var(--oncall); }
+.on-call::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--oncall); }
+.ext { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getStaff } from './api';
+import type { Staff } from './api';
+import { StaffCard } from './components/StaffCard';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="cross">+</span>
+      <span className="org">Cedar Health</span>
+      <span className="unit">North Campus</span>
+    </header>
+  );
+}
+
+function Directory() {
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [onCallOnly, setOnCallOnly] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getStaff().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setStaff(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleClear() {
+    setQuery('');
+  }
+
+  function handleToggleOnCall() {
+    setOnCallOnly((prev) => {
+      return !prev;
+    });
+  }
+
+  // derived: never stored in state
+  const q = query.trim().toLowerCase();
+  const visible = staff.filter((person) => {
+    if (onCallOnly && !person.onCall) {
+      return false;
+    }
+    return person.name.toLowerCase().includes(q) || person.role.toLowerCase().includes(q);
+  });
+
+  let chipCls = 'chip';
+  if (onCallOnly) {
+    chipCls = 'chip is-on';
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="message">Loading care team…</p>;
+  } else if (visible.length === 0) {
+    body = (
+      <div className="message">
+        <p>No matches for “{query}”.</p>
+        <button type="button" className="link-btn" onClick={() => { handleClear(); }}>Clear search</button>
+      </div>
+    );
+  } else {
+    body = (
+      <ul className="staff-list">
+        {visible.map((person) => {
+          return <StaffCard key={person.id} person={person} />;
+        })}
+      </ul>
+    );
+  }
+
+  let count = null;
+  if (!loading) {
+    count = <p className="count">Showing {visible.length} of {staff.length}</p>;
+  }
+
+  return (
+    <main className="directory">
+      <div className="dir-head">
+        <h1>Care team directory</h1>
+        <p className="sub">Find a colleague by name or role.</p>
+      </div>
+      <div className="toolbar">
+        <input
+          className="search"
+          type="search"
+          placeholder="Search name or role"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); }}
+        />
+        <button type="button" className={chipCls} aria-pressed={onCallOnly} onClick={() => { handleToggleOnCall(); }}>
+          On call now
+        </button>
+      </div>
+      {count}
+      {body}
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <Directory />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F2F6F8;
+  --surface: #FFFFFF;
+  --text: #13293D;
+  --muted: #5F7385;
+  --line: #DCE5EB;
+  --primary: #0A7EA4;
+  --primary-soft: #E3F2F8;
+  --oncall: #1F9D63;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+
+.topbar { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--text); color: #fff; }
+.cross { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: #E0525F; font-weight: 800; font-size: 18px; }
+.org { font-weight: 700; }
+.unit { margin-left: auto; font-size: 13px; color: #9FB4C6; }
+
+.directory { max-width: 720px; margin: 0 auto; padding: 28px 20px; }
+.dir-head h1 { margin: 0; font-size: 24px; }
+.sub { margin: 4px 0 18px; color: var(--muted); font-size: 14px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.search { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font: inherit; font-size: 15px; color: var(--text); }
+.search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+.staff-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.staff-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.staff-card + .staff-card { border-top: 1px solid var(--line); }
+.staff-avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-weight: 700; font-size: 14px; }
+.staff-info { flex: 1; min-width: 0; }
+.staff-info p { margin: 0; }
+.staff-name { font-weight: 600; font-size: 15px; }
+.staff-role { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staff-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.on-call { font-size: 11px; font-weight: 700; color: var(--oncall); }
+.on-call::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--oncall); }
+.ext { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---- Added: search + states ---- */
+.count { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.message { padding: 32px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
+.message p { margin: 0 0 8px; }
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
+/* Change: on-call chip */
+.chip { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: inherit; font-size: 14px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.chip:hover { border-color: var(--oncall); }
+.chip.is-on { background: #E4F6EC; border-color: var(--oncall); color: var(--oncall); font-weight: 600; }

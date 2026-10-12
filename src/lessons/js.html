@@ -1,0 +1,203 @@
+<template id="tpl-data">
+  <h1>JavaScript for UI work</h1>
+  <p class="lede">React is mostly JavaScript. The parts that show up constantly in feature work are small: a few syntax shortcuts, the array methods that reshape data, how truthiness works, and promises for anything async. This lesson teaches each one with examples you can run. The console under each example is the output.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Read modern syntax fluently: arrow functions, destructuring, spread, template strings, <code>?.</code> and <code>??</code></li>
+    <li>Turn an API response into exactly the shape a screen needs</li>
+    <li>Avoid the truthiness bugs that show up in JSX</li>
+    <li>Work with promises and async/await confidently</li>
+  </ul></div>
+
+  <h2>1. Syntax you'll read and write every few minutes</h2>
+  <h3>Arrow functions</h3>
+  <p><code>(a, b) =&gt; a + b</code> is a short way to write a function. With one parameter the parentheses are optional: <code>x =&gt; x * 2</code>. If the body is a single expression, it's returned automatically (an <em>implicit return</em>). If you use braces, you're writing a block and must <code>return</code> yourself. To implicitly return an object, wrap it in parentheses, otherwise the braces are read as a block: <code>m =&gt; ({ ...m, read: true })</code>.</p>
+  <h3>Destructuring</h3>
+  <p>Pull fields out of an object or items out of an array into variables, by name or position: <code>const { name, team } = person;</code> and <code>const [first, second] = list;</code>. You can rename (<code>{ name: fullName }</code>) and set defaults (<code>{ size = 40 }</code>). Component props and <code>useState</code> both use it.</p>
+  <h3>Spread</h3>
+  <p><code>...</code> copies the contents of an array or object into a new one: <code>[...list, item]</code>, <code>{ ...user, name: 'New' }</code>. Later fields win, so the second example copies <code>user</code> and overrides <code>name</code>. Spread makes a <b>shallow</b> copy: nested objects inside are shared, not copied. To change a nested field immutably you spread each level you change: <code>{ ...user, address: { ...user.address, city: 'Austin' } }</code>.</p>
+  <h3>Template literals</h3>
+  <p>Backtick strings can embed expressions: <code>`${count} ${count === 1 ? 'item' : 'items'}`</code>. Useful for class names and messages.</p>
+  <h3>Optional chaining and nullish coalescing</h3>
+  <p><code>user?.address?.city</code> returns <code>undefined</code> instead of crashing when something in the chain is missing. <code>value ?? 'default'</code> uses the default only when <code>value</code> is <code>null</code> or <code>undefined</code>, unlike <code>||</code>, which also replaces <code>0</code> and <code>''</code>.</p>
+
+  <script type="text/x-play" data-title="Syntax tour (read the console)" data-h="460" data-ph="76">
+export default function App() {
+  const user = { name: 'Maya Okafor', projects: 0, address: { city: 'Oakland' } };
+
+  // Destructuring with a rename and a default
+  const { name, role = 'member', address: { city } } = user;
+  console.log(name, role, city);
+
+  // Arrow functions: implicit return, and returning an object
+  const double = (x) => x * 2;
+  const withRead = (m) => ({ ...m, read: true });
+  console.log(double(21), withRead({ id: 1, read: false }));
+
+  // Spread: shallow copy, later fields win
+  const moved = { ...user, address: { ...user.address, city: 'Austin' } };
+  console.log('original city:', user.address.city, '| copy city:', moved.address.city);
+
+  // Template literal + pluralization
+  console.log(`${user.projects} ${user.projects === 1 ? 'project' : 'projects'}`);
+
+  // || vs ??
+  console.log('with ||:', user.projects || 'none', '| with ??:', user.projects ?? 'none');
+
+  // Optional chaining
+  console.log('manager:', user.manager?.name);
+
+  return <p>All output is in the console below.</p>;
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Note the <code>||</code> line prints "none" even though <code>projects</code> is 0. That's the classic bug; <code>??</code> gets it right.</li>
+    <li>Change <code>user.manager?.name</code> to <code>user.manager.name</code>. The app crashes: "Cannot read properties of undefined".</li>
+  </ol></div>
+
+  <h2>2. Truthiness, and why it matters in JSX</h2>
+  <p>In conditions, JavaScript treats some values as false. These are <b>falsy</b>: <code>false</code>, <code>0</code>, <code>''</code> (empty string), <code>null</code>, <code>undefined</code>, <code>NaN</code>. Everything else is truthy, including <code>[]</code>, <code>{}</code> and <code>'0'</code>.</p>
+  <p><code>a &amp;&amp; b</code> returns <code>a</code> if <code>a</code> is falsy, otherwise <code>b</code>. That's why <code>{items.length &amp;&amp; &lt;List /&gt;}</code> shows a <b>0</b> when the list is empty: it returns the 0, and React renders numbers. And an empty array is truthy, so <code>{items &amp;&amp; …}</code> renders even with no items. Be explicit: <code>items.length &gt; 0 &amp;&amp; …</code>.</p>
+
+  <h2>3. Array methods: reshaping data</h2>
+  <p>Almost every screen takes an array from an API and needs it filtered, sorted, grouped, counted or transformed. Each method below takes a function that's called once per item. Learn what each one <b>returns</b>, because that's how you chain them:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Method</th><th>Your function returns</th><th>The method returns</th><th>Use for</th></tr>
+    <tr><td><code>map</code></td><td>the new version of the item</td><td>a new array, same length</td><td>transform each item, render lists</td></tr>
+    <tr><td><code>filter</code></td><td><code>true</code> to keep</td><td>a new, shorter array</td><td>search, tabs, removing an item</td></tr>
+    <tr><td><code>find</code></td><td><code>true</code> for the match</td><td>the first matching item, or <code>undefined</code></td><td>the selected item by id</td></tr>
+    <tr><td><code>some</code> / <code>every</code></td><td><code>true</code>/<code>false</code></td><td>one boolean</td><td>"any unread?", "all done?"</td></tr>
+    <tr><td><code>reduce</code></td><td>the running result so far</td><td>the final result</td><td>totals, counts, grouping</td></tr>
+    <tr><td><code>sort</code></td><td>negative, zero or positive</td><td><b>the same array, sorted in place</b></td><td>ordering (copy first!)</td></tr>
+  </table></div>
+
+  <h3>sort, explained</h3>
+  <p>The compare function receives two items, <code>a</code> and <code>b</code>, and returns a negative number if <code>a</code> should come first, positive if <code>b</code> should, zero if they're equal. For numbers, <code>a - b</code> sorts ascending and <code>b - a</code> descending. For strings, <code>a.localeCompare(b)</code> handles alphabetical order properly. Dates: <code>new Date(a.at) - new Date(b.at)</code>. And because <code>sort</code> changes the array it's called on, sort a copy: <code>[...items].sort(…)</code>. (After <code>filter</code> or <code>map</code> you already have a new array, so sorting it directly is safe.)</p>
+
+  <h3>reduce, explained</h3>
+  <p><code>reduce</code> walks the array carrying an "accumulator". You give it a starting value; your function receives the accumulator and the current item, and returns the updated accumulator. A total: start at 0, add each amount. A count per category: start with <code>{}</code>, increment the key. Grouping: start with <code>{}</code>, push each item into the list for its key. If a <code>reduce</code> is getting hard to read, a plain <code>for…of</code> loop is perfectly acceptable.</p>
+
+  <script type="text/x-play" data-title="A data pipeline" data-h="560" data-ph="76">
+const orders = [
+  { id: 'A1', customer: 'Northwind', amount: 1290.5, status: 'paid', at: '2026-09-28' },
+  { id: 'A2', customer: 'Blue Fern', amount: 342, status: 'pending', at: '2026-09-29' },
+  { id: 'A3', customer: 'Kestrel', amount: 87.25, status: 'refunded', at: '2026-09-30' },
+  { id: 'A4', customer: 'Atlas', amount: 5120, status: 'paid', at: '2026-10-01' },
+  { id: 'A5', customer: 'Juniper', amount: 760, status: 'pending', at: '2026-10-02' },
+];
+
+export default function App() {
+  // filter → sort → map, chained
+  const paidNewestFirst = orders
+    .filter((o) => o.status === 'paid')
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .map((o) => o.customer);
+  console.log('paid, newest first:', paidNewestFirst);
+
+  // find by id
+  console.log('A3 is', orders.find((o) => o.id === 'A3').customer);
+
+  // some / every
+  console.log('any pending?', orders.some((o) => o.status === 'pending'));
+
+  // reduce: total
+  const total = orders.reduce((sum, o) => sum + o.amount, 0);
+  console.log('total:', total);
+
+  // reduce: count by status
+  const counts = orders.reduce((acc, o) => {
+    acc[o.status] = (acc[o.status] || 0) + 1;
+    return acc;
+  }, {});
+  console.log('counts:', counts);
+
+  // group into ordered sections (best for rendering)
+  const STATUSES = ['pending', 'paid', 'refunded'];
+  const sections = STATUSES
+    .map((s) => ({ label: s, items: orders.filter((o) => o.status === s) }))
+    .filter((section) => section.items.length > 0);
+  console.log('sections:', sections.map((s) => `${s.label} (${s.items.length})`));
+
+  // unique values
+  console.log('statuses seen:', [...new Set(orders.map((o) => o.status))]);
+
+  return <p>Output is in the console below.</p>;
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Change the pipeline to "pending orders over $500, smallest first, as amounts". Add a condition to the filter, change the sort to <code>a.amount - b.amount</code>, and map to <code>o.amount</code>.</li>
+    <li>Add <code>console.log(orders[0].id)</code> after a <code>orders.sort((a, b) =&gt; b.amount - a.amount)</code> with no copy. The original array has been reordered. That's what <code>sort</code> mutating means, and with state it causes bugs.</li>
+  </ol></div>
+
+  <h3>Objects as lookup tables</h3>
+  <p>When you need to look up items by id many times, build an object once: <code>const byId = Object.fromEntries(items.map(i =&gt; [i.id, i]))</code>, then <code>byId['m3']</code>. To loop over an object: <code>Object.keys(obj)</code>, <code>Object.values(obj)</code>, or <code>Object.entries(obj).map(([key, value]) =&gt; …)</code>. Use bracket syntax when the key is in a variable: <code>obj[key]</code>, and <code>{ [key]: value }</code> to create one.</p>
+
+  <h2>4. Strings</h2>
+  <p>The handful you'll use: <code>.trim()</code> (strip spaces from both ends, do this before validating or searching), <code>.toLowerCase()</code> (for case-insensitive comparison), <code>.includes(q)</code> (contains), <code>.startsWith()</code>, <code>.split(' ')</code> (to array), <code>.join(', ')</code> (array to string), <code>.slice(start, end)</code> (a piece), <code>.indexOf(q)</code> (position, or -1), and <code>.padStart(2, '0')</code> for "05".</p>
+  <script type="text/x-code" data-lang="js" data-title="string recipes">
+const q = query.trim().toLowerCase();
+const matches = name.toLowerCase().includes(q);                 // case-insensitive search
+const initials = name.split(' ').map((p) => p[0]).join('');     // "MO"
+const label = s.charAt(0).toUpperCase() + s.slice(1);           // "Admin"
+const short = text.length > 40 ? text.slice(0, 40) + '…' : text;
+</script>
+
+  <h2>5. Numbers and dates</h2>
+  <p>Don't hand-format numbers or dates. The built-in <code>Intl</code> objects do it correctly, including separators and locales:</p>
+  <script type="text/x-code" data-lang="js" data-title="formatting">
+new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(1290.5)   // "$1,290.50"
+new Intl.NumberFormat('en-US', { notation: 'compact' }).format(1234567)              // "1.2M"
+new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 }).format(0.4567) // "45.7%"
+new Date('2026-10-05T14:30:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })  // "Oct 5"
+</script>
+  <p>Create a formatter once, outside the component, and reuse it. Dates: <code>new Date(isoString)</code> parses; subtracting two dates gives milliseconds; and a date-only string like <code>'2026-10-05'</code> is read as midnight UTC, which shows as the 4th in US time zones. Add <code>'T00:00:00'</code> to read it as local time.</p>
+
+  <h2>6. Promises and async/await</h2>
+  <p>A <b>promise</b> is a placeholder for a value that isn't ready yet, like the result of a network request. It ends up either <em>fulfilled</em> with a value or <em>rejected</em> with an error. You react to it with <code>.then(value =&gt; …)</code> and <code>.catch(error =&gt; …)</code>.</p>
+  <p><code>async</code>/<code>await</code> is a nicer way to write the same thing. Inside an <code>async</code> function, <code>await somePromise</code> pauses that function until the promise settles, then gives you the value, or throws the error so you can use <code>try/catch</code>. The rest of the app keeps running while it waits. An <code>async</code> function always returns a promise itself.</p>
+  <script type="text/x-play" data-title="Promises, await, errors" data-h="470" data-ph="76">
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getUser(id) {
+  return wait(300).then(() => {
+    if (id === 0) throw new Error('User not found');
+    return { id, name: 'User ' + id };
+  });
+}
+
+async function demo() {
+  console.log('1. start');
+
+  const user = await getUser(7);              // pauses here, then continues
+  console.log('2. got', user.name);
+
+  try {
+    await getUser(0);
+  } catch (err) {
+    console.log('3. caught:', err.message);   // rejected promise → catch
+  } finally {
+    console.log('4. finally always runs');
+  }
+
+  // Run in parallel and wait for all
+  const [a, b] = await Promise.all([getUser(1), getUser(2)]);
+  console.log('5. both:', a.name, b.name);
+}
+
+export default function App() {
+  demo();
+  console.log('0. demo() returned immediately; it finishes in the background');
+  return <p>Output is in the console below.</p>;
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Read the order: "0" prints before "2". <code>await</code> only pauses <code>demo</code>, not the code that called it.</li>
+    <li>Remove the <code>try/catch</code> around <code>getUser(0)</code>. The error becomes an "Uncaught (in promise)" in the console and step 5 never runs.</li>
+  </ol></div>
+
+  <h2>7. Modules</h2>
+  <p>Covered in "Components, JSX and props": default exports import without braces, named exports with braces and their exact names. Paths starting with <code>./</code> or <code>../</code> are your files; bare names like <code>'react'</code> are installed packages.</p>
+
+  <div data-quiz="data"></div>
+</template>

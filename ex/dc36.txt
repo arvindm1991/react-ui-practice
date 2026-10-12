@@ -1,0 +1,519 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Message = {
+  id: string;
+  author: 'me' | 'agent';
+  text: string;
+  sentAt: string; // ISO date-time
+};
+
+const MESSAGES: Message[] = [
+  { id: 'm1', author: 'agent', text: 'Hi Arvind! I’m Lena, your Wayfarer concierge for the Lisbon trip. How can I help?', sentAt: '2026-10-08T10:02:00' },
+  { id: 'm2', author: 'me', text: 'Hi! Is airport pickup included on the 14th?', sentAt: '2026-10-08T10:05:00' },
+  { id: 'm3', author: 'agent', text: 'It is. A driver will meet you at arrivals with a sign. Flight TP 236 lands at 7:40 AM.', sentAt: '2026-10-08T10:07:00' },
+  { id: 'm4', author: 'me', text: 'Perfect, thanks.', sentAt: '2026-10-08T10:08:00' },
+  { id: 'm5', author: 'me', text: 'Could you book a table for two somewhere in Alfama on Friday?', sentAt: '2026-10-09T18:20:00' },
+  { id: 'm6', author: 'agent', text: 'Of course. Any preference: fado with dinner, or somewhere quieter?', sentAt: '2026-10-09T18:24:00' },
+  { id: 'm7', author: 'me', text: 'Fado sounds great.', sentAt: '2026-10-09T18:25:00' },
+  { id: 'm8', author: 'agent', text: 'Booked: Clube de Fado, Friday 8:30 PM, table for two. Confirmation is in your trip documents.', sentAt: '2026-10-09T18:41:00' },
+  { id: 'm9', author: 'agent', text: 'Good morning! Your hotel can do early check-in at 10 AM for €35. Want me to add it?', sentAt: '2026-10-10T09:12:00' },
+  { id: 'm10', author: 'me', text: 'Yes please, add it.', sentAt: '2026-10-10T09:30:00' },
+  { id: 'm11', author: 'agent', text: 'Done. Early check-in is confirmed for the 14th.', sentAt: '2026-10-10T09:33:00' },
+  { id: 'm12', author: 'agent', text: 'Anything else before your trip?', sentAt: '2026-10-10T09:34:00' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /threads/lisbon/messages -> Message[] (oldest first)
+export async function getMessages(): Promise<Message[]> {
+  await randomDelay(400, 900);
+  return MESSAGES.map((m) => ({ ...m }));
+}
+
+// The server's clock for new messages (fixed so the demo is stable).
+let clock = new Date('2026-10-10T15:00:00').getTime();
+let nextId = 100;
+const failedOnce = new Set<string>();
+
+// POST /threads/lisbon/messages { text } -> Message
+// Simulated flaky network: a message containing "fail" fails the FIRST time it's sent
+// (throws), and succeeds when the same text is retried.
+export async function sendMessage(text: string): Promise<Message> {
+  await randomDelay(600, 1100);
+  if (text.toLowerCase().includes('fail') && !failedOnce.has(text)) {
+    failedOnce.add(text);
+    throw new Error('Network error');
+  }
+  clock += 60000;
+  nextId += 1;
+  const d = new Date(clock);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const sentAt = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':00';
+  const message: Message = { id: 'm' + nextId, author: 'me', text, sentAt };
+  MESSAGES.push(message);
+  return { ...message };
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+export function Avatar({ initials, online }: { initials: string; online?: boolean }) {
+  let dot = null;
+  if (online) {
+    dot = <span className="online-dot" />;
+  }
+  return (
+    <span className="avatar">
+      {initials}
+      {dot}
+    </span>
+  );
+}
+@@@ shared src/utils/time.ts
+// The app's "now". Fixed so the demo data always reads the same.
+export const NOW_ISO = '2026-10-10T15:00:00';
+const NOW = new Date(NOW_ISO);
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// formatTime("2026-10-10T09:12:00") -> "9:12 AM"
+export function formatTime(iso: string): string {
+  const d = new Date(iso);
+  let h = d.getHours() % 12;
+  if (h === 0) {
+    h = 12;
+  }
+  let suffix = 'AM';
+  if (d.getHours() >= 12) {
+    suffix = 'PM';
+  }
+  return h + ':' + String(d.getMinutes()).padStart(2, '0') + ' ' + suffix;
+}
+
+function startOfDay(x: Date): number {
+  return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+}
+
+// dayLabel("2026-10-10T09:12:00") -> "Today", "2026-10-09..." -> "Yesterday", "2026-10-08..." -> "Thu, Oct 8"
+export function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const diffDays = Math.round((startOfDay(NOW) - startOfDay(d)) / 86400000);
+  if (diffDays === 0) {
+    return 'Today';
+  }
+  if (diffDays === 1) {
+    return 'Yesterday';
+  }
+  return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate();
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getMessages } from './api';
+import type { Message } from './api';
+import { Avatar } from './components/Avatar';
+import { formatTime } from './utils/time';
+
+function ChatHeader() {
+  return (
+    <header className="chat-header">
+      <Avatar initials="LC" online />
+      <div>
+        <p className="chat-name">Lena Costa</p>
+        <p className="chat-sub">Wayfarer concierge · replies in ~5 min</p>
+      </div>
+    </header>
+  );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  let cls = 'bubble-row';
+  if (message.author === 'me') {
+    cls = 'bubble-row is-mine';
+  }
+  return (
+    <div className={cls}>
+      <div className="bubble">
+        <p className="bubble-text">{message.text}</p>
+        <span className="bubble-meta">{formatTime(message.sentAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+// TODO: send messages (optimistic), failures + retry, auto-scroll
+function ChatThread() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getMessages().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setMessages(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="chat-empty">Loading conversation…</p>;
+  } else {
+    body = messages.map((m) => {
+      return <MessageBubble key={m.id} message={m} />;
+    });
+  }
+
+  return (
+    <section className="chat">
+      <ChatHeader />
+      <div className="messages">{body}</div>
+      <form className="composer">
+        <input className="composer-input" placeholder="Message Lena…" value={draft} onChange={(e) => { setDraft(e.target.value); }} />
+        <button type="submit" className="send-btn">Send</button>
+      </form>
+    </section>
+  );
+}
+
+function TripCard() {
+  return (
+    <aside className="trip">
+      <p className="trip-eyebrow">Upcoming trip</p>
+      <h2 className="trip-title">Lisbon, Portugal</h2>
+      <p className="trip-dates">Oct 14 – Oct 19 · 2 travellers</p>
+      <ul className="trip-list">
+        <li><span>✈︎</span> TP 236 · SFO → LIS</li>
+        <li><span>🏨</span> Memmo Alfama · 5 nights</li>
+        <li><span>🍷</span> Clube de Fado · Fri 8:30 PM</li>
+      </ul>
+    </aside>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <ChatThread />
+      <TripCard />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #EAF3F2;
+  --surface: #FFFFFF;
+  --border: #D7E5E3;
+  --text: #11302D;
+  --muted: #5F7C78;
+  --primary: #0F766E;
+  --primary-dark: #0B5E58;
+  --mine: #0F766E;
+  --theirs: #F1F6F5;
+  --danger: #DC2626;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; max-width: 920px; margin: 0 auto; padding: 24px 16px; }
+
+.chat { height: 560px; display: flex; flex-direction: column; background: var(--surface); border-radius: 18px; box-shadow: 0 10px 30px rgba(17, 48, 45, 0.08); overflow: hidden; }
+.chat-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.chat-name { margin: 0; font-weight: 700; }
+.chat-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.avatar { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #CCFBF1; color: var(--primary); font-weight: 800; }
+.online-dot { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; border-radius: 50%; background: #22C55E; border: 2px solid #fff; }
+
+.messages { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.chat-empty { margin: auto; color: var(--muted); }
+.bubble-row { display: flex; }
+.bubble-row.is-mine { justify-content: flex-end; }
+.bubble { max-width: 75%; padding: 9px 12px; border-radius: 16px 16px 16px 4px; background: var(--theirs); }
+.bubble-row.is-mine .bubble { background: var(--mine); color: #fff; border-radius: 16px 16px 4px 16px; }
+.bubble-text { margin: 0; line-height: 1.45; }
+.bubble-meta { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); text-align: right; }
+.bubble-row.is-mine .bubble-meta { color: rgba(255, 255, 255, 0.75); }
+
+.composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+.composer-input { flex: 1; height: 42px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; font: inherit; color: var(--text); background: #F8FBFB; }
+.composer-input:focus { outline: none; border-color: var(--primary); background: #fff; }
+.send-btn { height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.send-btn:hover { background: var(--primary-dark); }
+.send-btn:disabled { opacity: 0.5; cursor: default; }
+
+.trip { align-self: start; background: linear-gradient(170deg, #0F766E, #134E4A); color: #fff; border-radius: 18px; padding: 20px; }
+.trip-eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+.trip-title { margin: 6px 0 2px; font-size: 20px; }
+.trip-dates { margin: 0 0 16px; font-size: 13px; opacity: 0.85; }
+.trip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.trip-list li { display: flex; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getMessages, sendMessage } from './api';
+import type { Message } from './api';
+import { Avatar } from './components/Avatar';
+import { NOW_ISO, dayLabel, formatTime } from './utils/time';
+
+function ChatHeader() {
+  return (
+    <header className="chat-header">
+      <Avatar initials="LC" online />
+      <div>
+        <p className="chat-name">Lena Costa</p>
+        <p className="chat-sub">Wayfarer concierge · replies in ~5 min</p>
+      </div>
+    </header>
+  );
+}
+
+// What the UI shows: a server message plus where it is in its journey.
+type ChatMessage = Message & { status: 'sent' | 'sending' | 'failed' };
+
+type BubbleProps = {
+  message: ChatMessage;
+  onRetry: (id: string) => void;
+};
+
+function MessageBubble({ message, onRetry }: BubbleProps) {
+  let cls = 'bubble-row';
+  if (message.author === 'me') {
+    cls = 'bubble-row is-mine';
+  }
+  let meta = <span className="bubble-meta">{formatTime(message.sentAt)}</span>;
+  if (message.status === 'sending') {
+    cls = cls + ' is-sending';
+    meta = <span className="bubble-meta">Sending…</span>;
+  }
+  if (message.status === 'failed') {
+    cls = cls + ' is-failed';
+    meta = (
+      <span className="bubble-meta bubble-failed">
+        Failed ·
+        <button type="button" className="retry-btn" onClick={() => { onRetry(message.id); }}>Retry</button>
+      </span>
+    );
+  }
+  return (
+    <div className={cls}>
+      <div className="bubble">
+        <p className="bubble-text">{message.text}</p>
+      </div>
+      {meta}
+    </div>
+  );
+}
+
+function ChatThread() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMessages().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setMessages(data.map((m): ChatMessage => {
+        return { ...m, status: 'sent' };
+      }));
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Auto-scroll: runs after the DOM updates whenever a message is added (or the first load lands).
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages.length]);
+
+  function setStatus(id: string, status: ChatMessage['status']) {
+    setMessages((prev) => {
+      return prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, status };
+        }
+        return m;
+      });
+    });
+  }
+
+  // Shared by first send and retry: swap the temp message for the server's on success.
+  function deliver(tempId: string, text: string) {
+    sendMessage(text)
+      .then((saved) => {
+        setMessages((prev) => {
+          return prev.map((m): ChatMessage => {
+            if (m.id === tempId) {
+              return { ...saved, status: 'sent' };
+            }
+            return m;
+          });
+        });
+      })
+      .catch(() => {
+        setStatus(tempId, 'failed');
+      });
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (text === '') {
+      return;
+    }
+    const tempId = 'temp-' + Date.now();
+    const temp: ChatMessage = { id: tempId, author: 'me', text, sentAt: NOW_ISO, status: 'sending' };
+    setMessages((prev) => {
+      return [...prev, temp];
+    });
+    setDraft('');
+    deliver(tempId, text);
+  }
+
+  function handleRetry(id: string) {
+    const failed = messages.find((m) => {
+      return m.id === id;
+    });
+    if (!failed) {
+      return;
+    }
+    setStatus(id, 'sending');
+    deliver(id, failed.text);
+  }
+
+  // Change: a separator row whenever the day changes from the previous message.
+  let body;
+  if (loading) {
+    body = <p className="chat-empty">Loading conversation…</p>;
+  } else {
+    const rows: React.ReactNode[] = [];
+    let lastDay = '';
+    messages.forEach((m) => {
+      const day = dayLabel(m.sentAt);
+      if (day !== lastDay) {
+        rows.push(<div key={'day-' + day} className="day-sep"><span>{day}</span></div>);
+        lastDay = day;
+      }
+      rows.push(<MessageBubble key={m.id} message={m} onRetry={handleRetry} />);
+    });
+    body = rows;
+  }
+
+  return (
+    <section className="chat">
+      <ChatHeader />
+      <div className="messages" ref={listRef}>{body}</div>
+      <form className="composer" onSubmit={handleSubmit}>
+        <input className="composer-input" placeholder="Message Lena…" value={draft} onChange={(e) => { setDraft(e.target.value); }} />
+        <button type="submit" className="send-btn" disabled={draft.trim() === ''}>Send</button>
+      </form>
+    </section>
+  );
+}
+
+function TripCard() {
+  return (
+    <aside className="trip">
+      <p className="trip-eyebrow">Upcoming trip</p>
+      <h2 className="trip-title">Lisbon, Portugal</h2>
+      <p className="trip-dates">Oct 14 – Oct 19 · 2 travellers</p>
+      <ul className="trip-list">
+        <li><span>✈︎</span> TP 236 · SFO → LIS</li>
+        <li><span>🏨</span> Memmo Alfama · 5 nights</li>
+        <li><span>🍷</span> Clube de Fado · Fri 8:30 PM</li>
+      </ul>
+    </aside>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <ChatThread />
+      <TripCard />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #EAF3F2;
+  --surface: #FFFFFF;
+  --border: #D7E5E3;
+  --text: #11302D;
+  --muted: #5F7C78;
+  --primary: #0F766E;
+  --primary-dark: #0B5E58;
+  --mine: #0F766E;
+  --theirs: #F1F6F5;
+  --danger: #DC2626;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; max-width: 920px; margin: 0 auto; padding: 24px 16px; }
+
+.chat { height: 560px; display: flex; flex-direction: column; background: var(--surface); border-radius: 18px; box-shadow: 0 10px 30px rgba(17, 48, 45, 0.08); overflow: hidden; }
+.chat-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.chat-name { margin: 0; font-weight: 700; }
+.chat-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.avatar { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #CCFBF1; color: var(--primary); font-weight: 800; }
+.online-dot { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; border-radius: 50%; background: #22C55E; border: 2px solid #fff; }
+
+.messages { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.chat-empty { margin: auto; color: var(--muted); }
+.bubble-row { display: flex; }
+.bubble-row.is-mine { justify-content: flex-end; }
+.bubble { max-width: 75%; padding: 9px 12px; border-radius: 16px 16px 16px 4px; background: var(--theirs); }
+.bubble-row.is-mine .bubble { background: var(--mine); color: #fff; border-radius: 16px 16px 4px 16px; }
+.bubble-text { margin: 0; line-height: 1.45; }
+.bubble-meta { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); text-align: right; }
+.bubble-row.is-mine .bubble-meta { color: rgba(255, 255, 255, 0.75); }
+
+.composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+.composer-input { flex: 1; height: 42px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; font: inherit; color: var(--text); background: #F8FBFB; }
+.composer-input:focus { outline: none; border-color: var(--primary); background: #fff; }
+.send-btn { height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.send-btn:hover { background: var(--primary-dark); }
+.send-btn:disabled { opacity: 0.5; cursor: default; }
+
+.trip { align-self: start; background: linear-gradient(170deg, #0F766E, #134E4A); color: #fff; border-radius: 18px; padding: 20px; }
+.trip-eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+.trip-title { margin: 6px 0 2px; font-size: 20px; }
+.trip-dates { margin: 0 0 16px; font-size: 13px; opacity: 0.85; }
+.trip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.trip-list li { display: flex; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
+
+/* ---- Added: sending states + day separators ---- */
+/* Meta moved outside the bubble so "Failed · Retry" can sit under it. */
+.bubble-row { flex-direction: column; align-items: flex-start; }
+.bubble-row.is-mine { align-items: flex-end; }
+.bubble-row .bubble-meta { margin: 3px 6px 0; color: var(--muted); }
+.bubble-row.is-mine .bubble-meta { color: var(--muted); }
+.bubble-row.is-sending .bubble { opacity: 0.6; }
+.bubble-row.is-failed .bubble { background: #FEE2E2; color: #7F1D1D; }
+.bubble-failed { display: inline-flex; align-items: center; gap: 4px; color: var(--danger); font-weight: 600; }
+.bubble-row.is-mine .bubble-failed { color: var(--danger); }
+.retry-btn { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--danger); text-decoration: underline; cursor: pointer; }
+
+.day-sep { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }
+.day-sep::before, .day-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.day-sep span { padding: 3px 10px; border-radius: 999px; background: var(--theirs); }

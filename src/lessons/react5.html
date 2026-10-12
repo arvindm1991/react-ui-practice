@@ -1,0 +1,180 @@
+<template id="tpl-structure">
+  <h1>Structuring a feature</h1>
+  <p class="lede">You now know the parts. This lesson is about putting them together the way the interview needs: going from a mockup to components, deciding where each piece of state lives, and two extra tools (refs and portals) you'll occasionally need.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Turn a mockup into a component tree and a list of state, before writing code</li>
+    <li>Decide where state lives and lift it when two components need it</li>
+    <li>Use refs and portals when the situation calls for them</li>
+    <li>Answer "when would you use useMemo / context / useReducer?"</li>
+  </ul></div>
+
+  <h2>1. The five-step method</h2>
+  <p>This comes from the React docs ("Thinking in React") and it's the best plan you can follow, out loud, at the start of the interview. We'll walk through it with an inbox: a list of messages on the left, the open message on the right, and an unread count in the header.</p>
+
+  <h3>Step 1: draw boxes on the mockup</h3>
+  <p>Each box is a component. Repeated things are their own component. For the inbox: <code>App</code> (whole page) → <code>Header</code> (title + count) · <code>MessageList</code> → <code>MessageRow</code> (repeated) · <code>MessageDetail</code>.</p>
+
+  <h3>Step 2: build a static version</h3>
+  <p>Render the real data with props only, no state, no interaction. Hardcode the first message as "selected". This gets the markup and CSS right without logic getting in the way, and it's a working checkpoint early in the interview.</p>
+
+  <h3>Step 3: find the minimal state</h3>
+  <p>List every piece of data in the UI and ask three questions of each. Does it stay the same over time? Then it's not state. Is it passed in from a parent? Not state (in this component). Can it be computed from other state or props? Not state. Whatever survives is state.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Data</th><th>State?</th><th>Why</th></tr>
+    <tr><td>The list of messages</td><td><b>Yes</b></td><td>Changes when you mark read/unread</td></tr>
+    <tr><td>Which message is open</td><td><b>Yes</b> (as an id)</td><td>Changes on click</td></tr>
+    <tr><td>The open message's content</td><td>No</td><td><code>messages.find(m =&gt; m.id === selectedId)</code></td></tr>
+    <tr><td>Unread count</td><td>No</td><td><code>messages.filter(m =&gt; !m.read).length</code></td></tr>
+    <tr><td>Whether a row looks selected</td><td>No</td><td><code>m.id === selectedId</code></td></tr>
+  </table></div>
+
+  <h3>Step 4: decide where each piece of state lives</h3>
+  <p>For each piece of state: find every component that reads it, then find their <b>closest common parent</b>. The state goes there (or higher). <code>selectedId</code> is needed by <code>MessageList</code> (to highlight a row) and <code>MessageDetail</code> (to show it), so it goes in their parent, <code>App</code>. <code>messages</code> is needed by the list, the detail and the header count: also <code>App</code>.</p>
+  <p>State that only one component uses stays in that component: a dropdown's <code>open</code> flag lives in the dropdown; a form's draft text lives in the form.</p>
+
+  <h3>Step 5: add the reverse data flow</h3>
+  <p>Children that need to change the state get callback props: <code>MessageRow</code> calls <code>onSelect(id)</code>, <code>MessageDetail</code> calls <code>onMarkUnread(id)</code>. <code>App</code> owns the functions that actually update the state.</p>
+
+  <script type="text/x-play" data-title="The inbox, structured" data-h="560" data-console="off">
+import { useState } from 'react';
+
+const INITIAL = [
+  { id: 'm1', from: 'Priya', subject: 'Design review moved', read: false, body: 'Thursday at 2pm, same room.' },
+  { id: 'm2', from: 'Build bot', subject: 'Deploy #4182 succeeded', read: true, body: 'Finished in 6m 12s.' },
+  { id: 'm3', from: 'Jonas', subject: 'Usage chart question', read: false, body: 'Start the axis at zero?' },
+];
+
+export default function App() {
+  // State lives here: both the list and the detail need it
+  const [messages, setMessages] = useState(INITIAL);
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Derived
+  const selected = messages.find((m) => m.id === selectedId);
+  const unread = messages.filter((m) => !m.read).length;
+
+  function setRead(id, read) {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read } : m)));
+  }
+  function handleSelect(id) {
+    setSelectedId(id);
+    setRead(id, true);
+  }
+
+  return (
+    <div>
+      <h3>Inbox {unread > 0 && <span className="count">{unread}</span>}</h3>
+      <div className="inbox">
+        <MessageList messages={messages} selectedId={selectedId} onSelect={handleSelect} />
+        <MessageDetail message={selected} onMarkUnread={(id) => setRead(id, false)} />
+      </div>
+    </div>
+  );
+}
+
+function MessageList({ messages, selectedId, onSelect }) {
+  return (
+    <ul className="list">
+      {messages.map((m) => (
+        <li key={m.id}>
+          <button
+            className={'row' + (m.id === selectedId ? ' is-active' : '') + (m.read ? '' : ' is-unread')}
+            onClick={() => onSelect(m.id)}
+          >
+            {m.from}: {m.subject}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MessageDetail({ message, onMarkUnread }) {
+  if (!message) return <p className="empty">Select a message.</p>;
+  return (
+    <div className="detail">
+      <strong>{message.subject}</strong>
+      <p>{message.body}</p>
+      <button onClick={() => onMarkUnread(message.id)}>Mark as unread</button>
+    </div>
+  );
+}
+/*** css ***/
+h3 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.count { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #3451D1; color: white; }
+.inbox { display: grid; grid-template-columns: 220px 1fr; border: 1px solid #DADEE6; border-radius: 10px; overflow: hidden; }
+.list { list-style: none; margin: 0; padding: 0; border-right: 1px solid #DADEE6; }
+.row { width: 100%; padding: 10px; border: 0; border-bottom: 1px solid #EEF0F3; background: none; text-align: left; cursor: pointer; font-size: 13px; }
+.row.is-active { background: #EEF1FA; }
+.row.is-unread { font-weight: 700; }
+.detail, .empty { padding: 12px; font-size: 14px; }
+.empty { color: #6B7385; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click messages: the detail updates, bold goes away, the count drops. Then "Mark as unread".</li>
+    <li>Add a feature with a tiny diff: a "Mark all read" button in the header. You only need one new function in <code>App</code>: <code>setMessages(prev =&gt; prev.map(m =&gt; ({ ...m, read: true })))</code>. Because everything else is derived, the count and the bold rows update by themselves. This is why derived state makes the mid-interview requirement change easy.</li>
+  </ol></div>
+
+  <h2>2. Lifting state up</h2>
+  <p>Often you start with state in one component and then discover a sibling needs it too. The fix is mechanical: move the <code>useState</code> up to their common parent, pass the value down as a prop to both, and pass the setter (or a handler that calls it) down to whoever changes it. Say what you're doing: "both of these need the selected id, so I'm lifting it to the parent."</p>
+  <p>The opposite mistake is worth avoiding too: don't put everything in <code>App</code> "just in case". State that one component uses should stay local, because it keeps re-renders and prop lists small.</p>
+
+  <h2>3. Context: skipping the middlemen</h2>
+  <p>If state lives at the top and a component five levels down needs it, passing it through every level in between is called <b>prop drilling</b>. Context lets a component read a value from any ancestor that provides it, without the levels in between passing it on. You create it with <code>createContext</code>, wrap a subtree in its <code>Provider</code>, and read it with <code>useContext</code>.</p>
+  <p>It's meant for app-wide things like the current user, theme or locale. In a one-hour feature, two or three levels of props is fine and easier to follow. Use context if the codebase already has one for what you need, and follow its pattern.</p>
+
+  <h2>4. Refs: remembering without re-rendering</h2>
+  <p><code>useRef</code> gives you a box, <code>{ current: … }</code>, that survives between renders like state, but changing it does <em>not</em> cause a re-render. Two uses:</p>
+  <ul>
+    <li><b>Grabbing a DOM element</b>: put <code>ref={inputRef}</code> on the element, and after render <code>inputRef.current</code> is the real DOM node. Use it to focus an input, scroll something into view, or measure size. This is React's replacement for <code>document.querySelector</code>.</li>
+    <li><b>Keeping a value that isn't shown on screen</b>: a timer id, the previous value of something, a "has this run already" flag.</li>
+  </ul>
+  <p>If a value affects what's shown, it's state. If it doesn't, a ref avoids pointless re-renders. Don't read or write <code>ref.current</code> during render; do it in effects and event handlers.</p>
+  <script type="text/x-play" data-title="Focus with a ref" data-h="260" data-console="off">
+import { useEffect, useRef, useState } from 'react';
+
+export default function App() {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef(null);
+
+  // After the input appears, focus it
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
+
+  return editing ? (
+    <input ref={inputRef} defaultValue="Project name" onBlur={() => setEditing(false)} />
+  ) : (
+    <button onClick={() => setEditing(true)}>Rename</button>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click Rename: the input appears already focused. Click elsewhere to close it.</li>
+    <li>Delete the effect. Now you have to click into the input yourself.</li>
+  </ol></div>
+
+  <h2>5. Portals: escaping the parent's box</h2>
+  <p>A modal written deep inside a card is inside the card's HTML too. If any ancestor has <code>overflow: hidden</code> or its own stacking, the modal gets clipped or trapped behind things. <code>createPortal(jsx, document.body)</code> renders the JSX at the end of <code>&lt;body&gt;</code> instead, while it still behaves like a normal child in React: it reads props, and its events bubble to the React parent. Use it for modals, toasts and dropdowns that must escape a clipped container. The <b>Confirm modal</b> drill builds one.</p>
+
+  <h2>6. The rule of hooks</h2>
+  <p>Call hooks (<code>useState</code>, <code>useEffect</code>, <code>useRef</code>) only at the <b>top level</b> of a component: never inside <code>if</code>, loops, or nested functions. React doesn't know your hooks by name; it knows them by <em>call order</em> ("the first <code>useState</code>, the second <code>useState</code>…"). If a hook is skipped on one render because of an <code>if</code>, every hook after it gets the wrong stored value. If you need a condition, put it <em>inside</em> the hook, like <code>if (!open) return;</code> inside the effect.</p>
+
+  <h2>7. If they ask about useMemo or useCallback</h2>
+  <p>You don't need either in the interview. If asked, this answer is enough: "<code>useMemo</code> remembers a calculated value and <code>useCallback</code> remembers a function, until their inputs change. I'd add them if a calculation were actually expensive, like filtering thousands of rows on every keystroke. For a list this size, a plain calculation is fine."</p>
+
+  <h2>8. A checklist for good structure</h2>
+  <ul>
+    <li>Each component has one job you can name in a few words.</li>
+    <li>State is minimal, and everything else is derived.</li>
+    <li>State lives in the lowest component that covers everyone who needs it.</li>
+    <li>Props are named for meaning (<code>isActive</code>, <code>onSelect</code>), and callbacks start with <code>on</code>.</li>
+    <li>No component is a 200-line wall of JSX; repeated pieces are extracted.</li>
+    <li>Selection is stored as an id, not a copied object.</li>
+    <li>Existing components, helpers and patterns from the codebase are reused.</li>
+  </ul>
+
+  <p>Practice: <b>Inbox</b> is exactly this lesson. Then try the first mock interview.</p>
+  <div data-exs="d4,m1"></div>
+  <div data-quiz="r5"></div>
+</template>

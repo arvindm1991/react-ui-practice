@@ -1,0 +1,693 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type DeployStatus = 'Ready' | 'Building' | 'Queued' | 'Failed';
+
+export type Deployment = {
+  id: string;
+  commit: string;
+  branch: string;
+  status: DeployStatus;
+  age: string;
+};
+
+const DEPLOYMENTS: Deployment[] = [
+  { id: 'd5', commit: 'Fix webhook retries', branch: 'main', status: 'Ready', age: '12m ago' },
+  { id: 'd4', commit: 'Add billing page', branch: 'feat/billing', status: 'Failed', age: '1h ago' },
+  { id: 'd3', commit: 'Bump React to 18.3', branch: 'main', status: 'Ready', age: '3h ago' },
+  { id: 'd2', commit: 'Edge cache headers', branch: 'perf/cache', status: 'Ready', age: 'yesterday' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /projects/orbit/deployments -> Deployment[]
+export async function getDeployments(): Promise<Deployment[]> {
+  await randomDelay(300, 900);
+  return DEPLOYMENTS.map((d) => ({ ...d }));
+}
+@@@ shared src/commands.ts
+// Every action the app supports, as data. The palette only needs this list.
+export type Page = 'overview' | 'deployments' | 'settings';
+export type Section = 'Navigation' | 'Deployments' | 'Appearance';
+
+export type Command = {
+  id: string;
+  label: string;
+  section: Section;
+  run: () => void;
+};
+
+export type AppActions = {
+  goTo: (page: Page) => void;
+  redeploy: () => void;
+  clearCache: () => void;
+  toggleTheme: () => void;
+  toggleSidebar: () => void;
+};
+
+export const SECTIONS: Section[] = ['Navigation', 'Deployments', 'Appearance'];
+
+export function buildCommands(a: AppActions): Command[] {
+  return [
+    { id: 'go-overview', label: 'Go to Overview', section: 'Navigation', run: () => { a.goTo('overview'); } },
+    { id: 'go-deployments', label: 'Go to Deployments', section: 'Navigation', run: () => { a.goTo('deployments'); } },
+    { id: 'go-settings', label: 'Go to Settings', section: 'Navigation', run: () => { a.goTo('settings'); } },
+    { id: 'redeploy', label: 'Redeploy production', section: 'Deployments', run: () => { a.redeploy(); } },
+    { id: 'clear-cache', label: 'Clear build cache', section: 'Deployments', run: () => { a.clearCache(); } },
+    { id: 'theme', label: 'Toggle light / dark theme', section: 'Appearance', run: () => { a.toggleTheme(); } },
+    { id: 'sidebar', label: 'Collapse / expand sidebar', section: 'Appearance', run: () => { a.toggleSidebar(); } },
+  ];
+}
+@@@ shared src/components/Kbd.tsx
+import React from 'react';
+
+// <Kbd keys={['⌘', 'K']} /> renders keyboard key caps.
+export default function Kbd({ keys }: { keys: string[] }) {
+  return (
+    <span className="kbd-group">
+      {keys.map((k) => {
+        return <kbd key={k} className="kbd">{k}</kbd>;
+      })}
+    </span>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getDeployments } from './api';
+import type { Deployment } from './api';
+import { buildCommands } from './commands';
+import type { Page } from './commands';
+import Kbd from './components/Kbd';
+
+type SidebarProps = { page: Page; collapsed: boolean; onNavigate: (page: Page) => void };
+
+const NAV: { id: Page; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Overview', icon: '◧' },
+  { id: 'deployments', label: 'Deployments', icon: '⇡' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
+];
+
+function Sidebar({ page, collapsed, onNavigate }: SidebarProps) {
+  let cls = 'sidebar';
+  if (collapsed) {
+    cls = 'sidebar is-collapsed';
+  }
+  return (
+    <aside className={cls}>
+      <div className="project"><span className="project-dot" /><span className="nav-label">orbit-web</span></div>
+      <nav>
+        {NAV.map((item) => {
+          let itemCls = 'nav-item';
+          if (item.id === page) {
+            itemCls = 'nav-item is-active';
+          }
+          return (
+            <button key={item.id} type="button" className={itemCls} onClick={() => { onNavigate(item.id); }}>
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function TopBar({ title }: { title: string }) {
+  // TODO: this should open the command palette
+  return (
+    <header className="topbar">
+      <h1>{title}</h1>
+      <button type="button" className="search-trigger">
+        <span>Search or run a command…</span>
+        <Kbd keys={['⌘', 'K']} />
+      </button>
+    </header>
+  );
+}
+
+function DeploymentList({ deployments }: { deployments: Deployment[] }) {
+  return (
+    <ul className="deploys">
+      {deployments.map((d) => {
+        return (
+          <li key={d.id} className="deploy">
+            <span className={'status status-' + d.status.toLowerCase()}>{d.status}</span>
+            <span className="deploy-commit">{d.commit}</span>
+            <span className="deploy-branch">{d.branch}</span>
+            <span className="deploy-age">{d.age}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>('overview');
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [collapsed, setCollapsed] = useState(false);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getDeployments().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setDeployments(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => { setToast(''); }, 2500);
+  }
+
+  function handleRedeploy() {
+    setDeployments((prev) => {
+      const next: Deployment = { id: 'd' + Date.now(), commit: 'Redeploy of main', branch: 'main', status: 'Queued', age: 'just now' };
+      return [next, ...prev];
+    });
+    setPage('deployments');
+    showToast('Redeploy queued for production');
+  }
+
+  // Every action, as a list. Not used yet: the palette will use it.
+  const commands = buildCommands({
+    goTo: setPage,
+    redeploy: handleRedeploy,
+    clearCache: () => { showToast('Build cache cleared'); },
+    toggleTheme: () => { setTheme((t) => { if (t === 'dark') { return 'light'; } return 'dark'; }); },
+    toggleSidebar: () => { setCollapsed((c) => { return !c; }); },
+  });
+
+  let content;
+  if (page === 'overview') {
+    content = (
+      <div className="cards">
+        <div className="card"><p className="card-label">Production</p><p className="card-value">Ready</p></div>
+        <div className="card"><p className="card-label">Requests (24h)</p><p className="card-value">1.2M</p></div>
+        <div className="card"><p className="card-label">p95 latency</p><p className="card-value">184 ms</p></div>
+      </div>
+    );
+  } else if (page === 'deployments') {
+    content = <DeploymentList deployments={deployments} />;
+  } else {
+    content = <p className="muted">Project settings: domains, environment variables, and git integration.</p>;
+  }
+
+  let toastEl = null;
+  if (toast) {
+    toastEl = <div className="toast" role="status">{toast}</div>;
+  }
+
+  const title = NAV.find((n) => { return n.id === page; })?.label || '';
+
+  return (
+    <div className={'app theme-' + theme}>
+      <Sidebar page={page} collapsed={collapsed} onNavigate={setPage} />
+      <main className="main">
+        <TopBar title={title} />
+        <section className="content">{content}</section>
+      </main>
+      {toastEl}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0B0D12;
+  --panel: #12151C;
+  --panel-2: #1A1E27;
+  --line: #242936;
+  --text: #E6E8EE;
+  --muted: #8A91A3;
+  --accent: #7C8CFF;
+  --green: #3DD68C;
+  --amber: #F5B83D;
+  --red: #F2555A;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { --surface: var(--bg); min-height: 100vh; display: flex; background: var(--surface); color: var(--text); }
+.app.theme-light { --bg: #F7F8FA; --panel: #FFFFFF; --panel-2: #F0F2F6; --line: #E2E5EC; --text: #161A23; --muted: #667085; }
+
+.sidebar { width: 200px; flex-shrink: 0; padding: 16px 10px; background: var(--panel); border-right: 1px solid var(--line); }
+.sidebar.is-collapsed { width: 60px; }
+.sidebar.is-collapsed .nav-label { display: none; }
+.project { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font-weight: 700; font-size: 14px; }
+.project-dot { width: 18px; height: 18px; flex-shrink: 0; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #C084FC); }
+.nav-item { width: 100%; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; margin-bottom: 2px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.nav-item:hover { background: var(--panel-2); color: var(--text); }
+.nav-item.is-active { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nav-icon { width: 18px; text-align: center; }
+
+.main { flex: 1; min-width: 0; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 60px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+.topbar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+.search-trigger { display: flex; align-items: center; gap: 24px; height: 34px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.search-trigger:hover { border-color: var(--muted); }
+.kbd-group { display: inline-flex; gap: 3px; }
+.kbd { min-width: 20px; height: 20px; padding: 0 5px; display: inline-grid; place-items: center; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--panel-2); color: var(--muted); font: 11px ui-monospace, 'SF Mono', Menlo, monospace; }
+
+.content { padding: 24px; }
+.muted { color: var(--muted); font-size: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.card p { margin: 0; }
+.card-label { font-size: 12px; color: var(--muted); }
+.card-value { margin-top: 6px !important; font-size: 22px; font-weight: 700; }
+
+.deploys { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.deploy { display: grid; grid-template-columns: 90px 1fr 120px 80px; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.deploy:first-child { border-top: 0; }
+.deploy-branch { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+.deploy-age { font-size: 12px; color: var(--muted); text-align: right; }
+.status { justify-self: start; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.status-ready { background: rgba(61, 214, 140, 0.14); color: var(--green); }
+.status-queued, .status-building { background: rgba(245, 184, 61, 0.14); color: var(--amber); }
+.status-failed { background: rgba(242, 85, 90, 0.14); color: var(--red); }
+
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getDeployments } from './api';
+import type { Deployment } from './api';
+import { buildCommands, SECTIONS } from './commands';
+import type { Command, Page } from './commands';
+import Kbd from './components/Kbd';
+
+// "rdp" matches "ReDeploy Production": every typed letter appears in order.
+function fuzzyMatch(text: string, query: string): boolean {
+  const t = text.toLowerCase();
+  const q = query.toLowerCase().replace(/\s+/g, '');
+  let pos = 0;
+  for (const ch of q) {
+    const found = t.indexOf(ch, pos);
+    if (found === -1) {
+      return false;
+    }
+    pos = found + 1;
+  }
+  return true;
+}
+
+type SidebarProps = { page: Page; collapsed: boolean; onNavigate: (page: Page) => void };
+
+const NAV: { id: Page; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Overview', icon: '◧' },
+  { id: 'deployments', label: 'Deployments', icon: '⇡' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
+];
+
+function Sidebar({ page, collapsed, onNavigate }: SidebarProps) {
+  let cls = 'sidebar';
+  if (collapsed) {
+    cls = 'sidebar is-collapsed';
+  }
+  return (
+    <aside className={cls}>
+      <div className="project"><span className="project-dot" /><span className="nav-label">orbit-web</span></div>
+      <nav>
+        {NAV.map((item) => {
+          let itemCls = 'nav-item';
+          if (item.id === page) {
+            itemCls = 'nav-item is-active';
+          }
+          return (
+            <button key={item.id} type="button" className={itemCls} onClick={() => { onNavigate(item.id); }}>
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function TopBar({ title, onSearch }: { title: string; onSearch: (el: HTMLElement) => void }) {
+  return (
+    <header className="topbar">
+      <h1>{title}</h1>
+      <button type="button" className="search-trigger" onClick={(e) => { onSearch(e.currentTarget); }}>
+        <span>Search or run a command…</span>
+        <Kbd keys={['⌘', 'K']} />
+      </button>
+    </header>
+  );
+}
+
+function DeploymentList({ deployments }: { deployments: Deployment[] }) {
+  return (
+    <ul className="deploys">
+      {deployments.map((d) => {
+        return (
+          <li key={d.id} className="deploy">
+            <span className={'status status-' + d.status.toLowerCase()}>{d.status}</span>
+            <span className="deploy-commit">{d.commit}</span>
+            <span className="deploy-branch">{d.branch}</span>
+            <span className="deploy-age">{d.age}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+type PaletteProps = { commands: Command[]; onClose: () => void };
+
+// Only rendered while open, so query and active index reset on every open.
+function CommandPalette({ commands, onClose }: PaletteProps) {
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+
+  // derived: filtered and put in section order, so the arrow keys follow what you see
+  const results: Command[] = [];
+  SECTIONS.forEach((section) => {
+    commands.forEach((c) => {
+      if (c.section === section && fuzzyMatch(c.label, query)) {
+        results.push(c);
+      }
+    });
+  });
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    setActive(0); // the list changed, so start from the top
+  }
+
+  function runCommand(cmd: Command) {
+    onClose();
+    cmd.run();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault(); // don't move the text cursor
+      if (results.length > 0) {
+        setActive((i) => { return (i + 1) % results.length; });
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (results.length > 0) {
+        setActive((i) => { return (i - 1 + results.length) % results.length; });
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (results[active]) {
+        runCommand(results[active]);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }
+
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }
+
+  let activeId: string | undefined = undefined;
+  if (results[active]) {
+    activeId = 'cmd-' + results[active].id;
+  }
+
+  let body;
+  if (results.length === 0) {
+    body = <p className="palette-empty">No commands match "{query}"</p>;
+  } else {
+    body = (
+      <div className="palette-list" id="palette-list" role="listbox" aria-label="Commands">
+        {SECTIONS.map((section) => {
+          const items = results.filter((c) => {
+            return c.section === section;
+          });
+          if (items.length === 0) {
+            return null;
+          }
+          return (
+            <div key={section} role="group" aria-label={section}>
+              <p className="palette-section" aria-hidden="true">{section}</p>
+              {items.map((c) => {
+                const index = results.indexOf(c);
+                let cls = 'palette-item';
+                if (index === active) {
+                  cls = 'palette-item is-active';
+                }
+                return (
+                  <div
+                    key={c.id}
+                    id={'cmd-' + c.id}
+                    role="option"
+                    aria-selected={index === active}
+                    className={cls}
+                    onMouseMove={() => { setActive(index); }}
+                    onClick={() => { runCommand(c); }}
+                  >
+                    {c.label}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="palette-backdrop" onClick={handleBackdropClick}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div className="palette-input-row">
+          <span className="palette-icon" aria-hidden="true">⌕</span>
+          <input
+            className="palette-input"
+            autoFocus
+            placeholder="Type a command…"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="palette-list"
+            aria-activedescendant={activeId}
+            value={query}
+            onChange={(e) => { handleQueryChange(e.target.value); }}
+            onKeyDown={handleKeyDown}
+          />
+          <Kbd keys={['esc']} />
+        </div>
+        {body}
+        <div className="palette-foot"><Kbd keys={['↑', '↓']} /> to navigate <Kbd keys={['↵']} /> to run</div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>('overview');
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [collapsed, setCollapsed] = useState(false);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [toast, setToast] = useState('');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // The element to give focus back to. A ref: changing it should not re-render.
+  const returnFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDeployments().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setDeployments(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Ctrl/Cmd+K toggles the palette from anywhere.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); // the browser uses Ctrl+K for its own search bar
+        if (paletteOpen) {
+          setPaletteOpen(false);
+        } else {
+          returnFocus.current = e.target as HTMLElement; // what had focus when K was pressed
+          setPaletteOpen(true);
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [paletteOpen]);
+
+  // When the palette closes, put focus back where it was.
+  useEffect(() => {
+    if (!paletteOpen && returnFocus.current) {
+      returnFocus.current.focus();
+      returnFocus.current = null;
+    }
+  }, [paletteOpen]);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => { setToast(''); }, 2500);
+  }
+
+  function handleRedeploy() {
+    setDeployments((prev) => {
+      const next: Deployment = { id: 'd' + Date.now(), commit: 'Redeploy of main', branch: 'main', status: 'Queued', age: 'just now' };
+      return [next, ...prev];
+    });
+    setPage('deployments');
+    showToast('Redeploy queued for production');
+  }
+
+  function openPalette(from: HTMLElement) {
+    returnFocus.current = from;
+    setPaletteOpen(true);
+  }
+
+  function closePalette() {
+    setPaletteOpen(false);
+  }
+
+  const commands = buildCommands({
+    goTo: setPage,
+    redeploy: handleRedeploy,
+    clearCache: () => { showToast('Build cache cleared'); },
+    toggleTheme: () => { setTheme((t) => { if (t === 'dark') { return 'light'; } return 'dark'; }); },
+    toggleSidebar: () => { setCollapsed((c) => { return !c; }); },
+  });
+
+  let content;
+  if (page === 'overview') {
+    content = (
+      <div className="cards">
+        <div className="card"><p className="card-label">Production</p><p className="card-value">Ready</p></div>
+        <div className="card"><p className="card-label">Requests (24h)</p><p className="card-value">1.2M</p></div>
+        <div className="card"><p className="card-label">p95 latency</p><p className="card-value">184 ms</p></div>
+      </div>
+    );
+  } else if (page === 'deployments') {
+    content = <DeploymentList deployments={deployments} />;
+  } else {
+    content = <p className="muted">Project settings: domains, environment variables, and git integration.</p>;
+  }
+
+  let toastEl = null;
+  if (toast) {
+    toastEl = <div className="toast" role="status">{toast}</div>;
+  }
+
+  let palette = null;
+  if (paletteOpen) {
+    palette = <CommandPalette commands={commands} onClose={closePalette} />;
+  }
+
+  const title = NAV.find((n) => { return n.id === page; })?.label || '';
+
+  return (
+    <div className={'app theme-' + theme}>
+      <Sidebar page={page} collapsed={collapsed} onNavigate={setPage} />
+      <main className="main">
+        <TopBar title={title} onSearch={openPalette} />
+        <section className="content">{content}</section>
+      </main>
+      {toastEl}
+      {palette}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0B0D12;
+  --panel: #12151C;
+  --panel-2: #1A1E27;
+  --line: #242936;
+  --text: #E6E8EE;
+  --muted: #8A91A3;
+  --accent: #7C8CFF;
+  --green: #3DD68C;
+  --amber: #F5B83D;
+  --red: #F2555A;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { --surface: var(--bg); min-height: 100vh; display: flex; background: var(--surface); color: var(--text); }
+.app.theme-light { --bg: #F7F8FA; --panel: #FFFFFF; --panel-2: #F0F2F6; --line: #E2E5EC; --text: #161A23; --muted: #667085; }
+
+.sidebar { width: 200px; flex-shrink: 0; padding: 16px 10px; background: var(--panel); border-right: 1px solid var(--line); }
+.sidebar.is-collapsed { width: 60px; }
+.sidebar.is-collapsed .nav-label { display: none; }
+.project { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font-weight: 700; font-size: 14px; }
+.project-dot { width: 18px; height: 18px; flex-shrink: 0; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #C084FC); }
+.nav-item { width: 100%; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; margin-bottom: 2px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.nav-item:hover { background: var(--panel-2); color: var(--text); }
+.nav-item.is-active { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nav-icon { width: 18px; text-align: center; }
+
+.main { flex: 1; min-width: 0; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 60px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+.topbar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+.search-trigger { display: flex; align-items: center; gap: 24px; height: 34px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.search-trigger:hover { border-color: var(--muted); }
+.kbd-group { display: inline-flex; gap: 3px; }
+.kbd { min-width: 20px; height: 20px; padding: 0 5px; display: inline-grid; place-items: center; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--panel-2); color: var(--muted); font: 11px ui-monospace, 'SF Mono', Menlo, monospace; }
+
+.content { padding: 24px; }
+.muted { color: var(--muted); font-size: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.card p { margin: 0; }
+.card-label { font-size: 12px; color: var(--muted); }
+.card-value { margin-top: 6px !important; font-size: 22px; font-weight: 700; }
+
+.deploys { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.deploy { display: grid; grid-template-columns: 90px 1fr 120px 80px; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.deploy:first-child { border-top: 0; }
+.deploy-branch { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+.deploy-age { font-size: 12px; color: var(--muted); text-align: right; }
+.status { justify-self: start; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.status-ready { background: rgba(61, 214, 140, 0.14); color: var(--green); }
+.status-queued, .status-building { background: rgba(245, 184, 61, 0.14); color: var(--amber); }
+.status-failed { background: rgba(242, 85, 90, 0.14); color: var(--red); }
+
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* ---- Added: command palette ---- */
+.palette-backdrop { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: rgba(5, 7, 12, 0.55); backdrop-filter: blur(2px); }
+.palette { width: 100%; max-width: 560px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+.palette-input-row { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+.palette-icon { color: var(--muted); font-size: 18px; }
+.palette-input { flex: 1; height: 52px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; }
+.palette-input:focus { outline: none; }
+.palette-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+.palette-section { margin: 0; padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.palette-item { display: flex; align-items: center; height: 38px; padding: 0 10px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.palette-item.is-active { background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+.palette-empty { margin: 0; padding: 28px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.palette-foot { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }

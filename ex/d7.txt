@@ -1,0 +1,177 @@
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 520px; padding: 24px; }
+h1 { margin: 0 0 16px; font-size: 20px; }
+.list { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid #E2E5EA; border-radius: 10px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.row + .row { border-top: 1px solid #EEF0F3; }
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #D5D9E0;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover { background: #F6F7F9; }
+.btn-danger { background: #D92D20; border-color: #D92D20; color: #fff; }
+.btn-danger:hover { background: #B42318; }
+.btn:focus-visible { outline: 2px solid #3451D1; outline-offset: 2px; }
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 10;
+}
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 20px 40px rgba(16, 24, 40, 0.2);
+}
+.dialog h2 { margin: 0 0 8px; font-size: 17px; }
+.dialog p { margin: 0 0 20px; color: #5A6273; font-size: 14px; line-height: 1.5; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.empty { padding: 24px; text-align: center; color: #7A8292; }
+@@@ starter src/components/Modal.jsx
+import React from 'react';
+
+// TODO: build a reusable Modal.
+// Props: open, title, children, onClose
+// - Render into document.body with createPortal (from 'react-dom')
+// - Backdrop click closes; clicks inside the dialog do not
+// - Escape closes (add the listener in an effect, remove it in cleanup)
+// - role="dialog", aria-modal="true", aria-labelledby pointing at the title
+export default function Modal({ open, title, children, onClose }) {
+  return null;
+}
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+import Modal from './components/Modal';
+
+const INITIAL = [
+  { id: 1, name: 'Billing dashboard' },
+  { id: 2, name: 'Docs search' },
+  { id: 3, name: 'Prompt library' },
+];
+
+// TODO: clicking Delete opens a confirm modal naming the project.
+// Cancel closes it. "Delete project" removes the project and closes.
+// Focus should land on the Cancel button when the modal opens.
+export default function App() {
+  const [projects, setProjects] = useState(INITIAL);
+
+  return (
+    <div className="page">
+      <h1>Projects</h1>
+      <ul className="list">
+        {projects.map((p) => (
+          <li key={p.id} className="row">
+            <span>{p.name}</span>
+            <button className="btn">Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+@@@ solution src/components/Modal.jsx
+import React, { useEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
+
+export default function Modal({ open, title, children, onClose }) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey); // cleanup!
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    // Close only when the click started on the backdrop itself
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <h2 id={titleId}>{title}</h2>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+@@@ solution src/App.jsx
+import React, { useEffect, useRef, useState } from 'react';
+import Modal from './components/Modal';
+
+const INITIAL = [
+  { id: 1, name: 'Billing dashboard' },
+  { id: 2, name: 'Docs search' },
+  { id: 3, name: 'Prompt library' },
+];
+
+export default function App() {
+  const [projects, setProjects] = useState(INITIAL);
+  const [pendingId, setPendingId] = useState(null); // which project we're confirming
+  const cancelRef = useRef(null);
+
+  const pending = projects.find((p) => p.id === pendingId);
+  const close = () => setPendingId(null);
+
+  // Move focus into the dialog when it opens
+  useEffect(() => {
+    if (pending && cancelRef.current) cancelRef.current.focus();
+  }, [pending]);
+
+  function confirmDelete() {
+    setProjects((prev) => prev.filter((p) => p.id !== pendingId));
+    close();
+  }
+
+  return (
+    <div className="page">
+      <h1>Projects</h1>
+      {projects.length === 0 ? (
+        <div className="empty">No projects left.</div>
+      ) : (
+        <ul className="list">
+          {projects.map((p) => (
+            <li key={p.id} className="row">
+              <span>{p.name}</span>
+              <button className="btn" onClick={() => setPendingId(p.id)}>Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal open={Boolean(pending)} title="Delete project?" onClose={close}>
+        <p>
+          <b>{pending && pending.name}</b> and its history will be removed. This can't be undone.
+        </p>
+        <div className="dialog-actions">
+          <button className="btn" ref={cancelRef} onClick={close}>Cancel</button>
+          <button className="btn btn-danger" onClick={confirmDelete}>Delete project</button>
+        </div>
+      </Modal>
+    </div>
+  );
+}

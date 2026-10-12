@@ -1,0 +1,504 @@
+@@@ shared src/App.jsx
+import React, { useState } from 'react';
+import Sidebar from './components/Sidebar';
+import ChatPane from './components/ChatPane';
+
+export default function App() {
+  const [activeId, setActiveId] = useState(null);
+
+  return (
+    <div className="app-shell">
+      <Sidebar activeId={activeId} onSelect={setActiveId} />
+      <ChatPane conversationId={activeId} />
+    </div>
+  );
+}
+@@@ shared src/components/ChatPane.jsx
+import React from 'react';
+
+export default function ChatPane({ conversationId }) {
+  return (
+    <main className="chat-pane">
+      {conversationId ? (
+        <p className="chat-placeholder">Conversation <code>{conversationId}</code> would load here.</p>
+      ) : (
+        <p className="chat-placeholder">Pick a conversation or start a new one.</p>
+      )}
+    </main>
+  );
+}
+@@@ shared src/components/Icon.jsx
+import React from 'react';
+
+const base = {
+  width: 16,
+  height: 16,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+};
+
+export function PlusIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+export function SearchIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+export function StarIcon({ filled, ...props }) {
+  return (
+    <svg {...base} fill={filled ? 'currentColor' : 'none'} {...props}>
+      <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" />
+    </svg>
+  );
+}
+@@@ shared src/utils/dates.js
+// Shared date helpers used across the app.
+export const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfDay(value) {
+  const d = new Date(value);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Returns one of GROUP_ORDER for a date (ISO string or Date).
+export function getDateGroup(value, now = new Date()) {
+  const days = Math.round((startOfDay(now) - startOfDay(value)) / DAY_MS);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days <= 7) return 'Previous 7 days';
+  return 'Older';
+}
+@@@ shared src/api.js
+// Fake API. Treat it like a real backend you can't change.
+const hoursAgo = (h) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+
+const conversations = [
+  { id: 'c1', title: 'Refactor the billing webhook handler', updatedAt: hoursAgo(0.3), starred: false },
+  { id: 'c2', title: 'Explain CSS grid auto-fill vs auto-fit', updatedAt: hoursAgo(1.5), starred: false },
+  { id: 'c3', title: 'Draft launch email for the usage dashboard', updatedAt: hoursAgo(26), starred: false },
+  { id: 'c4', title: 'SQL: weekly active users by plan', updatedAt: hoursAgo(30), starred: false },
+  { id: 'c5', title: 'Summarize the Q3 customer interview notes and pull out the top five themes', updatedAt: hoursAgo(60), starred: false },
+  { id: 'c6', title: 'Regex for parsing transcript timestamps', updatedAt: hoursAgo(96), starred: false },
+  { id: 'c7', title: 'Trip plan: Kyoto in November', updatedAt: hoursAgo(130), starred: false },
+  { id: 'c8', title: 'Debug useEffect running twice', updatedAt: hoursAgo(300), starred: false },
+  { id: 'c9', title: 'Compare Postgres and SQLite for a side project', updatedAt: hoursAgo(700), starred: false },
+];
+
+// GET /conversations -> Conversation[] (unsorted)
+export function getConversations() {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(conversations.map((c) => ({ ...c }))), 700);
+  });
+}
+@@@ shared src/styles.css
+/* Design tokens. Use these instead of hard-coded values. */
+:root {
+  --color-bg: #FFFFFF;
+  --color-sidebar: #F4F5F7;
+  --color-hover: #E9EBEF;
+  --color-active: #DEE3F0;
+  --color-border: #E2E5EA;
+  --color-text: #1A1F2B;
+  --color-muted: #6B7385;
+  --color-star: #D4920B;
+  --color-focus: #3451D1;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  min-height: 480px;
+}
+
+.chat-pane {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+}
+
+.chat-placeholder code {
+  background: var(--color-sidebar);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+}
+@@@ starter src/components/Sidebar.jsx
+import React, { useEffect, useState } from 'react';
+import { getConversations } from '../api';
+
+// TODO: Build the sidebar from the design (see the Task and Design tabs).
+export default function Sidebar({ activeId, onSelect }) {
+  const [conversations, setConversations] = useState([]);
+
+  useEffect(() => {
+    getConversations().then(setConversations);
+  }, []);
+
+  return (
+    <aside className="sidebar">
+      <ul>
+        {conversations.map((c) => (
+          <li key={c.id}>{c.title}</li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+@@@ solution src/components/Sidebar.jsx
+import React, { useEffect, useState } from 'react';
+import { getConversations } from '../api';
+import { getDateGroup, GROUP_ORDER } from '../utils/dates';
+import { PlusIcon, SearchIcon } from './Icon';
+import ConversationItem from './ConversationItem';
+
+// Includes the mid-session change (Starred section).
+export default function Sidebar({ activeId, onSelect }) {
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getConversations().then((data) => {
+      if (cancelled) return;
+      setConversations(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function toggleStar(id) {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, starred: !c.starred } : c))
+    );
+  }
+
+  function startNewChat() {
+    const chat = { id: 'new-' + Date.now(), title: 'New chat', updatedAt: new Date().toISOString(), starred: false };
+    setConversations((prev) => [chat, ...prev]);
+    setQuery('');
+    onSelect(chat.id);
+  }
+
+  // ---- derived data ----
+  const q = query.trim().toLowerCase();
+  const sorted = conversations
+    .filter((c) => c.title.toLowerCase().includes(q))
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  const sections = [];
+  const starred = sorted.filter((c) => c.starred);
+  if (starred.length > 0) sections.push({ label: 'Starred', items: starred });
+  GROUP_ORDER.forEach((label) => {
+    const items = sorted.filter((c) => !c.starred && getDateGroup(c.updatedAt) === label);
+    if (items.length > 0) sections.push({ label, items });
+  });
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-top">
+        <button className="new-chat" onClick={startNewChat}>
+          <PlusIcon />
+          New chat
+        </button>
+        <label className="search">
+          <SearchIcon className="search-icon" />
+          <input
+            className="search-input"
+            placeholder="Search chats"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+      </div>
+
+      <nav className="sidebar-list" aria-label="Conversations">
+        {loading &&
+          Array.from({ length: 6 }, (_, i) => <div key={i} className="skeleton-row" />)}
+
+        {!loading && sections.length === 0 && (
+          <p className="sidebar-empty">No chats match “{query}”.</p>
+        )}
+
+        {sections.map((section) => (
+          <section key={section.label} className="group">
+            <h3 className="group-label">{section.label}</h3>
+            <ul className="group-items">
+              {section.items.map((c) => (
+                <ConversationItem
+                  key={c.id}
+                  conversation={c}
+                  active={c.id === activeId}
+                  onSelect={onSelect}
+                  onToggleStar={toggleStar}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+@@@ solution src/components/ConversationItem.jsx
+import React from 'react';
+import { StarIcon } from './Icon';
+
+// Two sibling buttons (never nest a button inside a button).
+export default function ConversationItem({ conversation, active, onSelect, onToggleStar }) {
+  const { id, title, starred } = conversation;
+  let className = 'item';
+  if (active) className += ' is-active';
+  if (starred) className += ' is-starred';
+
+  return (
+    <li className={className}>
+      <button className="item-main" onClick={() => onSelect(id)} title={title}>
+        {title}
+      </button>
+      <button
+        className="item-star"
+        onClick={() => onToggleStar(id)}
+        aria-label={starred ? 'Unstar' : 'Star'}
+        aria-pressed={starred}
+      >
+        <StarIcon filled={starred} />
+      </button>
+    </li>
+  );
+}
+@@@ solution src/styles.css
+/* Design tokens. Use these instead of hard-coded values. */
+:root {
+  --color-bg: #FFFFFF;
+  --color-sidebar: #F4F5F7;
+  --color-hover: #E9EBEF;
+  --color-active: #DEE3F0;
+  --color-border: #E2E5EA;
+  --color-text: #1A1F2B;
+  --color-muted: #6B7385;
+  --color-star: #D4920B;
+  --color-focus: #3451D1;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  min-height: 480px;
+}
+
+.chat-pane {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+}
+
+.chat-placeholder code {
+  background: var(--color-sidebar);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;               /* lets the list scroll inside a flex column */
+}
+
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.new-chat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.new-chat:hover { background: var(--color-hover); }
+
+.search { position: relative; display: block; }
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3) 0 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-hover);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.search-input:focus {
+  outline: none;
+  background: var(--color-bg);
+  border-color: var(--color-focus);
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--space-2) var(--space-4);
+}
+
+.group + .group { margin-top: var(--space-4); }
+
+.group-label {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+}
+
+.group-items { list-style: none; margin: 0; padding: 0; }
+
+.item {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+.item:hover { background: var(--color-hover); }
+.item.is-active { background: var(--color-active); }
+
+.item-main {
+  flex: 1;
+  min-width: 0;
+  padding: 7px var(--space-2);
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.item.is-active .item-main { font-weight: 500; }
+
+.item-star {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  opacity: 0;                  /* hidden until hover/focus... */
+}
+.item:hover .item-star,
+.item-star:focus-visible,
+.item.is-starred .item-star { opacity: 1; }   /* ...or when starred */
+.item.is-starred .item-star { color: var(--color-star); }
+.item-star:hover { background: var(--color-active); }
+
+.item-main:focus-visible,
+.item-star:focus-visible,
+.new-chat:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.skeleton-row {
+  height: 14px;
+  margin: 12px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-hover);
+}
+
+.sidebar-empty {
+  padding: var(--space-4) var(--space-2);
+  font-size: 13px;
+  color: var(--color-muted);
+}

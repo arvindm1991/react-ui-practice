@@ -1,0 +1,266 @@
+<template id="tpl-state">
+  <h1>State and rendering</h1>
+  <p class="lede">Props let data flow in. State is how a component remembers things that change: what's typed, what's selected, what's open. To use it well you need an accurate picture of what a "render" is, because almost every React bug comes from a wrong picture of it.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain why a normal variable can't drive the UI, and what <code>useState</code> does instead</li>
+    <li>Describe exactly what happens when you call a setter</li>
+    <li>Update arrays and objects in state without bugs</li>
+    <li>Decide what belongs in state and what should be calculated</li>
+  </ul></div>
+
+  <h2>1. Why a normal variable doesn't work</h2>
+  <p>Here's the obvious first attempt at a counter. Click the button and watch the console.</p>
+  <script type="text/x-play" data-title="A counter that doesn't work" data-h="230">
+export default function App() {
+  let count = 0;
+  console.log('App rendered, count =', count);
+
+  function handleClick() {
+    count = count + 1;
+    console.log('clicked, count is now', count);
+  }
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={handleClick}>Add one</button>
+    </div>
+  );
+}
+</script>
+  <p>The console shows <code>count</code> going up, but the screen stays at 0. Two separate reasons:</p>
+  <ol>
+    <li><b>Changing a variable doesn't tell React anything.</b> React only re-runs your component when it's told something changed. Assigning to a local variable is invisible to it.</li>
+    <li><b>Even if React re-ran the function, <code>let count = 0</code> would run again</b> and reset it. A component is a function, and every call starts fresh. Local variables don't survive between calls.</li>
+  </ol>
+  <p>So we need two things: a value that <em>survives</em> between calls, and a way to <em>tell React</em> it changed. That's exactly what <code>useState</code> provides.</p>
+
+  <h2>2. useState</h2>
+  <script type="text/x-code" data-lang="jsx" data-title="anatomy">
+const [count, setCount] = useState(0);
+//     ↑        ↑                 ↑
+//  current   function to     starting value, used only
+//   value    change it       on the very first render
+</script>
+  <p><code>useState</code> returns a pair, and the square brackets are <em>array destructuring</em>: a short way of naming the two items. You can name them anything; the convention is <code>[thing, setThing]</code>.</p>
+  <p>React stores the value for you, outside your function, attached to this particular component on the screen. Every time your component runs, <code>useState</code> hands back the latest stored value. Calling <code>setCount(5)</code> stores the new value <em>and</em> tells React "this component needs to run again".</p>
+  <script type="text/x-play" data-title="A counter that works" data-h="230">
+import { useState } from 'react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  console.log('App rendered, count =', count);
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Add one</button>
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click a few times and read the console. Every click logs "App rendered". The <b>whole function runs again</b>, top to bottom, every time state changes.</li>
+    <li>Click Reset twice. The second click usually logs nothing: when you set the value it already has, React skips the re-render.</li>
+  </ol></div>
+
+  <h2>3. What a render actually is</h2>
+  <p>Here's the full cycle. It's worth reading slowly, because everything later builds on it:</p>
+  <div class="flow"><span>1. Something calls <code>setX(newValue)</code></span><i>→</i><span>2. React stores it and schedules a render</span><i>→</i><span>3. React calls your component function again</span><i>→</i><span>4. <code>useState</code> returns the new value; the whole body runs; you return new JSX</span><i>→</i><span>5. React compares it to the last JSX and updates only what changed on the page</span></div>
+  <p>Consequences you can rely on:</p>
+  <ul>
+    <li><b>Every render is a fresh run of the function.</b> Every local variable and every function you define inside the component is created again. That's fine and normal.</li>
+    <li><b>When a component renders, all its children render too</b> (they're called as part of building its JSX). Their state is kept; they just get a chance to return updated JSX.</li>
+    <li><b>Rendering doesn't mean the page changes.</b> If the JSX comes out the same, React doesn't touch the DOM. Re-rendering is cheap; don't fear it.</li>
+    <li><b>Never call a setter while the component is rendering.</b> Only call it from code that runs <em>later</em>: an event handler (the user clicked or typed) or an effect. See the examples just below.</li>
+  </ul>
+  <h3>Where a setter may be called</h3>
+  <p>The rule is about <em>when</em> the code runs. Your component body runs during every render, so a setter there asks for another render, which runs the body again, which calls the setter again, forever. Defining a function that calls a setter is fine. Calling that function while rendering is the problem.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="right and wrong">
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  // ✗ Runs during render → render → setCount → render → … "Too many re-renders"
+  setCount(count + 1);
+
+  // ✓ Defining a function that calls a setter is fine: nothing runs yet
+  function increment() {
+    setCount((c) => c + 1);
+  }
+
+  // ✗ Calling it during render is the same problem as the first line
+  increment();
+
+  // ✓ Effect: runs after render, and only when its dependencies change
+  useEffect(() => {
+    setCount(0);
+  }, [someProp]);
+
+  return (
+    <>
+      {/* ✓ Event: React calls it later, when the user clicks */}
+      <button onClick={increment}>+1</button>
+      <button onClick={() => setCount(0)}>Reset</button>
+
+      {/* ✗ The parentheses call it NOW, during render, not on click */}
+      <button onClick={increment()}>+1</button>
+      <button onClick={setCount(0)}>Reset</button>
+    </>
+  );
+}
+</script>
+  <p>Quick test: will this line run every time the component renders? If yes, it must not set state. Code inside <code>function handleX() {…}</code>, <code>onClick={() =&gt; …}</code>, <code>useEffect(() =&gt; …)</code>, <code>.then(…)</code> or <code>setTimeout(…)</code> runs later, so setters there are fine.</p>
+
+  <h2>4. State is a snapshot</h2>
+  <p>This one surprises everybody. Predict what this button does, then try it:</p>
+  <script type="text/x-play" data-title="Predict: +3 or +1?" data-h="260">
+import { useState } from 'react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  function addThree() {
+    setCount(count + 1);
+    setCount(count + 1);
+    setCount(count + 1);
+    console.log('right after setting, count =', count);
+  }
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={addThree}>Add three?</button>
+    </div>
+  );
+}
+</script>
+  <p>It adds one, and the log shows the <em>old</em> value. Here's why. When this render happened, <code>count</code> was 0, and inside this render it is a constant 0. It doesn't change when you call the setter; the setter asks for a <em>future</em> render with a new value. So all three lines say <code>setCount(0 + 1)</code>, three requests for "1". And the <code>console.log</code> right after sees this render's 0.</p>
+  <p>Think of each render as a photograph: the values in it are frozen. A new render takes a new photo.</p>
+  <h3>The updater form</h3>
+  <p>When the next value depends on the previous one, pass a <em>function</em> instead of a value: <code>setCount(c =&gt; c + 1)</code>. React queues the functions and runs them in order, handing each one the result of the previous, so three of them really add three. Use the updater form whenever you compute new state from old state, especially for arrays: <code>setItems(prev =&gt; [...prev, item])</code>.</p>
+  <div class="try"><b>Try this</b><ol>
+    <li>Change all three lines to <code>setCount(c =&gt; c + 1)</code>. Now it adds three.</li>
+    <li>The log still says the old value. If you need the new value right away, compute it into a variable first: <code>const next = count + 1; setCount(next); console.log(next);</code></li>
+  </ol></div>
+
+  <h2>5. Never mutate state: make a new copy</h2>
+  <p>How does React know state changed? It compares the old and new value with <code>===</code>. For numbers and strings that compares the values. For <b>arrays and objects it compares identity</b>: "is this the same object in memory?" If you change an array in place with <code>push</code> and pass the same array back, React sees the same object, concludes nothing changed, and may skip the update. Even when something else causes a render, mutating causes subtle bugs because old snapshots now show new data.</p>
+  <p>The rule: <b>treat state as read-only. To change it, build a new array or object</b> and pass that to the setter.</p>
+  <script type="text/x-play" data-title="Mutating vs copying" data-h="420">
+import { useState } from 'react';
+
+export default function App() {
+  const [items, setItems] = useState(['Buy milk', 'Ship feature']);
+
+  function addBroken() {
+    items.push('Broken add ' + items.length);  // changes the SAME array
+    setItems(items);                            // React: "same array, nothing to do"
+    console.log('pushed; array length is', items.length);
+  }
+
+  function addCorrect() {
+    setItems((prev) => [...prev, 'Correct add ' + prev.length]); // a NEW array
+  }
+
+  function removeFirst() {
+    setItems((prev) => prev.filter((_, i) => i !== 0));
+  }
+
+  return (
+    <div>
+      <ul>{items.map((t, i) => <li key={i}>{t}</li>)}</ul>
+      <button onClick={addBroken}>Add (mutate)</button>{' '}
+      <button onClick={addCorrect}>Add (copy)</button>{' '}
+      <button onClick={removeFirst}>Remove first</button>
+    </div>
+  );
+}
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click "Add (mutate)" twice. The console shows the array growing, but the screen doesn't change.</li>
+    <li>Now click "Add (copy)". Suddenly the hidden "broken" items appear too, because they were in the array all along. This is what mutation bugs look like in real apps: things updating at the wrong time.</li>
+  </ol></div>
+
+  <h3>The copy recipes</h3>
+  <p>The <code>...</code> is the <b>spread</b> syntax: it copies the items of an array (or fields of an object) into a new one. With spread plus <code>map</code> and <code>filter</code> (which always return new arrays), you can do every update:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="immutable updates">
+// Arrays
+setItems(prev => [...prev, newItem]);                    // add to end
+setItems(prev => [newItem, ...prev]);                    // add to start
+setItems(prev => prev.filter(i => i.id !== id));         // remove
+setItems(prev => prev.map(i =>                          // update one
+  i.id === id ? { ...i, done: !i.done } : i
+));
+
+// Objects
+setUser(prev => ({ ...prev, name: 'Maya' }));             // change one field
+setForm(prev => ({ ...prev, [field]: value }));          // field name from a variable
+
+// Sorting: sort() mutates, so copy first
+const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
+</script>
+  <p>Read the "update one" line slowly, because you'll write it in nearly every interview: "make a new array where every item stays the same, except the one with this id, which becomes a copy of itself with <code>done</code> flipped".</p>
+  <p>Methods that mutate (avoid on state): <code>push</code>, <code>pop</code>, <code>shift</code>, <code>unshift</code>, <code>splice</code>, <code>sort</code>, <code>reverse</code>, and assigning to <code>arr[i]</code> or <code>obj.x</code>. Methods that return new arrays (safe): <code>map</code>, <code>filter</code>, <code>slice</code>, <code>concat</code>, spread.</p>
+
+  <h2>6. What belongs in state</h2>
+  <p>This is the most important design decision in a feature, and interviewers watch it closely. The rule:</p>
+  <div class="callout is-key"><span class="callout-label">Keep state minimal</span>
+    <p>Store only what can't be calculated from something else. Everything that <em>can</em> be calculated from props or other state should be computed during render.</p></div>
+  <p>Take a searchable list. The user controls the search text, so that's state. The list from the server is state. But the <em>filtered</em> list? It's fully determined by those two. If you also store it in state, you now have two copies of the truth that you must keep in sync by hand, and the bug where "I added an item but it doesn't show in the filtered list" is just waiting to happen.</p>
+  <script type="text/x-play" data-title="Derived values" data-h="440">
+import { useState } from 'react';
+
+const PEOPLE = [
+  { id: 1, name: 'Ada Lovelace', team: 'Research' },
+  { id: 2, name: 'Grace Hopper', team: 'Platform' },
+  { id: 3, name: 'Alan Turing', team: 'Research' },
+  { id: 4, name: 'Katherine Johnson', team: 'Applied' },
+];
+
+export default function App() {
+  // State: only what the user controls
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Derived: recalculated on every render, always in sync
+  const q = query.trim().toLowerCase();
+  const visible = PEOPLE.filter((p) => p.name.toLowerCase().includes(q));
+  const selected = PEOPLE.find((p) => p.id === selectedId);
+
+  return (
+    <div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" />
+      <p>Showing {visible.length} of {PEOPLE.length}</p>
+      <ul>
+        {visible.map((p) => (
+          <li key={p.id}>
+            <button onClick={() => setSelectedId(p.id)}>{p.name}</button>
+          </li>
+        ))}
+      </ul>
+      <p>Selected: {selected ? `${selected.name} (${selected.team})` : 'nobody'}</p>
+    </div>
+  );
+}
+</script>
+  <p>Three habits in that example:</p>
+  <ul>
+    <li><b>Filtered list, count and selected person are all derived.</b> No <code>useState</code>, no syncing.</li>
+    <li><b>Store the selected <em>id</em>, not a copy of the selected object.</b> If the person's data changes, an id still finds the latest version; a copied object goes stale.</li>
+    <li><b>Ask the question every time:</b> "could I compute this from what I already have?" If yes, it's not state.</li>
+  </ul>
+  <p>Worried about performance from recalculating? For a list of a few hundred items it's microseconds. Mention <code>useMemo</code> only if asked.</p>
+
+  <h2>7. Where state lives, and when it resets</h2>
+  <p>State belongs to a component <em>instance</em>, the specific copy on screen. Two <code>&lt;Counter /&gt;</code>s have separate counts. When a component is removed from the screen, its state is thrown away; when it comes back, it starts from the initial value again. That's usually what you want (a closed form forgets its draft), and occasionally a surprise.</p>
+  <p>Several related values (<code>status</code>, <code>data</code>, <code>error</code>) can be separate <code>useState</code> calls or one object. Separate calls are simplest. Group them only when they always change together.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Screen doesn't update after changing an array</b><p>You mutated it (<code>push</code>, <code>sort</code>, <code>arr[i] =</code>). Build a new array.</p></div>
+  <div class="mistake"><b>"Too many re-renders"</b><p>A setter runs during render, often <code>onClick={setOpen(true)}</code> (calls it immediately) instead of <code>onClick={() =&gt; setOpen(true)}</code>.</p></div>
+  <div class="mistake"><b>Value looks one step behind</b><p>You read state right after setting it. It updates on the next render; use the value you just computed.</p></div>
+  <div class="mistake"><b>Two pieces of state disagree</b><p>One of them should be derived from the other.</p></div>
+
+  <div data-quiz="r2"></div>
+</template>

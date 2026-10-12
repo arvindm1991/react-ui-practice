@@ -1,0 +1,224 @@
+@@@ shared src/api.js
+// Fake backend. Change these to test each state of your UI:
+const FAIL_RATE = 0.3; // 1 = always fail, 0 = never fail
+const RETURN_EMPTY = false; // true = server returns []
+const DELAY_MS = 900;
+
+const orders = [
+  { id: 'A-1042', customer: 'Northwind Labs', amount: 1290.5, status: 'paid', createdAt: '2026-09-28T10:12:00Z' },
+  { id: 'A-1043', customer: 'Blue Fern Studio', amount: 342, status: 'pending', createdAt: '2026-09-29T14:40:00Z' },
+  { id: 'A-1044', customer: 'Kestrel & Co', amount: 87.25, status: 'refunded', createdAt: '2026-09-30T09:05:00Z' },
+  { id: 'A-1045', customer: 'Atlas Freight', amount: 5120, status: 'paid', createdAt: '2026-10-01T16:22:00Z' },
+  { id: 'A-1046', customer: 'Juniper Health', amount: 760, status: 'pending', createdAt: '2026-10-02T11:58:00Z' },
+];
+
+export function fetchOrders() {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (Math.random() < FAIL_RATE) {
+        reject(new Error('Request failed: 503 Service Unavailable'));
+      } else {
+        resolve(RETURN_EMPTY ? [] : orders.map((o) => ({ ...o })));
+      }
+    }, DELAY_MS);
+  });
+}
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 640px; padding: 24px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.page-header h1 { margin: 0; font-size: 20px; }
+.total { font-size: 13px; color: #5A6273; }
+.card { background: #fff; border: 1px solid #E2E5EA; border-radius: 10px; overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7A8292;
+  padding: 10px 14px;
+  background: #FAFBFC;
+  border-bottom: 1px solid #E2E5EA;
+}
+.table td { padding: 12px 14px; border-bottom: 1px solid #EEF0F3; }
+.table tr:last-child td { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.status { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.status-paid { background: #E3F5EA; color: #1C7A43; }
+.status-pending { background: #FFF3DC; color: #93600B; }
+.status-refunded { background: #ECEEF2; color: #545C6B; }
+
+.skeleton-row { display: flex; gap: 12px; padding: 14px; border-bottom: 1px solid #EEF0F3; }
+.skeleton {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #EEF0F3 25%, #F6F7F9 50%, #EEF0F3 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.message { padding: 32px 16px; text-align: center; color: #5A6273; }
+.message.error { color: #B42318; }
+.message p { margin: 0 0 12px; }
+.btn {
+  border: 1px solid #D5D9E0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+@@@ starter src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { fetchOrders } from './api';
+
+// TODO: load orders with fetchOrders() and handle every state:
+//   loading  -> 3 shimmering skeleton rows
+//   error    -> the error message + a "Try again" button that refetches
+//   empty    -> "No orders yet."
+//   success  -> the table, plus the total in the header
+// Tip: open api.js and change FAIL_RATE / RETURN_EMPTY to test each state.
+export default function App() {
+  const orders = [];
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1>Recent orders</h1>
+      </header>
+      <div className="card">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Customer</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th className="num">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((o) => (
+              <tr key={o.id}>
+                <td>{o.id}</td>
+                <td>{o.customer}</td>
+                <td>{o.createdAt}</td>
+                <td>{o.status}</td>
+                <td className="num">{o.amount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+@@@ solution src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { fetchOrders } from './api';
+
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+function SkeletonRows({ count = 3 }) {
+  return Array.from({ length: count }, (_, i) => (
+    <div key={i} className="skeleton-row">
+      <div className="skeleton" style={{ width: '18%' }} />
+      <div className="skeleton" style={{ width: '40%' }} />
+      <div className="skeleton" style={{ width: '22%' }} />
+    </div>
+  ));
+}
+
+export default function App() {
+  // One status value is easier to reason about than three booleans.
+  const [status, setStatus] = useState('loading'); // 'loading' | 'error' | 'success'
+  const [orders, setOrders] = useState([]);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0); // bump to refetch
+
+  useEffect(() => {
+    let cancelled = false; // ignore late responses after unmount / refetch
+    setStatus('loading');
+    fetchOrders()
+      .then((data) => {
+        if (cancelled) return;
+        setOrders(data);
+        setStatus('success');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message);
+        setStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
+
+  const total = orders.reduce((sum, o) => sum + o.amount, 0);
+
+  let content;
+  if (status === 'loading') {
+    content = <SkeletonRows />;
+  } else if (status === 'error') {
+    content = (
+      <div className="message error">
+        <p>{error}</p>
+        <button className="btn" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+      </div>
+    );
+  } else if (orders.length === 0) {
+    content = <div className="message">No orders yet.</div>;
+  } else {
+    content = (
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th className="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.id}>
+              <td>{o.id}</td>
+              <td>{o.customer}</td>
+              <td>{formatDate(o.createdAt)}</td>
+              <td>
+                <span className={`status status-${o.status}`}>{o.status}</span>
+              </td>
+              <td className="num">{money.format(o.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1>Recent orders</h1>
+        {status === 'success' && orders.length > 0 && (
+          <span className="total">Total {money.format(total)}</span>
+        )}
+      </header>
+      <div className="card">{content}</div>
+    </div>
+  );
+}

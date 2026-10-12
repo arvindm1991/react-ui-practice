@@ -1,0 +1,156 @@
+<template id="tpl-gotchas">
+  <h1>Gotchas</h1>
+  <p class="lede">The traps that catch almost everyone in a timed React round. Each one has a symptom, the wrong code, the right code and a one-line rule. Read it tonight and again on Wednesday morning.</p>
+
+  <div class="callout is-key"><span class="callout-label">Something's broken? Check these first</span>
+    <p>1. Read the first line of the error. 2. <code>console.log</code> the data right before you render it. 3. Did you mutate state, call a function instead of passing it, or forget a <code>return</code>? Those three explain most bugs.</p></div>
+
+  <h2>Rendering and state</h2>
+  <div class="gt-list">
+    <div class="gt"><h3>1. A derived value isn't a function, and it doesn't "listen"</h3>
+      <p class="gt-sym">Symptom: you expect <code>visible</code> to update on typing, or you try to call it.</p>
+      <pre class="gt-bad">const visible = people.filter(...);
+&lt;input onChange={visible} /&gt;        // ✗ it's an array, not a handler
+{visible().map(...)}                 // ✗ it's not a function</pre>
+      <pre class="gt-good">const [query, setQuery] = useState('');                 // the SOURCE is state
+const visible = people.filter((p) =&gt; p.name.includes(query)); // plain value
+&lt;input onChange={(e) =&gt; setQuery(e.target.value)} /&gt;     // change the source</pre>
+      <p class="gt-rule">A derived value is recalculated on every render. Typing calls the setter, the component re-runs, and <code>visible</code> is computed again. If it isn't updating, the thing it's computed from isn't state.</p></div>
+
+    <div class="gt"><h3>2. Reading state right after setting it</h3>
+      <pre class="gt-bad">setCount(count + 1);
+console.log(count);           // ✗ still the old value</pre>
+      <pre class="gt-good">const next = count + 1;
+setCount(next);
+console.log(next);            // ✓ use the value you computed</pre>
+      <p class="gt-rule">State is a snapshot. The new value arrives on the next render.</p></div>
+
+    <div class="gt"><h3>3. Mutating state</h3>
+      <p class="gt-sym">Symptom: the data changed (console proves it) but the screen didn't.</p>
+      <pre class="gt-bad">items.push(x); setItems(items);       // ✗ same array
+item.done = true;                     // ✗ changed in place
+items.sort(...)                       // ✗ sort mutates</pre>
+      <pre class="gt-good">setItems((prev) =&gt; [...prev, x]);
+setItems((prev) =&gt; prev.map((i) =&gt; (i.id === id ? { ...i, done: true } : i)));
+const sorted = [...items].sort(...);</pre>
+      <p class="gt-rule">Never change state in place. Make a new array or object.</p></div>
+
+    <div class="gt"><h3>4. Setting from the old value twice</h3>
+      <pre class="gt-bad">setCount(count + 1); setCount(count + 1);   // ✗ adds 1</pre>
+      <pre class="gt-good">setCount((c) =&gt; c + 1); setCount((c) =&gt; c + 1);   // ✓ adds 2</pre>
+      <p class="gt-rule">When the new value depends on the old one, use the <code>prev =&gt;</code> form.</p></div>
+
+    <div class="gt"><h3>5. map where you meant filter</h3>
+      <p class="gt-sym">Symptom: the list shows empty rows, and the log shows <code>[true, false, …]</code>.</p>
+      <pre class="gt-bad">const visible = people.map((p) =&gt; p.team === team);     // ✗ array of booleans</pre>
+      <pre class="gt-good">const visible = people.filter((p) =&gt; p.team === team);  // ✓ array of people</pre>
+      <p class="gt-rule"><code>map</code> transforms each item. <code>filter</code> keeps items where your function returns true.</p></div>
+
+    <div class="gt"><h3>6. Arrow function with braces but no return</h3>
+      <p class="gt-sym">Symptom: nothing renders, no error.</p>
+      <pre class="gt-bad">{items.map((i) =&gt; { &lt;li&gt;{i.name}&lt;/li&gt; })}      // ✗ returns undefined</pre>
+      <pre class="gt-good">{items.map((i) =&gt; &lt;li key={i.id}&gt;{i.name}&lt;/li&gt;)}
+{items.map((i) =&gt; { return &lt;li key={i.id}&gt;{i.name}&lt;/li&gt;; })}</pre>
+      <p class="gt-rule">Braces after <code>=&gt;</code> mean a function body: write <code>return</code>. Parentheses or nothing mean an automatic return.</p></div>
+  </div>
+
+  <h2>Events and forms</h2>
+  <div class="gt-list">
+    <div class="gt"><h3>7. Calling the function instead of passing it</h3>
+      <p class="gt-sym">Symptom: "Too many re-renders", or the action fires on page load.</p>
+      <pre class="gt-bad">&lt;button onClick={handleDelete(id)}&gt;      // ✗ runs during render
+&lt;button onClick={setOpen(true)}&gt;         // ✗ runs during render</pre>
+      <pre class="gt-good">&lt;button onClick={handleSave}&gt;              // ✓ no arguments: pass the name
+&lt;button onClick={() =&gt; handleDelete(id)}&gt; // ✓ arguments: wrap in an arrow</pre>
+      <p class="gt-rule">Parentheses right after the name call it now. Need arguments? Wrap in <code>() =&gt;</code>.</p></div>
+
+    <div class="gt"><h3>8. Form reloads the page, or the wrong button submits</h3>
+      <pre class="gt-bad">function handleSubmit() { ... }            // ✗ page reloads
+&lt;button onClick={cancel}&gt;Cancel&lt;/button&gt;   // ✗ inside a form, this submits</pre>
+      <pre class="gt-good">function handleSubmit(e) { e.preventDefault(); ... }
+&lt;button type="button" onClick={cancel}&gt;Cancel&lt;/button&gt;</pre>
+      <p class="gt-rule"><code>e.preventDefault()</code> first in every submit handler. Buttons in a form default to <code>type="submit"</code>.</p></div>
+
+    <div class="gt"><h3>9. Can't type in the input</h3>
+      <pre class="gt-bad">&lt;input value={name} /&gt;                         // ✗ frozen
+&lt;input type="checkbox" value={done} onChange={...} /&gt;   // ✗ wrong prop</pre>
+      <pre class="gt-good">&lt;input value={name} onChange={(e) =&gt; setName(e.target.value)} /&gt;
+&lt;input type="checkbox" checked={done} onChange={(e) =&gt; setDone(e.target.checked)} /&gt;</pre>
+      <p class="gt-rule"><code>value</code> always needs <code>onChange</code>. Checkboxes use <code>checked</code>.</p></div>
+
+    <div class="gt"><h3>10. Input values are always strings</h3>
+      <pre class="gt-bad">setQty(e.target.value);  qty + 1   // ✗ "5" + 1 = "51"</pre>
+      <pre class="gt-good">setQty(Number(e.target.value));</pre>
+      <p class="gt-rule">Convert with <code>Number()</code> before doing math.</p></div>
+
+    <div class="gt"><h3>11. Click on a button inside a clickable row triggers both</h3>
+      <pre class="gt-good">&lt;button onClick={(e) =&gt; { e.stopPropagation(); remove(id); }}&gt;</pre>
+      <p class="gt-rule">Clicks bubble up to parents. Stop it, or make the two buttons siblings. Never put a button inside a button.</p></div>
+  </div>
+
+  <h2>Lists and conditional rendering</h2>
+  <div class="gt-list">
+    <div class="gt"><h3>12. Keys</h3>
+      <pre class="gt-bad">{items.map((i, index) =&gt; &lt;Row key={index} … /&gt;)}   // ✗ breaks on delete/sort</pre>
+      <pre class="gt-good">{items.map((i) =&gt; &lt;Row key={i.id} … /&gt;)}            // ✓ stable id, outermost element</pre>
+      <p class="gt-rule">Key = a stable id from the data, on the element <code>map</code> returns.</p></div>
+
+    <div class="gt"><h3>13. A stray 0 on the page</h3>
+      <pre class="gt-bad">{items.length &amp;&amp; &lt;List /&gt;}       // ✗ renders "0" when empty</pre>
+      <pre class="gt-good">{items.length &gt; 0 &amp;&amp; &lt;List /&gt;}
+{items.length &gt; 0 ? &lt;List /&gt; : &lt;Empty /&gt;}</pre>
+      <p class="gt-rule">Compare explicitly. React renders the number 0.</p></div>
+
+    <div class="gt"><h3>14. "Objects are not valid as a React child"</h3>
+      <pre class="gt-bad">&lt;p&gt;{user}&lt;/p&gt;</pre>
+      <pre class="gt-good">&lt;p&gt;{user.name}&lt;/p&gt;</pre>
+      <p class="gt-rule">JSX renders text, numbers, elements and arrays of elements. Not objects.</p></div>
+
+    <div class="gt"><h3>15. if / for inside JSX braces</h3>
+      <pre class="gt-bad">{if (isAdmin) &lt;Badge /&gt;}</pre>
+      <pre class="gt-good">{isAdmin &amp;&amp; &lt;Badge /&gt;}      {isAdmin ? &lt;Badge /&gt; : null}      {items.map(...)}</pre>
+      <p class="gt-rule">Braces take expressions. Use <code>if</code>/<code>for</code> above the <code>return</code>, or inside a <code>.map(() =&gt; { … })</code> body.</p></div>
+  </div>
+
+  <h2>Effects and data</h2>
+  <div class="gt-list">
+    <div class="gt"><h3>16. "Cannot read properties of undefined (reading 'map')"</h3>
+      <pre class="gt-bad">const [items, setItems] = useState();      // ✗ undefined until loaded</pre>
+      <pre class="gt-good">const [items, setItems] = useState([]);    // ✓ always an array
+if (loading) return &lt;p&gt;Loading…&lt;/p&gt;;</pre>
+      <p class="gt-rule">Start lists as <code>[]</code>. Data from an API arrives after the first render.</p></div>
+
+    <div class="gt"><h3>17. Effect runs forever, or sees old values</h3>
+      <pre class="gt-bad">useEffect(() =&gt; { setItems(...) }, [items]);   // ✗ sets its own dependency: loop
+useEffect(() =&gt; { fetch(range) }, []);         // ✗ ignores range changes
+useEffect(async () =&gt; { ... }, []);            // ✗ effect can't be async</pre>
+      <pre class="gt-good">useEffect(() =&gt; {
+  let cancelled = false;
+  load(range).then((d) =&gt; { if (!cancelled) setItems(d); });
+  return () =&gt; { cancelled = true; };
+}, [range]);                                   // ✓ everything used inside is listed</pre>
+      <p class="gt-rule">List what the effect uses. Never depend on what it sets. Put async code inside. Clean up timers and listeners.</p></div>
+
+    <div class="gt"><h3>18. Using an effect for derived data</h3>
+      <pre class="gt-bad">useEffect(() =&gt; setFiltered(items.filter(...)), [items, query]);</pre>
+      <pre class="gt-good">const filtered = items.filter(...);</pre>
+      <p class="gt-rule">"When A changes, set B" means B should be calculated, not stored.</p></div>
+  </div>
+
+  <h2>Imports, JSX and CSS</h2>
+  <div class="gt-list">
+    <div class="gt"><h3>19. "Element type is invalid… got: undefined"</h3>
+      <pre class="gt-bad">import { Avatar } from './Avatar';    // ✗ file uses export default</pre>
+      <pre class="gt-good">import Avatar from './Avatar';         // default: no braces
+import { formatDate } from './utils';  // named: braces, exact name</pre>
+      <p class="gt-rule">Open the file, check how it exports, and match it.</p></div>
+
+    <div class="gt"><h3>20. Small JSX and CSS slips</h3>
+      <pre class="gt-good">className="card"              // not class
+style={{ marginTop: 8 }}      // an object, camelCase, not a string
+&lt;img /&gt;  &lt;input /&gt;            // every tag closes
+min-width: 0                  // flex child that must truncate
+position: relative            // on the parent of anything absolute</pre>
+      <p class="gt-rule">If a style "does nothing", inspect it: misspelled class, overridden rule, or a missing parent setting.</p></div>
+  </div>
+</template>

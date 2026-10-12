@@ -1,0 +1,1005 @@
+{
+ "dc31": {
+  "kind": "drill",
+  "level": 3,
+  "order": 31,
+  "minutes": 25,
+  "changeAt": 16,
+  "title": "Notifications dropdown",
+  "focus": "src/App.tsx",
+  "summary": "A project-management app header. Make the bell show an unread badge and open a notifications dropdown that marks items read.",
+  "skills": [
+   "load on mount",
+   "derived count",
+   "optimistic update",
+   "click outside",
+   "grouping"
+  ],
+  "brief": "<p>The header of <b>Tasklane</b>, a project board. <code>AppHeader</code> has the nav, search, a <code>BellButton</code> that does nothing yet, and the user's <code>Avatar</code>. The board below is static.</p><p>Read <code>api.ts</code>: <code>getNotifications()</code> (0.4–1s), <code>markRead(id)</code> and <code>markAllRead()</code> (0.3–0.7s each). Also read <code>utils/time.ts</code> (<code>timeAgo</code>, <code>isToday</code>, a fixed <code>NOW</code>) and <code>components/</code> (<code>Avatar</code>, <code>BellIcon</code>). Reuse them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~16 min):</b> Today / Earlier groups.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–20 Next + change · 20–25 polish and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The badge needs the unread count before the menu is ever opened, so I load notifications on mount, not on open. I'll make one <code>NotificationsMenu</code> component that owns <code>items</code>, <code>loading</code> and <code>open</code>, and replaces <code>BellButton</code>. Unread count is derived with <code>filter</code>, never stored. Clicking an item updates it locally first and calls <code>markRead</code> in the background (optimistic). For click-outside I put a ref on the wrapper (bell + menu) and listen for <code>mousedown</code> on <code>document</code> only while open, removing the listener in the cleanup.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "After <code>getNotifications()</code> resolves, the bell shows a red badge with the unread count (<b>4</b>). The badge is not rendered when the count is 0",
+   "Clicking the bell toggles a 360px dropdown (title \"Notifications\") listing each notification: <code>Avatar</code>, <b>actor</b> + text, and <code>timeAgo</code> (\"18m ago\"). Unread rows have a tinted background and a blue dot. While still loading it says \"Loading notifications…\"",
+   "Clicking an unread notification marks it read immediately (dot and tint go, badge decrements) and calls <code>markRead(id)</code>",
+   "<b>Mark all as read</b> in the dropdown header marks every item read, removes the badge and calls <code>markAllRead()</code>. It is disabled when nothing is unread",
+   "Clicking anywhere outside the bell + dropdown closes it, and so does <b>Escape</b>. Clicking inside the dropdown does not close it"
+  ],
+  "change": {
+   "title": "Today / Earlier",
+   "html": "<p>\"The list is one long wall. Split it by day.\"</p><ul><li>Group the notifications under two small uppercase headings: <b>Today</b> and <b>Earlier</b> (use <code>isToday(createdAt)</code> from <code>utils/time.ts</code>).</li><li>A group with no items shows no heading. Order within each group stays newest first.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: two derived arrays, and a small <code>NotificationGroup</code> component that returns <code>null</code> when empty.</p>"
+  },
+  "hints": [
+   "State placement: one component owns <code>items</code>, <code>loading</code> and <code>open</code>. The badge, the list and \"Mark all\" all read the same <code>items</code>.",
+   "Derived: <code>const unreadCount = items.filter((n) =&gt; { return !n.read; }).length;</code> Then <code>let badge = null; if (unreadCount &gt; 0) { badge = ...; }</code>",
+   "Marking one read without mutating: <code>setItems((prev) =&gt; { return prev.map((n) =&gt; { if (n.id === id) { return { ...n, read: true }; } return n; }); });</code> then call <code>markRead(id)</code>.",
+   "Click outside: search <b>mdn Node.contains</b> and <b>react click outside ref</b>. Put <code>useRef</code> on the wrapper that contains both the bell and the menu, otherwise clicking the bell closes and reopens it.",
+   "The effect shape: <code>useEffect(() =&gt; { if (!open) { return; } function handle(e: MouseEvent) { if (ref.current &amp;&amp; !ref.current.contains(e.target as Node)) { setOpen(false); } } document.addEventListener(\"mousedown\", handle); return () =&gt; { document.removeEventListener(\"mousedown\", handle); }; }, [open]);</code>"
+  ],
+  "rubric": [
+   "Loaded on mount so the badge is right before opening",
+   "Unread count derived, not a second piece of state",
+   "Optimistic read update with map + spread (no mutation)",
+   "Document listeners added only while open and removed in cleanup",
+   "Ref on the wrapper so the bell click doesn't fight the outside click",
+   "Reused Avatar, BellIcon, timeAgo and isToday",
+   "Grouping done with derived arrays; empty group hidden"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#5B5BD6"
+    ],
+    [
+     "--primary-soft",
+     "#EEEEFC"
+    ],
+    [
+     "--danger (badge)",
+     "#E5484D"
+    ],
+    [
+     "Unread row",
+     "#F7F7FE"
+    ],
+    [
+     "--muted",
+     "#6B7090"
+    ],
+    [
+     "--border",
+     "#E6E8F0"
+    ]
+   ],
+   "notes": [
+    [
+     "Badge",
+     "min-w 18 · h 18 · pill · 11/700 · 2px white ring · top 3 right 2"
+    ],
+    [
+     "Dropdown",
+     "w 360 · radius 12 · top 44 · shadow 0 12 32 /14%"
+    ],
+    [
+     "Header",
+     "pad 14 16 · title 15/700 · link 13/600"
+    ],
+    [
+     "Row",
+     "pad 10 16 · gap 12 · avatar 36"
+    ],
+    [
+     "Unread dot",
+     "8px · --primary"
+    ],
+    [
+     "Group title",
+     "11/700 · uppercase · tracking .06em · pad 10 16 4"
+    ]
+   ]
+  }
+ },
+ "dc32": {
+  "kind": "drill",
+  "level": 3,
+  "order": 32,
+  "minutes": 30,
+  "changeAt": 19,
+  "title": "Onboarding wizard",
+  "focus": "src/App.tsx",
+  "summary": "A fitness app sign-up. Turn the single Profile form into a 3-step wizard with validation, a step indicator and a final submit.",
+  "skills": [
+   "lifted form state",
+   "step state",
+   "per-step validation",
+   "async submit",
+   "conditional rendering"
+  ],
+  "brief": "<p>The sign-up screen of <b>Stride</b>. <code>OnboardingWizard</code> already holds the whole form in one <code>form</code> object and renders <code>ProfileStep</code>. The Continue button does nothing.</p><p>Read <code>components/Steps.tsx</code>: <code>ProfileStep</code> and <code>PreferencesStep</code> are done and take <code>values</code>, <code>errors</code> and <code>onChange</code>. <code>Field</code> already shows an error in red if you pass one. <code>utils/validate.ts</code> has <code>isValidEmail</code> and <code>isIntInRange</code>. <code>createAccount(data)</code> in <code>api.ts</code> takes 0.7–1.3s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> jump back from the indicator.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The form object already lives in the wizard, so going Back keeps the values for free as long as I don't unmount the state. I add <code>step</code> (0, 1, 2) and <code>errors</code>. A pure <code>validateStep(step, form)</code> returns an errors object; Continue only advances when it's empty. The body is an if/else on <code>step</code>. Submit sets <code>submitting</code>, calls <code>createAccount</code>, and when it resolves I store the account and render a success screen instead of the wizard. The indicator is a small component that gets <code>current</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Three steps: <b>Profile</b> → <b>Preferences</b> (uses <code>PreferencesStep</code>) → <b>Review</b>. <b>Continue</b> moves forward, <b>Back</b> (hidden on step 1) moves back, and values typed earlier are still there",
+   "<b>Continue</b> validates the current step first. Profile: name required (\"Enter your name\"), valid email (\"Enter a valid email\"), age 13–99 (\"Age must be between 13 and 99\"). Preferences: a goal (\"Pick a goal\"). Errors show under the fields and the step does not change",
+   "Review lists Name, Email, Age, Goal (label, not id), Workouts (\"3 days a week\") and Units. <b>Create my plan</b> calls <code>createAccount(form)</code>, shows \"Creating…\" and is disabled while waiting, then shows \"You're all set, {name}!\" with the returned plan name",
+   "A step indicator above the title: three labelled steps, current one highlighted, completed ones show ✓. The eyebrow reads \"Step 2 of 3\"",
+   "Fixing a field clears its error right away (no need to press Continue again to see it go)"
+  ],
+  "change": {
+   "title": "Jump back from the indicator",
+   "html": "<p>\"On Review people want to fix their email without pressing Back twice.\"</p><ul><li>Completed steps in the indicator are clickable and jump straight to that step (values kept).</li><li>The current step and future steps are not clickable (you can't skip validation by jumping forward).</li></ul>"
+  },
+  "hints": [
+   "New state next to <code>form</code>: <code>const [step, setStep] = useState(0);</code> and <code>const [errors, setErrors] = useState&lt;StepErrors&gt;({});</code>",
+   "Write validation as a plain function outside the component: <code>function validateStep(step: number, form: OnboardingData): StepErrors</code>. It's easy to test and the component stays short.",
+   "\"Is the errors object empty?\" Search: <b>mdn Object.keys</b>. <code>if (Object.keys(found).length &gt; 0) { setErrors(found); return; }</code>",
+   "Pick the body above the return: <code>let body; if (step === 0) { body = &lt;ProfileStep ... /&gt;; } else if (step === 1) { ... } else { body = &lt;ReviewStep values={form} /&gt;; }</code>",
+   "Change: render each indicator step as a <code>&lt;button disabled={i &gt;= current}&gt;</code> and call <code>onJump(i)</code>. Disabled buttons ignore clicks, so the guard is in the markup."
+  ],
+  "rubric": [
+   "Single form object kept in the wizard (Back keeps values)",
+   "Validation is a pure function, run on Continue",
+   "Errors passed to the existing Field via the step components",
+   "Submit shows a pending state and can't double-submit",
+   "Success screen driven by the API result",
+   "Indicator derived from step; forward jumps impossible",
+   "Reused isValidEmail / isIntInRange / GOALS"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#FF5A36"
+    ],
+    [
+     "--primary-soft",
+     "#FFEDE6"
+    ],
+    [
+     "--danger",
+     "#D92D20"
+    ],
+    [
+     "Done step bar",
+     "#FFB59E"
+    ],
+    [
+     "--border",
+     "#F0E2D8"
+    ],
+    [
+     "--muted",
+     "#8A7468"
+    ]
+   ],
+   "notes": [
+    [
+     "Indicator",
+     "3 equal columns · gap 8 · 3px bottom bar"
+    ],
+    [
+     "Step dot",
+     "24px circle · 12/700 · current filled --primary"
+    ],
+    [
+     "Review",
+     "1.5px border · radius 12 · rows pad 12 0"
+    ],
+    [
+     "Buttons",
+     "h 44 · pill · Back ghost, Continue filled"
+    ],
+    [
+     "Success badge",
+     "64px circle · --primary · ✓ 30px"
+    ]
+   ]
+  }
+ },
+ "dc33": {
+  "kind": "drill",
+  "level": 3,
+  "order": 33,
+  "minutes": 25,
+  "changeAt": 16,
+  "title": "Poll with live results",
+  "focus": "src/App.tsx",
+  "summary": "A gaming-community post with a poll. Vote optimistically, animate result bars with percentages, and allow changing your vote.",
+  "skills": [
+   "optimistic update",
+   "derived percentages",
+   "CSS width transition",
+   "server reconciliation"
+  ],
+  "brief": "<p>A post in <b>Guildhall</b>, a dark-themed gaming community. <code>PollWidget</code> already loads the poll with <code>getPoll()</code> and renders the four options as buttons that do nothing.</p><p>Read <code>api.ts</code>: <code>vote(optionId)</code> takes 0.6–1.2s and returns the whole updated <code>Poll</code> (it moves your vote if you already voted). <code>utils/poll.ts</code> has <code>percent</code> and <code>formatVotes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~16 min):</b> Change vote.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–21 change · 21–25 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>poll</code> stays the single source of truth; <code>myVote</code> is in it. Results show when <code>myVote !== null</code>. On click I update <code>poll</code> locally first (+1 on the chosen option, set <code>myVote</code>) so the bars move instantly, then call <code>vote</code> and replace <code>poll</code> with the server's copy. Total and percentages are derived. For the animation I render the bar span always, with width 0% before voting, and CSS <code>transition: width</code> does the rest.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking an option votes for it <b>immediately</b> (optimistic): the options switch to results without waiting for the API, and <code>vote(optionId)</code> is called. When it resolves, the poll is replaced with the server's data",
+   "Results: each option shows a filled bar behind the label whose width is its percentage, and the percentage on the right (\"10%\"). Under the list: \"101 votes · Closes in 2 days\". Your option has a ✓ and a stronger gradient bar",
+   "After voting, the options are disabled: you cannot vote twice",
+   "Bars <b>animate</b> from 0 to their width (about 0.6s). While the vote is saving, the meta line says \"Saving your vote…\""
+  ],
+  "change": {
+   "title": "Change vote",
+   "html": "<p>\"People misclick. Let them change their vote.\"</p><ul><li>A <b>Change vote</b> link in the results meta line (disabled while saving). It hides the results and makes the options clickable again (\"Pick a new option\" + <b>Cancel</b>).</li><li>Picking a different option moves the vote optimistically (−1 old, +1 new; total stays 101) and calls <code>vote</code> again. Picking the same option just returns to the results.</li></ul>"
+  },
+  "hints": [
+   "Derived: <code>const total = poll.options.reduce((sum, o) =&gt; { return sum + o.votes; }, 0);</code> and <code>const showResults = poll.myVote !== null;</code>",
+   "Optimistic update without mutation: <code>setPoll((prev) =&gt; { ... return { ...prev, myVote: optionId, options: prev.options.map((o) =&gt; { ... return { ...o, votes }; }) }; });</code>",
+   "Animation: search <b>mdn css transition width</b>. A transition only runs if the <i>same element</i> changes width, so render the bar span in both states (width 0% before voting).",
+   "Can't vote twice: <code>disabled={showResults || saving}</code> on the option button.",
+   "Change: one boolean <code>changing</code>. <code>showResults = poll.myVote !== null &amp;&amp; !changing</code>. In the optimistic update also subtract 1 from <code>prev.myVote</code>'s option."
+  ],
+  "rubric": [
+   "UI updates before the API resolves (optimistic)",
+   "Server response replaces the local guess",
+   "Total and percentages derived; percent() reused",
+   "Bars animate via a persistent element + CSS transition",
+   "No double voting (disabled while showing results / saving)",
+   "Change vote moves the count, total unchanged"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0E0F1A"
+    ],
+    [
+     "--surface-2 (poll)",
+     "#1F2135"
+    ],
+    [
+     "--primary",
+     "#A78BFA"
+    ],
+    [
+     "--accent",
+     "#22D3EE"
+    ],
+    [
+     "Bar",
+     "rgba(167,139,250,.16)"
+    ],
+    [
+     "My bar",
+     "gradient #8B5CF6 55% → #22D3EE 35%"
+    ]
+   ],
+   "notes": [
+    [
+     "Option",
+     "h 44 · radius 10 · pad 0 14 · gap 8"
+    ],
+    [
+     "Bar",
+     "absolute · full height · transition width .6s"
+    ],
+    [
+     "Percent",
+     "700 · tabular-nums · right"
+    ],
+    [
+     "Check",
+     "18px circle · --primary"
+    ],
+    [
+     "Meta",
+     "12 · muted · link 12/700 --primary"
+    ]
+   ]
+  }
+ },
+ "dc34": {
+  "kind": "drill",
+  "level": 3,
+  "order": 34,
+  "minutes": 25,
+  "changeAt": 16,
+  "title": "Inline rename",
+  "focus": "src/App.tsx",
+  "summary": "A deploy dashboard's project list. Double-click a name to edit it in place, Enter saves through the API, Escape cancels.",
+  "skills": [
+   "edit mode",
+   "draft state",
+   "keyboard events",
+   "async save",
+   "lifting state"
+  ],
+  "brief": "<p>The Projects page of <b>Deployd</b>, a hosting dashboard. <code>ProjectList</code> loads projects with <code>getProjects()</code> and renders a <code>ProjectRow</code> each. Each row has an <b>Edit</b> button that does nothing.</p><p>Read <code>api.ts</code>: <code>renameProject(id, name)</code> takes 0.5–1s, returns the updated project, and <b>throws</b> if another project already has that name. <code>StatusDot</code> and <code>formatAgo</code> already exist.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next and Stretch. <b>Change (~16 min):</b> one row at a time.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–21 change · 21–25 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Editing needs a <b>draft</b> separate from the saved name so Escape can throw it away. I'll keep <code>editingId</code>, <code>draft</code>, <code>error</code> and <code>saving</code> in <code>ProjectList</code>, because the list owns <code>projects</code> and has to replace the renamed one. The row becomes presentational: it gets <code>isEditing</code> and callbacks. The input uses <code>autoFocus</code> and an <code>onKeyDown</code> for Enter and Escape. Save trims, rejects empty, calls the API, then maps the updated project into the list.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Stretch"
+  ],
+  "requirements": [
+   "Double-clicking a project name, or clicking <b>Edit</b>, replaces the name with a focused input holding the current name (text selected). The actions become <b>Cancel</b> and <b>Save</b>",
+   "<b>Enter</b> (or Save) calls <code>renameProject(id, name.trim())</code>. While waiting the input is disabled and Save reads \"Saving…\". On success the row shows the new name and leaves edit mode",
+   "<b>Escape</b> (or Cancel) leaves edit mode and the old name is shown, with no API call",
+   "An empty (or whitespace-only) name is not saved: the input gets a red border and \"Name can't be empty\" appears under it; you stay in edit mode. Saving an unchanged name just closes the editor",
+   "If the API rejects (e.g. renaming \"Docs\" to \"marketing site\"), stay in edit mode and show the error message from the API under the input"
+  ],
+  "change": {
+   "title": "Only one row at a time",
+   "html": "<p>\"QA opened three editors at once and lost track of which one they saved.\"</p><ul><li>Only one row can be in edit mode. Starting to edit another row closes the first one (its draft is discarded).</li><li>While a save is in progress, the other rows' <b>Edit</b> buttons are disabled.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">If you put <code>isEditing</code> state inside each row, this is where you lift it to the list as a single <code>editingId</code>.</p>"
+  },
+  "hints": [
+   "Keep a <code>draft</code> string separate from <code>project.name</code>. Copy the name into it when editing starts; Escape just leaves edit mode.",
+   "Keys: <code>function handleKeyDown(e: React.KeyboardEvent&lt;HTMLInputElement&gt;) { if (e.key === \"Enter\") { onSave(); } if (e.key === \"Escape\") { onCancel(); } }</code>. Search: <b>mdn KeyboardEvent key</b>.",
+   "Focus: the input only exists while editing, so <code>autoFocus</code> works. Select all with <code>onFocus={(e) =&gt; { e.target.select(); }}</code>.",
+   "Replace the saved project: <code>setProjects((prev) =&gt; { return prev.map((p) =&gt; { if (p.id === updated.id) { return updated; } return p; }); });</code>",
+   "Errors from the API: <code>renameProject(id, name).then(...).catch((err: Error) =&gt; { setSaving(false); setError(err.message); });</code>",
+   "Change: one <code>editingId: string | null</code> in the list; each row gets <code>isEditing={p.id === editingId}</code>. One id can only match one row."
+  ],
+  "rubric": [
+   "Draft separate from saved value; Escape discards it",
+   "Enter/Escape handled on the input",
+   "Empty name blocked with a visible message",
+   "Saving state disables input and buttons",
+   "API error caught and shown; stays in edit mode",
+   "Single editingId in the list enforces one editor",
+   "List updated immutably with the server's project"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--text / primary",
+     "#111111"
+    ],
+    [
+     "--focus",
+     "#0070F3"
+    ],
+    [
+     "--danger",
+     "#EE0000"
+    ],
+    [
+     "--border",
+     "#EAEAEA"
+    ],
+    [
+     "Editing row",
+     "#FCFCFC"
+    ]
+   ],
+   "notes": [
+    [
+     "Name input",
+     "h 32 · max-w 320 · radius 6 · 600 weight · focus ring 3px rgba(0,112,243,.15)"
+    ],
+    [
+     "Error",
+     "12 · --danger · under input"
+    ],
+    [
+     "Save button",
+     "h 28 · black fill · white text"
+    ],
+    [
+     "Row",
+     "min-h 64 · pad 10 16"
+    ]
+   ]
+  }
+ },
+ "dc35": {
+  "kind": "drill",
+  "level": 3,
+  "order": 35,
+  "minutes": 30,
+  "changeAt": 19,
+  "title": "School month calendar",
+  "focus": "src/App.tsx",
+  "summary": "A school family portal. Replace the agenda list with a 7-column month grid with events, prev/next month, and a day panel.",
+  "skills": [
+   "date math",
+   "grid layout",
+   "refetch on change",
+   "derived cells",
+   "selection state"
+  ],
+  "brief": "<p>The family portal of <b>Maple Grove Elementary</b>. <code>SchoolCalendar</code> gets a fixed <code>today</code> prop (Sept 15, 2026; never use <code>Date.now</code>) and shows this month's events from <code>getEvents(year, month)</code> as a flat list. The ‹ › buttons do nothing.</p><p>Read <code>utils/date.ts</code>: <code>daysInMonth</code>, <code>firstWeekday</code>, <code>toKey</code>, <code>formatLongDate</code>, <code>WEEKDAYS</code>, <code>MONTH_NAMES</code>. Months are 0-based like <code>Date</code>. <code>EventChip</code> renders one event. <code>getEvents</code> takes 0.4–0.9s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> day side panel.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The visible month is state, <code>{ year, month }</code>, starting from <code>today</code>. The effect refetches when it changes, with the cancelled guard so a slow response for the old month can't land. The cells are derived: N blanks for the first weekday, then days 1..N, then blanks to fill the last row. Events are matched to cells by <code>toKey</code>. Prev/next use <code>new Date(year, month ± 1, 1)</code> so December → January rolls the year for me.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "A 7-column grid with Sun–Sat headings. September 2026 starts on a Tuesday, so the 1st is in the third column; blank cells fill before the 1st and after the last day so every row has 7",
+   "Each day cell shows the day number and up to 2 <code>EventChip</code>s for that date. If there are more, show \"+1 more\" (Sept 15 has 3 events). Today (the <code>today</code> prop) has a yellow circle on its number",
+   "‹ and › change the month (title \"October 2026\") and fetch that month's events. Going back from January goes to December of the previous year",
+   "While a month is loading, show a small \"Loading…\" next to the title. A slow response for a month you already left must not overwrite the current one",
+   "The agenda list is gone; the <code>Legend</code> stays under the grid"
+  ],
+  "change": {
+   "title": "Day side panel",
+   "html": "<p>\"Parents need to see the times.\"</p><ul><li>Clicking a day selects it (green outline) and opens a panel to the right of the grid titled with <code>formatLongDate</code> (\"Tuesday, September 15\") listing that day's events with their time, or \"All day\".</li><li>A day without events says \"No events this day.\" A ✕ closes the panel. Changing month clears the selection.</li></ul>"
+  },
+  "hints": [
+   "State: <code>const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });</code> and use <code>[view.year, view.month]</code> as the effect dependencies.",
+   "Cells: <code>const cells: (number | null)[] = [];</code> push <code>null</code> <code>firstWeekday(...)</code> times, then 1..<code>daysInMonth(...)</code>, then <code>null</code> while <code>cells.length % 7 !== 0</code>.",
+   "Month arithmetic: search <b>mdn Date constructor month overflow</b>. <code>new Date(2026, 12, 1)</code> is January 2027.",
+   "CSS: <code>display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));</code>. The <code>minmax(0, …)</code> stops long chips from stretching a column.",
+   "Change: store <code>selectedKey</code> (the \"YYYY-MM-DD\" string), not a Date or the events. The panel's events are <code>events.filter((e) =&gt; { return e.date === selectedKey; })</code>."
+  ],
+  "rubric": [
+   "Visible month in state, separate from today",
+   "Refetch effect keyed on year+month with cancelled guard",
+   "Cells derived (blanks + days + trailing blanks)",
+   "Year rollover handled by Date, not by hand",
+   "Reused date utils and EventChip",
+   "Selection stored as a key; panel derived from events",
+   "Grid uses CSS grid with minmax(0,1fr)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#2F855A"
+    ],
+    [
+     "--primary-soft",
+     "#E3F2E8"
+    ],
+    [
+     "Today circle (--sun)",
+     "#F6C343"
+    ],
+    [
+     "--border",
+     "#E1E8DC"
+    ],
+    [
+     "Blank cell hatch",
+     "#F1F4EF"
+    ]
+   ],
+   "notes": [
+    [
+     "Grid",
+     "7 cols · gap 6"
+    ],
+    [
+     "Cell",
+     "min-h 92 · pad 6 · radius 10 · 1px border"
+    ],
+    [
+     "Day number",
+     "24px circle · 13/800"
+    ],
+    [
+     "\"+N more\"",
+     "11/700 · muted"
+    ],
+    [
+     "Panel",
+     "240 wide · radius 12 · pad 14 · title 15/800"
+    ]
+   ]
+  }
+ },
+ "dc36": {
+  "kind": "drill",
+  "level": 3,
+  "order": 36,
+  "minutes": 30,
+  "changeAt": 19,
+  "title": "Chat: optimistic send",
+  "focus": "src/App.tsx",
+  "summary": "A travel-concierge chat. Send messages optimistically with Sending… / Failed · Retry states, auto-scroll, and day separators.",
+  "skills": [
+   "optimistic list insert",
+   "temp ids",
+   "error + retry",
+   "useRef scroll",
+   "grouping while rendering"
+  ],
+  "brief": "<p>The concierge chat of <b>Wayfarer</b>. <code>ChatThread</code> loads the conversation with <code>getMessages()</code> and renders <code>MessageBubble</code>s. The composer is a controlled input, but sending does nothing.</p><p>Read <code>api.ts</code>: <code>sendMessage(text)</code> takes 0.6–1.1s and returns the saved <code>Message</code> with a real id. To simulate a flaky network, a message containing <b>\"fail\"</b> throws the first time it's sent and succeeds on retry. <code>utils/time.ts</code> has <code>formatTime</code>, <code>dayLabel</code> and a fixed <code>NOW_ISO</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> date separators.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Each message in state gets a <code>status</code>: sent, sending or failed. On submit I append a message with a temporary id and status sending, clear the input, and call the API. Success swaps the temp message for the server's one (matched by temp id); failure flips its status to failed. Retry sets it back to sending and calls the same <code>deliver</code> function. Auto-scroll is an effect on <code>messages.length</code> that sets <code>scrollTop = scrollHeight</code> on a ref to the scroll container.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Submitting the composer (Enter or <b>Send</b>) adds your message to the bottom <b>immediately</b>, faded, with \"Sending…\" under it, and clears the input. Empty messages are ignored and Send is disabled while empty",
+   "When <code>sendMessage</code> resolves, the message becomes normal and shows its time (\"3:01 PM\")",
+   "If it throws, the bubble turns red and shows \"Failed · <b>Retry</b>\". Retry sets it back to \"Sending…\" and sends the same text again (it succeeds the second time)",
+   "The thread scrolls to the bottom after the first load and whenever a message is added"
+  ],
+  "change": {
+   "title": "Date separators",
+   "html": "<p>\"It's hard to tell which day an answer came.\"</p><ul><li>Before the first message of each day, show a centered pill separator with a line on both sides: <b>Thu, Oct 8</b>, <b>Yesterday</b>, <b>Today</b> (use <code>dayLabel</code>).</li><li>New messages sent today don't add another separator.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: build the rows in a loop above the return, remembering the previous day label.</p>"
+  },
+  "hints": [
+   "Extend the type locally: <code>type ChatMessage = Message &amp; { status: \"sent\" | \"sending\" | \"failed\" };</code> and map the loaded messages to <code>status: \"sent\"</code>.",
+   "Form submit: <code>&lt;form onSubmit={handleSubmit}&gt;</code> and <code>e.preventDefault()</code> first. Search: <b>mdn preventDefault form submit</b>.",
+   "Temp id: <code>const tempId = \"temp-\" + Date.now();</code> Pass it to the API callback so you know which message to replace, even if two sends overlap.",
+   "Auto-scroll: <code>useEffect(() =&gt; { const el = listRef.current; if (el) { el.scrollTop = el.scrollHeight; } }, [messages.length]);</code> Search: <b>mdn scrollHeight</b>.",
+   "Change: <code>const rows: React.ReactNode[] = []; let lastDay = \"\"; messages.forEach((m) =&gt; { const day = dayLabel(m.sentAt); if (day !== lastDay) { rows.push(...); lastDay = day; } rows.push(&lt;MessageBubble ... /&gt;); });</code>"
+  ],
+  "rubric": [
+   "Optimistic insert with a temp id",
+   "Success replaces by temp id; failure flips status (no mutation)",
+   "Retry reuses the same send function",
+   "Scroll handled with a ref + effect, not on every render",
+   "Form submit with preventDefault; empty blocked",
+   "Separators computed while building rows, using dayLabel"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary / mine",
+     "#0F766E"
+    ],
+    [
+     "--theirs",
+     "#F1F6F5"
+    ],
+    [
+     "Failed bubble",
+     "#FEE2E2 / #7F1D1D"
+    ],
+    [
+     "--danger",
+     "#DC2626"
+    ],
+    [
+     "--muted",
+     "#5F7C78"
+    ]
+   ],
+   "notes": [
+    [
+     "Bubble",
+     "max-w 75% · pad 9 12 · radius 16 (4 on the tail corner)"
+    ],
+    [
+     "Sending",
+     "bubble opacity .6"
+    ],
+    [
+     "Meta",
+     "11 · muted · under the bubble"
+    ],
+    [
+     "Separator",
+     "11/700 · pill pad 3 10 · 1px lines both sides"
+    ],
+    [
+     "Composer",
+     "h 42 · pill input + pill button"
+    ]
+   ]
+  }
+ },
+ "dc37": {
+  "kind": "drill",
+  "level": 4,
+  "order": 37,
+  "minutes": 35,
+  "changeAt": 23,
+  "title": "City autocomplete",
+  "focus": "src/components/CityInput.tsx",
+  "summary": "A flight search \"To\" field. Suggestions from an API as you type, full keyboard and mouse support, match highlighting, and recent searches.",
+  "skills": [
+   "combobox",
+   "race conditions",
+   "active index",
+   "keyboard handling",
+   "blur vs click",
+   "highlighting"
+  ],
+  "brief": "<p>The search hero of <b>skyhop</b>. <code>SearchPanel</code> renders a <code>CityInput</code> for \"To\", which is just a controlled input right now.</p><p>Read <code>api.ts</code>: <code>searchCities(query)</code> takes 0.25–0.7s, so responses can arrive <b>out of order</b> while typing. <code>getRecentSearches()</code> takes 0.2–0.5s. <code>utils/format.ts</code> has <code>formatCity</code> (\"Lisbon, Portugal\").</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> recent searches.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"All state lives in <code>CityInput</code>: <code>query</code>, <code>results</code>, <code>loading</code>, <code>open</code>, <code>activeIndex</code>. An effect on <code>query</code> calls the API with a cancelled flag, which also fixes out-of-order responses. <code>activeIndex</code> is the one thing both keyboard and mouse change; Enter picks <code>results[activeIndex]</code>. Selecting fills the input with <code>formatCity</code> and closes. Closing on blur would kill the click on an option, so options use <code>onMouseDown</code> + <code>preventDefault</code>.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Typing shows a dropdown under the field with up to 6 suggestions from <code>searchCities</code>: pin icon, \"City, Country\" and the airport code. While the first results load: \"Searching…\"; no matches: <code>No cities match \"xyz\"</code>. Stale responses never overwrite newer ones",
+   "The typed part of each suggestion is highlighted (bold, primary color) with a <code>&lt;mark&gt;</code>, e.g. typing \"lo\" highlights \"Lo\" in \"London\" and \"lo\" in \"Barcelona\"",
+   "Clicking a suggestion fills the input with \"City, Country\", closes the dropdown and shows the code as a small badge next to the input",
+   "<b>ArrowDown/ArrowUp</b> move a highlighted row (wrapping around), <b>Enter</b> selects it (without submitting the form), <b>Escape</b> closes. Hovering a row highlights it too: there is only ever one highlighted row",
+   "Blurring the input closes the dropdown, but clicking a suggestion still works. The input has <code>role=\"combobox\"</code>, <code>aria-expanded</code> and <code>aria-activedescendant</code>"
+  ],
+  "change": {
+   "title": "Recent searches",
+   "html": "<p>\"Most people fly to the same few places.\"</p><ul><li>When the input is focused and <b>empty</b>, show a \"Recent searches\" heading and the cities from <code>getRecentSearches()</code> (clock icon instead of the pin).</li><li>Keyboard and mouse work on that list the same way. Selecting any city (from search or recents) moves it to the top of recents (no duplicates, max 5).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one derived <code>options</code> array (recents when the query is empty, otherwise results) means the keyboard code doesn't change at all.</p>"
+  },
+  "hints": [
+   "Effect: <code>useEffect(() =&gt; { if (query.trim() === \"\") { setResults([]); return; } let cancelled = false; searchCities(query).then((data) =&gt; { if (cancelled) { return; } setResults(data); }); return () =&gt; { cancelled = true; }; }, [query]);</code> The cleanup of the old query runs before the new one starts.",
+   "Highlight: search <b>mdn String indexOf</b>. Split the label into before / match / after with <code>slice</code>, and wrap the middle in <code>&lt;mark&gt;</code>.",
+   "Keys: <code>e.preventDefault()</code> on ArrowUp/Down (stops the caret jumping) and on Enter (stops the form submitting). Wrap with <code>(prev + 1) % options.length</code>.",
+   "Blur fires before click. Search: <b>react onBlur before onClick dropdown</b>. Fix: <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on each option keeps focus in the input.",
+   "Reset <code>activeIndex</code> to -1 whenever the query changes, otherwise it can point past the end of a shorter list.",
+   "Change: <code>let options = results; if (query.trim() === \"\") { options = recent; }</code> and update recents with <code>[city, ...prev.filter(...)].slice(0, 5)</code>."
+  ],
+  "rubric": [
+   "Out-of-order responses handled (cancelled flag in the effect)",
+   "Single activeIndex shared by keyboard and mouse",
+   "preventDefault on arrows and Enter",
+   "Blur/click race solved with mousedown preventDefault",
+   "Highlight without dangerouslySetInnerHTML",
+   "Basic combobox ARIA",
+   "Recents reuse the same options pipeline"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#2563EB"
+    ],
+    [
+     "--primary-soft (active row)",
+     "#EAF1FF"
+    ],
+    [
+     "--text",
+     "#0B1B3F"
+    ],
+    [
+     "--muted",
+     "#5E6B85"
+    ],
+    [
+     "Hero gradient",
+     "#1E3A8A → #2563EB"
+    ]
+   ],
+   "notes": [
+    [
+     "Dropdown",
+     "w 340 · top +10 · pad 6 · radius 12 · shadow 0 16 40 /18%"
+    ],
+    [
+     "Option",
+     "pad 9 10 · radius 8 · gap 10"
+    ],
+    [
+     "Icon tile",
+     "28px · radius 8"
+    ],
+    [
+     "Match",
+     "<mark> · no bg · 800 · --primary"
+    ],
+    [
+     "Code badge",
+     "pad 2 6 · radius 6 · 11/800 · white on --primary"
+    ],
+    [
+     "Heading",
+     "11/800 · uppercase · muted"
+    ]
+   ]
+  }
+ },
+ "dc38": {
+  "kind": "drill",
+  "level": 4,
+  "order": 38,
+  "minutes": 35,
+  "changeAt": 23,
+  "title": "File explorer tree",
+  "focus": "src/App.tsx",
+  "summary": "An in-browser IDE. Build a recursive, expandable file tree, a preview pane that loads file contents, and a breadcrumb.",
+  "skills": [
+   "recursive component",
+   "Set in state",
+   "lifting selection",
+   "fetch on selection",
+   "breadcrumb path"
+  ],
+  "brief": "<p>The editor of <b>Codebox</b>, a dark IDE. <code>Explorer</code> loads the nested tree with <code>getTree()</code> but only lists the top level; folders don't open. <code>Preview</code> just says \"Select a file to preview it\".</p><p>Read <code>api.ts</code>: folders have <code>children</code>; <code>getFile(id)</code> takes 0.3–0.8s. <code>components/CodeView.tsx</code> renders code with line numbers; <code>utils/files.ts</code> has <code>fileIcon</code> and <code>formatBytes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> Collapse all + file counts.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>TreeNode</code> component renders one row and, if it's an open folder, maps its children to <code>TreeNode</code> again with <code>depth + 1</code>. Expanded folders are one <code>Set</code> of ids in <code>Explorer</code>, not state in each node, so they survive re-renders and can be cleared at once. The selected file is needed by both the explorer (highlight) and the preview (load), so it lives in <code>App</code>. Each node passes its path down, so on select I already have the breadcrumb.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Folders show a ▸ chevron (rotated ▾ when open) and toggle open/closed on click; files show their <code>fileIcon</code> badge. Children are indented 14px per level, to any depth (<code>src/utils/api/client.ts</code> is 3 levels deep). <code>src</code> starts open",
+   "Clicking a file highlights it (tinted row + purple left edge) and the preview loads it with <code>getFile</code>: \"Loading…\" then <code>CodeView</code>. Clicking another file quickly never shows the first file's content",
+   "The preview header shows a breadcrumb: <b>codebox-web › src › components › Button.tsx</b> (last part bold), and the size on the right with <code>formatBytes</code>",
+   "Collapsing a folder that contains the selected file keeps the file selected and previewed",
+   "The tree has <code>role=\"tree\"</code>, folders' items have <code>aria-expanded</code>"
+  ],
+  "change": {
+   "title": "Collapse all + file counts",
+   "html": "<p>\"The tree gets long. Give me a reset, and tell me how big folders are.\"</p><ul><li>A <b>Collapse all</b> button in the Explorer header closes every folder (disabled when nothing is open).</li><li>Each folder shows a small muted pill on the right with the number of <b>files</b> inside it, counting all nested folders (<code>src</code> shows 9).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">If you kept <code>open</code> state inside each <code>TreeNode</code>, this is the moment you have to lift it.</p>"
+  },
+  "hints": [
+   "Recursive component: <code>function TreeNode({ node, depth, ... }) { ... children = node.children.map((child) =&gt; { return &lt;TreeNode key={child.id} node={child} depth={depth + 1} ... /&gt;; }) }</code>. Search: <b>react recursive component tree</b>.",
+   "Indent with an inline style: <code>style={{ paddingLeft: 10 + depth * 14 }}</code>.",
+   "Set in state: never <code>.add</code> on the current set. <code>setExpanded((prev) =&gt; { const next = new Set(prev); ...; return next; })</code>. Search: <b>mdn Set</b>.",
+   "Breadcrumb: pass <code>parentPath</code> down. Each node computes <code>const path = [...parentPath, node.name];</code> and sends it up with <code>onSelect({ id, path })</code>.",
+   "Preview fetch: <code>useEffect</code> on the selected id with the <code>cancelled</code> guard, so a slow first file can't overwrite the second.",
+   "Change: <code>function countFiles(node: FileNode): number { if (node.type === \"file\") { return 1; } ... sum countFiles(child) ... }</code>. Collapse all is <code>setExpanded(new Set())</code>."
+  ],
+  "rubric": [
+   "Recursive TreeNode with depth-based indent",
+   "Expanded state as one immutable Set at the top",
+   "Selection lifted to App (explorer + preview both need it)",
+   "Path built while recursing, not searched afterwards",
+   "File fetch guarded against stale responses",
+   "Recursive count as a pure function",
+   "Reused CodeView, fileIcon, formatBytes"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0D1117"
+    ],
+    [
+     "--panel",
+     "#161B22"
+    ],
+    [
+     "--primary",
+     "#8B5CF6"
+    ],
+    [
+     "Selected row",
+     "rgba(139,92,246,.16) + inset 2px --primary"
+    ],
+    [
+     "--muted",
+     "#7D8799"
+    ],
+    [
+     "File badge",
+     "#93C5FD on 12%"
+    ]
+   ],
+   "notes": [
+    [
+     "Row",
+     "h 26 · gap 6 · indent 10 + 14 × depth"
+    ],
+    [
+     "Chevron",
+     "11px · rotate 90° when open · .12s"
+    ],
+    [
+     "Count pill",
+     "10/700 · pad 0 6 · bg white 6%"
+    ],
+    [
+     "Preview head",
+     "h 36 · pad 0 16 · crumbs 12 · sep ›"
+    ],
+    [
+     "Header button",
+     "10/700 · uppercase · muted"
+    ]
+   ]
+  }
+ },
+ "dc39": {
+  "kind": "drill",
+  "level": 4,
+  "order": 39,
+  "minutes": 40,
+  "changeAt": 26,
+  "title": "Employee directory table",
+  "focus": "src/App.tsx",
+  "summary": "An HR directory. Combine search, a department filter, sortable columns and pagination, then add column visibility toggles.",
+  "skills": [
+   "derived pipeline",
+   "sort without mutating",
+   "pagination math",
+   "reset page on filter",
+   "config-driven columns"
+  ],
+  "brief": "<p>The Directory page of <b>Peoplebase</b>. <code>EmployeeTable</code> loads all 28 employees with <code>getEmployees()</code> (0.5–1.1s) and renders every one in a plain table.</p><p>Read <code>components/</code>: <code>Pagination</code> (Prev / \"Page 2 of 4\" / Next) and <code>DeptBadge</code> already exist. <code>DEPARTMENTS</code> is exported from <code>api.ts</code>. <code>formatDate</code> is in <code>utils/format.ts</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~26 min):</b> column toggles.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–7 plan out loud · 7–26 Core + Next · 26–35 change · 35–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The only state is the inputs: <code>query</code>, <code>dept</code>, <code>sortKey</code>, <code>sortDir</code>, <code>page</code>. Everything else is a pipeline computed on each render: filter by query, filter by department, copy and sort, then slice the page. Every handler that changes a filter also sets page back to 1, because page 3 of the old list might not exist. I'll describe the columns in one array so the header and cells are both maps over it, which also makes the sort buttons uniform.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "A toolbar above the table: a search input (\"Search name or title\", case-insensitive on name OR title) and a department select (\"All departments\" + each department). Both apply together",
+   "Every column header is a button that sorts by it: first click ascending ▲, second descending ▼; other headers show a muted ↕. Default: Name ascending. Start date sorts by date",
+   "8 rows per page with the existing <code>Pagination</code> component, and \"Showing 9–16 of 28\" on the left of the footer. Changing the search, department or sort goes back to page 1",
+   "When filters are active, a <b>Clear filters</b> button resets search and department (and the page). With no matches the table shows one row: \"No employees match your filters.\"",
+   "Sorted headers have <code>aria-sort</code> (\"ascending\" / \"descending\")"
+  ],
+  "change": {
+   "title": "Column visibility",
+   "html": "<p>\"Managers only care about name, title and start date.\"</p><ul><li>A <b>Columns</b> button at the right of the toolbar opens a small menu of checkboxes: Title, Department, Location, Start date (all on by default). Name is always shown.</li><li>Unchecking hides that column's header and cells. The empty-state row still spans all visible columns.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: a native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code> gives you open/close for free.</p>"
+  },
+  "hints": [
+   "Write the pipeline as consts after the loading check: <code>filtered</code> → <code>sorted</code> → <code>pageRows</code>. None of these go in state.",
+   "Sorting: <code>[...filtered].sort((a, b) =&gt; { return a[sortKey].localeCompare(b[sortKey]); })</code>. ISO dates (\"2019-03-04\") sort correctly as strings. Search: <b>mdn localeCompare</b>.",
+   "Paging: <code>const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE)); const start = (page - 1) * PAGE_SIZE; const pageRows = sorted.slice(start, start + PAGE_SIZE);</code>",
+   "Reset to page 1 inside the handlers (<code>handleQuery</code>, <code>handleDept</code>, <code>handleSort</code>), not in an effect.",
+   "Columns as data: <code>const COLUMNS = [{ key: \"name\", label: \"Name\" }, ...];</code> then <code>COLUMNS.map</code> for headers and a <code>renderCell(employee, key)</code> helper for cells.",
+   "Change: <code>visible: Record&lt;ColumnKey, boolean&gt;</code>, toggled with <code>{ ...prev, [key]: !prev[key] }</code>, and <code>const visibleColumns = COLUMNS.filter(...)</code>."
+  ],
+  "rubric": [
+   "Only inputs in state; the pipeline is derived",
+   "Copied before sorting",
+   "Page reset in the filter/sort handlers",
+   "Correct page math and range text",
+   "Reused Pagination, DeptBadge, formatDate, DEPARTMENTS",
+   "Columns driven by one config array",
+   "Empty state with correct colSpan"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0F766E"
+    ],
+    [
+     "--head",
+     "#F1F5F9"
+    ],
+    [
+     "--border",
+     "#E2E8F0"
+    ],
+    [
+     "--muted",
+     "#64748B"
+    ],
+    [
+     "Sidebar",
+     "#0F172A"
+    ],
+    [
+     "Inactive arrow",
+     "#94A3B8"
+    ]
+   ],
+   "notes": [
+    [
+     "Toolbar",
+     "pad 12 14 · gap 10 · bottom border"
+    ],
+    [
+     "Search",
+     "w 240 · h 36 · radius 8"
+    ],
+    [
+     "Header button",
+     "h 30 · pad 0 8 · 600 · arrow 10px gap 6"
+    ],
+    [
+     "Footer",
+     "pad 10 14 · space-between · range 13 muted"
+    ],
+    [
+     "Columns menu",
+     "min-w 180 · top 42 · right 0 · radius 8"
+    ]
+   ]
+  }
+ },
+ "dc40": {
+  "kind": "drill",
+  "level": 4,
+  "order": 40,
+  "minutes": 35,
+  "changeAt": 23,
+  "title": "@mentions in comments",
+  "focus": "src/components/CommentBox.tsx",
+  "summary": "An expense-approval thread. Typing \"@\" + letters in the comment box opens a filtered people dropdown that inserts \"@Name \".",
+  "skills": [
+   "selectionStart",
+   "regex on text before caret",
+   "string splice",
+   "restoring caret",
+   "keyboard navigation"
+  ],
+  "brief": "<p>An expense report in <b>Ledgerly</b>. The right column shows the discussion (<code>CommentList</code>, which already highlights <code>@First Last</code> mentions) and a <code>CommentBox</code> textarea whose <b>Comment</b> button works.</p><p>Read <code>api.ts</code>: <code>getUsers()</code> takes 0.4–0.9s and returns the six people you can mention. <code>components/Avatar.tsx</code> takes a name and color.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> keyboard navigation.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>CommentBox</code> loads users on mount. On every change I look at the text <i>before the caret</i> (<code>selectionStart</code>): if it ends with <code>@letters</code> at the start or after a space, I store <code>{ start, query }</code>, otherwise null. Suggestions are derived from that. Inserting replaces <code>text.slice(start, start + 1 + query.length)</code> with <code>@Name </code>. Because the value changes, React moves the caret to the end, so I put it back with <code>setSelectionRange</code> after the update.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Typing \"@\" followed by letters (at the start or after a space) opens a dropdown under the textarea with up to 5 people whose first or last name starts with those letters (case-insensitive): avatar, name, role. \"@p\" shows Priya Shah, Paula Reyes and Peter Nguyen; \"@pa\" only Paula",
+   "Clicking a person replaces the typed \"@pa\" with \"@Paula Reyes \" (with a trailing space) and closes the dropdown. Text before and after is kept",
+   "Pressing <b>Enter</b> while the dropdown is open inserts the first person instead of a newline",
+   "After inserting, focus stays in the textarea and the caret is right after the inserted name (also when inserting in the middle of the text)",
+   "The dropdown closes when the fragment no longer matches (e.g. you type a space), when nobody matches, and on blur. An email like \"a@b\" does not open it"
+  ],
+  "change": {
+   "title": "Keyboard navigation",
+   "html": "<p>\"Our power users never touch the mouse.\"</p><ul><li><b>ArrowDown/ArrowUp</b> move a highlighted row in the dropdown (wrapping around); hovering highlights too.</li><li><b>Enter</b> inserts the highlighted person, <b>Escape</b> closes the dropdown without changing the text. The highlight resets to the first row when the typed letters change.</li></ul>"
+  },
+  "hints": [
+   "Caret position: search <b>mdn HTMLTextAreaElement selectionStart</b>. In <code>onChange</code>, <code>e.target.selectionStart</code> is where the caret is right after that keystroke.",
+   "Detect the fragment with a regex on the text before the caret: <code>/(^|\\s)@([a-zA-Z]*)$/.exec(value.slice(0, caret))</code>. Group 2 is the query; <code>start = caret - query.length - 1</code>.",
+   "Insert: <code>text.slice(0, start) + \"@\" + user.name + \" \" + text.slice(start + 1 + query.length)</code>.",
+   "Restoring the caret: the DOM value updates after the render, so wait one frame: <code>requestAnimationFrame(() =&gt; { el.focus(); el.setSelectionRange(pos, pos); });</code> with a <code>useRef</code> on the textarea. Search: <b>mdn setSelectionRange</b>.",
+   "Clicking an option blurs the textarea first. Use <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on options so the click still lands.",
+   "Change: <code>activeIndex</code> state, reset to 0 in <code>handleChange</code>; in <code>onKeyDown</code> only act when the dropdown is open, and <code>preventDefault</code> for arrows, Enter and Escape."
+  ],
+  "rubric": [
+   "Detection based on text before the caret, not the whole text",
+   "Mention state is {start, query}; suggestions derived",
+   "Correct splice keeps the surrounding text",
+   "Caret restored after the controlled value changes",
+   "Enter inserts instead of newline only while open",
+   "Blur/click race handled",
+   "Keyboard index wraps and resets on query change"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#047857"
+    ],
+    [
+     "--primary-soft (active row)",
+     "#E7F6EF"
+    ],
+    [
+     "--primary-dark",
+     "#065F46"
+    ],
+    [
+     "--border",
+     "#E3E8E2"
+    ],
+    [
+     "Topbar",
+     "#0B2B20"
+    ]
+   ],
+   "notes": [
+    [
+     "Dropdown",
+     "w 280 · left 12 · just under the textarea · pad 6 · radius 10"
+    ],
+    [
+     "Option",
+     "pad 7 8 · gap 10 · avatar 26"
+    ],
+    [
+     "Name",
+     "600"
+    ],
+    [
+     "Role",
+     "12 · muted · right"
+    ],
+    [
+     "Shadow",
+     "0 14 32 rgba(11,43,32,.16)"
+    ]
+   ]
+  }
+ }
+}

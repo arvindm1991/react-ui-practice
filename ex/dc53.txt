@@ -1,0 +1,719 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+import { moveCardInBoard, findCard } from './utils/board';
+
+export type ColumnId = 'backlog' | 'progress' | 'review' | 'done';
+export type Card = {
+  id: string;
+  title: string;
+  tag: 'Bug' | 'Feature' | 'Chore';
+  points: number;
+  assignee: string | null;
+};
+export type Board = Record<ColumnId, Card[]>;
+
+export const COLUMNS: { id: ColumnId; title: string }[] = [
+  { id: 'backlog', title: 'Backlog' },
+  { id: 'progress', title: 'In progress' },
+  { id: 'review', title: 'In review' },
+  { id: 'done', title: 'Done' },
+];
+
+// The server's copy of the board.
+let DB: Board = {
+  backlog: [
+    { id: 'ORB-41', title: 'Dark mode for the billing page', tag: 'Feature', points: 3, assignee: 'Ana Lima' },
+    { id: 'ORB-44', title: 'CSV export times out over 10k rows', tag: 'Bug', points: 5, assignee: null },
+    { id: 'ORB-38', title: 'Upgrade the API servers to Node 22', tag: 'Chore', points: 2, assignee: 'Ben Okafor' },
+  ],
+  progress: [
+    { id: 'ORB-29', title: 'Onboarding checklist v2', tag: 'Feature', points: 8, assignee: 'Chloe Park' },
+    { id: 'ORB-47', title: 'Fix flaky checkout e2e test', tag: 'Bug', points: 1, assignee: 'Ben Okafor' },
+  ],
+  review: [
+    { id: 'ORB-33', title: 'Rate-limit the public API', tag: 'Feature', points: 5, assignee: 'Dev Shah' },
+    { id: 'ORB-45', title: 'Audit log retention setting', tag: 'Feature', points: 3, assignee: null },
+  ],
+  done: [
+    { id: 'ORB-21', title: 'SSO with Okta', tag: 'Feature', points: 8, assignee: 'Ana Lima' },
+    { id: 'ORB-36', title: 'Remove the legacy pricing page', tag: 'Chore', points: 1, assignee: 'Chloe Park' },
+  ],
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function copyBoard(b: Board): Board {
+  return {
+    backlog: b.backlog.map((c) => ({ ...c })),
+    progress: b.progress.map((c) => ({ ...c })),
+    review: b.review.map((c) => ({ ...c })),
+    done: b.done.map((c) => ({ ...c })),
+  };
+}
+
+// GET /sprints/24/board -> Board
+export async function getBoard(): Promise<Board> {
+  await randomDelay(400, 1000);
+  return copyBoard(DB);
+}
+
+// POST /cards/:id/move { toColumn, toIndex }
+// toIndex is the position in the destination column AFTER the card is taken out of its old spot.
+// Rejects (deterministically) when moving an unassigned card into "done".
+export async function moveCard(cardId: string, toColumn: ColumnId, toIndex: number): Promise<void> {
+  await randomDelay(400, 900);
+  const pos = findCard(DB, cardId);
+  if (!pos) {
+    throw new Error('Card ' + cardId + ' not found.');
+  }
+  const card = DB[pos.columnId][pos.index];
+  if (toColumn === 'done' && !card.assignee) {
+    throw new Error('Assign someone before moving ' + card.id + ' to Done.');
+  }
+  DB = moveCardInBoard(DB, cardId, toColumn, toIndex);
+}
+@@@ shared src/utils/board.ts
+import type { Board, ColumnId } from '../api';
+
+// Where is a card? findCard(board, 'ORB-41') -> { columnId: 'backlog', index: 0 }
+export function findCard(board: Board, cardId: string): { columnId: ColumnId; index: number } | null {
+  const ids = Object.keys(board) as ColumnId[];
+  for (const columnId of ids) {
+    const index = board[columnId].findIndex((c) => c.id === cardId);
+    if (index !== -1) {
+      return { columnId, index };
+    }
+  }
+  return null;
+}
+
+// Pure: returns a NEW board with the card moved.
+// toIndex is the index in the destination column after the card has been removed from its old spot.
+export function moveCardInBoard(board: Board, cardId: string, toColumn: ColumnId, toIndex: number): Board {
+  const from = findCard(board, cardId);
+  if (!from) {
+    return board;
+  }
+  const card = board[from.columnId][from.index];
+  const next: Board = { ...board };
+  next[from.columnId] = board[from.columnId].filter((c) => c.id !== cardId);
+  const dest = [...next[toColumn]];
+  const at = Math.max(0, Math.min(toIndex, dest.length));
+  dest.splice(at, 0, card);
+  next[toColumn] = dest;
+  return next;
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#F97316', '#0EA5E9', '#8B5CF6', '#10B981', '#EC4899'];
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+export default function Avatar({ name }: { name: string | null }) {
+  if (!name) {
+    return <span className="avatar is-empty" title="Unassigned" aria-label="Unassigned" />;
+  }
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i);
+  }
+  const color = COLORS[sum % COLORS.length];
+  return (
+    <span className="avatar" style={{ background: color }} title={name} aria-label={name}>
+      {initials(name)}
+    </span>
+  );
+}
+@@@ shared src/components/Toast.tsx
+import React from 'react';
+
+type ToastProps = {
+  message: string;
+  onDismiss: () => void;
+};
+
+// Presentational only. The parent decides when it shows and for how long.
+export default function Toast({ message, onDismiss }: ToastProps) {
+  return (
+    <div className="toast" role="alert">
+      <span className="toast-icon" aria-hidden="true">!</span>
+      <span className="toast-msg">{message}</span>
+      <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => { onDismiss(); }}>✕</button>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getBoard, COLUMNS } from './api';
+import type { Board, Card, ColumnId } from './api';
+import Avatar from './components/Avatar';
+
+function CardView({ card }: { card: Card }) {
+  return (
+    <article className="card" data-card-id={card.id}>
+      <div className="card-top">
+        <span className={'tag tag-' + card.tag.toLowerCase()}>{card.tag}</span>
+        <span className="card-id">{card.id}</span>
+      </div>
+      <h3 className="card-title">{card.title}</h3>
+      <div className="card-bottom">
+        <span className="points">{card.points} pts</span>
+        <Avatar name={card.assignee} />
+      </div>
+    </article>
+  );
+}
+
+type ColumnProps = {
+  id: ColumnId;
+  title: string;
+  cards: Card[];
+};
+
+function Column({ id, title, cards }: ColumnProps) {
+  return (
+    <section className={'column column-' + id}>
+      <header className="column-head">
+        <span className="column-dot" />
+        <h2>{title}</h2>
+        <span className="column-count">{cards.length}</span>
+      </header>
+      <div className="column-body">
+        {cards.map((card) => {
+          return <CardView key={card.id} card={card} />;
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [board, setBoard] = useState<Board | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBoard().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setBoard(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let content;
+  if (!board) {
+    content = <p className="loading">Loading board…</p>;
+  } else {
+    content = (
+      <div className="board">
+        {COLUMNS.map((col) => {
+          return <Column key={col.id} id={col.id} title={col.title} cards={board[col.id]} />;
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">◆ Orbit</span>
+        <h1>Sprint 24</h1>
+        <span className="sprint-dates">Oct 6 – Oct 17</span>
+      </header>
+      {content}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F4F3EF;
+  --column: #EAE8E2;
+  --surface: #FFFFFF;
+  --border: #DDDAD2;
+  --text: #1F1E1B;
+  --muted: #77736A;
+  --accent: #5B5BD6;
+  --danger: #D93F0B;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: baseline; gap: 14px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; color: var(--accent); }
+.topbar h1 { margin: 0; font-size: 18px; }
+.sprint-dates { color: var(--muted); font-size: 13px; }
+
+.loading { padding: 40px; text-align: center; color: var(--muted); }
+
+.board { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 14px; padding: 18px 24px 24px; overflow-x: auto; align-items: start; }
+.column { background: var(--column); border-radius: 12px; padding: 10px; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; }
+.column-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.column-dot { width: 8px; height: 8px; border-radius: 50%; background: #A8A397; }
+.column-progress .column-dot { background: #E5A00D; }
+.column-review .column-dot { background: var(--accent); }
+.column-done .column-dot { background: #2DA44E; }
+.column-count { margin-left: auto; font-size: 12px; color: var(--muted); }
+.column-body { display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+
+.card { background: var(--surface); border-radius: var(--radius); padding: 10px 12px; box-shadow: 0 1px 2px rgba(31, 30, 27, 0.08), 0 0 0 1px rgba(31, 30, 27, 0.05); }
+.card-top { display: flex; justify-content: space-between; align-items: center; }
+.card-id { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-title { margin: 6px 0 10px; font-size: 13.5px; font-weight: 500; line-height: 1.35; }
+.card-bottom { display: flex; justify-content: space-between; align-items: center; }
+.points { font-size: 12px; color: var(--muted); }
+
+.tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+.tag-feature { background: #E8E8FC; color: #4343B8; }
+.tag-bug { background: #FDE8E1; color: #B4360A; }
+.tag-chore { background: #ECEBE6; color: #5E5A51; }
+
+.avatar { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 10.5px; font-weight: 700; }
+.avatar.is-empty { border: 1.5px dashed #B5B0A5; background: transparent; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 10px 12px; border-radius: 10px; background: #1F1E1B; color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); font-size: 13.5px; }
+.toast-icon { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--danger); font-weight: 700; font-size: 12px; }
+.toast-close { border: 0; background: none; color: #A8A397; cursor: pointer; font-size: 13px; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getBoard, moveCard, COLUMNS } from './api';
+import type { Board, Card, ColumnId } from './api';
+import Avatar from './components/Avatar';
+import Toast from './components/Toast';
+import { findCard, moveCardInBoard } from './utils/board';
+
+type DropTarget = { columnId: ColumnId; index: number };
+
+type CardViewProps = {
+  card: Card;
+  dragging: boolean;
+  selected: boolean;
+  onDragStart: (e: React.DragEvent<HTMLElement>, cardId: string) => void;
+  onDragEnd: () => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLElement>, cardId: string) => void;
+  onSelect: (cardId: string) => void;
+};
+
+function CardView({ card, dragging, selected, onDragStart, onDragEnd, onKeyDown, onSelect }: CardViewProps) {
+  let cls = 'card';
+  if (dragging) {
+    cls += ' is-dragging';
+  }
+  if (selected) {
+    cls += ' is-selected';
+  }
+  return (
+    <article
+      className={cls}
+      data-card-id={card.id}
+      draggable
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-describedby="kb-help"
+      onDragStart={(e) => { onDragStart(e, card.id); }}
+      onDragEnd={() => { onDragEnd(); }}
+      onKeyDown={(e) => { onKeyDown(e, card.id); }}
+      onClick={() => { onSelect(card.id); }}
+    >
+      <div className="card-top">
+        <span className={'tag tag-' + card.tag.toLowerCase()}>{card.tag}</span>
+        <span className="card-id">{card.id}</span>
+      </div>
+      <h3 className="card-title">{card.title}</h3>
+      <div className="card-bottom">
+        <span className="points">{card.points} pts</span>
+        <Avatar name={card.assignee} />
+      </div>
+    </article>
+  );
+}
+
+type ColumnProps = {
+  id: ColumnId;
+  title: string;
+  cards: Card[];
+  indicatorAt: number | null;
+  dragId: string | null;
+  selectedId: string | null;
+  onDragOver: (e: React.DragEvent<HTMLElement>, columnId: ColumnId) => void;
+  onDragLeave: (e: React.DragEvent<HTMLElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLElement>) => void;
+  cardHandlers: Pick<CardViewProps, 'onDragStart' | 'onDragEnd' | 'onKeyDown' | 'onSelect'>;
+};
+
+function Column({ id, title, cards, indicatorAt, dragId, selectedId, onDragOver, onDragLeave, onDrop, cardHandlers }: ColumnProps) {
+  // Build the list with the insert indicator spliced in at its index.
+  const items: React.ReactNode[] = [];
+  const indicator = <div key="drop-indicator" className="drop-indicator" />;
+  cards.forEach((card, i) => {
+    if (indicatorAt === i) {
+      items.push(indicator);
+    }
+    items.push(
+      <CardView key={card.id} card={card} dragging={card.id === dragId} selected={card.id === selectedId} {...cardHandlers} />
+    );
+  });
+  if (indicatorAt === cards.length) {
+    items.push(indicator);
+  }
+
+  let cls = 'column column-' + id;
+  if (indicatorAt !== null) {
+    cls += ' is-over';
+  }
+
+  return (
+    <section
+      className={cls}
+      onDragOver={(e) => { onDragOver(e, id); }}
+      onDragLeave={(e) => { onDragLeave(e); }}
+      onDrop={(e) => { onDrop(e); }}
+    >
+      <header className="column-head">
+        <span className="column-dot" />
+        <h2>{title}</h2>
+        <span className="column-count">{cards.length}</span>
+      </header>
+      <div className="column-body">
+        {items}
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [board, setBoard] = useState<Board | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBoard().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setBoard(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The toast hides itself after 4 s. A new message restarts the timer.
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const t = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [toast]);
+
+  // Keyboard moves can remount the card in another column: put focus back on it.
+  useEffect(() => {
+    if (!selectedId || !boardRef.current) {
+      return;
+    }
+    const el = boardRef.current.querySelector<HTMLElement>('[data-card-id="' + selectedId + '"]');
+    if (el) {
+      el.focus();
+    }
+  }, [board, selectedId]);
+
+  // Optimistic: move now, save in the background, put it back if the server says no.
+  function commitMove(cardId: string, toColumn: ColumnId, toIndex: number) {
+    if (!board) {
+      return;
+    }
+    const from = findCard(board, cardId);
+    if (!from || (from.columnId === toColumn && from.index === toIndex)) {
+      return;
+    }
+    setBoard((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      return moveCardInBoard(prev, cardId, toColumn, toIndex);
+    });
+    const col = COLUMNS.find((c) => { return c.id === toColumn; });
+    let colTitle: string = toColumn;
+    if (col) {
+      colTitle = col.title;
+    }
+    setAnnouncement('Moved ' + cardId + ' to ' + colTitle + ', position ' + (toIndex + 1) + '.');
+    moveCard(cardId, toColumn, toIndex).catch((err: Error) => {
+      // Roll back only THIS card, so other moves made meanwhile survive.
+      setBoard((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return moveCardInBoard(prev, cardId, from.columnId, from.index);
+      });
+      setToast(err.message);
+      setAnnouncement(err.message);
+    });
+  }
+
+  // ---- mouse drag and drop ----
+  function handleDragStart(e: React.DragEvent<HTMLElement>, cardId: string) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', cardId);
+    setDragId(cardId);
+    setSelectedId(null);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLElement>, columnId: ColumnId) {
+    if (!dragId) {
+      return;
+    }
+    e.preventDefault(); // without this, drop never fires
+    // Insert before the first card whose vertical middle is below the pointer.
+    const cardEls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-card-id]'));
+    let index = cardEls.length;
+    for (let i = 0; i < cardEls.length; i++) {
+      const r = cardEls[i].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) {
+        index = i;
+        break;
+      }
+    }
+    // dragover fires constantly: only set state when the target changes
+    if (!dropTarget || dropTarget.columnId !== columnId || dropTarget.index !== index) {
+      setDropTarget({ columnId, index });
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLElement>) {
+    // Ignore leaving into a child of the same column.
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setDropTarget(null);
+    }
+  }
+
+  function endDrag() {
+    setDragId(null);
+    setDropTarget(null);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLElement>) {
+    e.preventDefault();
+    if (!board || !dragId || !dropTarget) {
+      endDrag();
+      return;
+    }
+    const from = findCard(board, dragId);
+    let index = dropTarget.index;
+    // The indicator index counts the dragged card itself; the API index doesn't.
+    if (from && from.columnId === dropTarget.columnId && from.index < index) {
+      index -= 1;
+    }
+    commitMove(dragId, dropTarget.columnId, index);
+    endDrag();
+  }
+
+  // ---- change: keyboard alternative ----
+  function handleSelect(cardId: string) {
+    setSelectedId((prev) => {
+      if (prev === cardId) {
+        return null;
+      }
+      return cardId;
+    });
+  }
+
+  function handleCardKeyDown(e: React.KeyboardEvent<HTMLElement>, cardId: string) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSelect(cardId);
+      return;
+    }
+    if (e.key === 'Escape') {
+      setSelectedId(null);
+      return;
+    }
+    if (selectedId !== cardId || !board) {
+      return;
+    }
+    const from = findCard(board, cardId);
+    if (!from) {
+      return;
+    }
+    const colIndex = COLUMNS.findIndex((c) => { return c.id === from.columnId; });
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      let step = 1;
+      if (e.key === 'ArrowLeft') {
+        step = -1;
+      }
+      const target = COLUMNS[colIndex + step];
+      if (target) {
+        commitMove(cardId, target.id, Math.min(from.index, board[target.id].length));
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      let to = from.index + 1;
+      if (e.key === 'ArrowUp') {
+        to = from.index - 1;
+      }
+      if (to >= 0 && to < board[from.columnId].length) {
+        commitMove(cardId, from.columnId, to);
+      }
+    }
+  }
+
+  const cardHandlers = {
+    onDragStart: handleDragStart,
+    onDragEnd: endDrag,
+    onKeyDown: handleCardKeyDown,
+    onSelect: handleSelect,
+  };
+
+  let content;
+  if (!board) {
+    content = <p className="loading">Loading board…</p>;
+  } else {
+    content = (
+      <div className="board" ref={boardRef}>
+        {COLUMNS.map((col) => {
+          let indicatorAt: number | null = null;
+          if (dropTarget && dropTarget.columnId === col.id) {
+            indicatorAt = dropTarget.index;
+          }
+          return (
+            <Column
+              key={col.id}
+              id={col.id}
+              title={col.title}
+              cards={board[col.id]}
+              indicatorAt={indicatorAt}
+              dragId={dragId}
+              selectedId={selectedId}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              cardHandlers={cardHandlers}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  let toastEl = null;
+  if (toast) {
+    toastEl = <Toast message={toast} onDismiss={() => { setToast(null); }} />;
+  }
+
+  let help = 'Drag cards, or focus one and press Enter to pick it up.';
+  if (selectedId) {
+    help = 'Moving ' + selectedId + ' · ← → change column · ↑ ↓ reorder · Enter or Esc to drop';
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">◆ Orbit</span>
+        <h1>Sprint 24</h1>
+        <span className="sprint-dates">Oct 6 – Oct 17</span>
+        <span className="kb-help" id="kb-help">{help}</span>
+      </header>
+      {content}
+      <p className="sr-only" aria-live="assertive">{announcement}</p>
+      {toastEl}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F4F3EF;
+  --column: #EAE8E2;
+  --surface: #FFFFFF;
+  --border: #DDDAD2;
+  --text: #1F1E1B;
+  --muted: #77736A;
+  --accent: #5B5BD6;
+  --danger: #D93F0B;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: baseline; gap: 14px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; color: var(--accent); }
+.topbar h1 { margin: 0; font-size: 18px; }
+.sprint-dates { color: var(--muted); font-size: 13px; }
+
+.loading { padding: 40px; text-align: center; color: var(--muted); }
+
+.board { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 14px; padding: 18px 24px 24px; overflow-x: auto; align-items: start; }
+.column { background: var(--column); border-radius: 12px; padding: 10px; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; }
+.column-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.column-dot { width: 8px; height: 8px; border-radius: 50%; background: #A8A397; }
+.column-progress .column-dot { background: #E5A00D; }
+.column-review .column-dot { background: var(--accent); }
+.column-done .column-dot { background: #2DA44E; }
+.column-count { margin-left: auto; font-size: 12px; color: var(--muted); }
+.column-body { display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+
+.card { background: var(--surface); border-radius: var(--radius); padding: 10px 12px; box-shadow: 0 1px 2px rgba(31, 30, 27, 0.08), 0 0 0 1px rgba(31, 30, 27, 0.05); }
+.card-top { display: flex; justify-content: space-between; align-items: center; }
+.card-id { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-title { margin: 6px 0 10px; font-size: 13.5px; font-weight: 500; line-height: 1.35; }
+.card-bottom { display: flex; justify-content: space-between; align-items: center; }
+.points { font-size: 12px; color: var(--muted); }
+
+.tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+.tag-feature { background: #E8E8FC; color: #4343B8; }
+.tag-bug { background: #FDE8E1; color: #B4360A; }
+.tag-chore { background: #ECEBE6; color: #5E5A51; }
+
+.avatar { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 10.5px; font-weight: 700; }
+.avatar.is-empty { border: 1.5px dashed #B5B0A5; background: transparent; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 10px 12px; border-radius: 10px; background: #1F1E1B; color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); font-size: 13.5px; }
+.toast-icon { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--danger); font-weight: 700; font-size: 12px; }
+.toast-close { border: 0; background: none; color: #A8A397; cursor: pointer; font-size: 13px; }
+
+/* ---- Added: drag and drop + keyboard moves ---- */
+.card { cursor: grab; transition: box-shadow 0.15s, opacity 0.15s; }
+.card:hover { box-shadow: 0 2px 6px rgba(31, 30, 27, 0.12), 0 0 0 1px rgba(31, 30, 27, 0.08); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card.is-dragging { opacity: 0.4; }
+.card.is-selected { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 8px 20px rgba(91, 91, 214, 0.25); }
+
+.column { transition: background 0.15s; }
+.column.is-over { background: #E2E0F5; }
+.drop-indicator { height: 3px; margin: -2px 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.18); }
+
+.kb-help { margin-left: auto; font-size: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

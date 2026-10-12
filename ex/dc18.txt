@@ -1,0 +1,557 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type PatientSummary = {
+  id: string;
+  name: string;
+  mrn: string;           // medical record number
+  nextAppt: string;      // "Today 10:30"
+  flag: 'none' | 'follow-up' | 'urgent';
+};
+
+export type PatientDetail = PatientSummary & {
+  dob: string;           // "1958-03-12"
+  sex: 'F' | 'M' | 'X';
+  phone: string;
+  allergies: string[];
+  conditions: string[];
+  medications: { name: string; dose: string }[];
+  vitals: { bp: string; hr: number; tempF: number };
+  lastVisit: string;     // "Aug 30, 2026"
+  provider: string;
+};
+
+const PATIENTS: PatientDetail[] = [
+  {
+    id: 'p1', name: 'Margaret Ellison', mrn: '00412-88', nextAppt: 'Today 9:15', flag: 'follow-up',
+    dob: '1951-03-12', sex: 'F', phone: '(925) 555-0142', allergies: ['Penicillin', 'Latex'],
+    conditions: ['Type 2 diabetes', 'Hypertension'],
+    medications: [{ name: 'Metformin', dose: '500 mg twice daily' }, { name: 'Lisinopril', dose: '10 mg daily' }],
+    vitals: { bp: '138/86', hr: 78, tempF: 98.4 }, lastVisit: 'Aug 30, 2026', provider: 'Dr. Okafor',
+  },
+  {
+    id: 'p2', name: 'Daniel Reyes', mrn: '00977-14', nextAppt: 'Today 10:30', flag: 'none',
+    dob: '1989-11-02', sex: 'M', phone: '(925) 555-0198', allergies: [],
+    conditions: ['Seasonal asthma'],
+    medications: [{ name: 'Albuterol inhaler', dose: 'as needed' }],
+    vitals: { bp: '118/76', hr: 64, tempF: 98.1 }, lastVisit: 'Mar 14, 2026', provider: 'Dr. Okafor',
+  },
+  {
+    id: 'p3', name: 'Aisha Rahman', mrn: '01203-55', nextAppt: 'Today 11:00', flag: 'urgent',
+    dob: '1994-06-21', sex: 'F', phone: '(925) 555-0117', allergies: ['Sulfa drugs'],
+    conditions: ['Migraine', 'Iron deficiency anemia'],
+    medications: [{ name: 'Sumatriptan', dose: '50 mg as needed' }, { name: 'Ferrous sulfate', dose: '325 mg daily' }],
+    vitals: { bp: '110/70', hr: 92, tempF: 99.6 }, lastVisit: 'Sep 28, 2026', provider: 'Dr. Lin',
+  },
+  {
+    id: 'p4', name: 'Tomás Herrera', mrn: '00655-02', nextAppt: 'Today 1:45', flag: 'none',
+    dob: '1972-01-30', sex: 'M', phone: '(925) 555-0163', allergies: ['Shellfish'],
+    conditions: ['High cholesterol'],
+    medications: [{ name: 'Atorvastatin', dose: '20 mg nightly' }],
+    vitals: { bp: '126/82', hr: 70, tempF: 98.6 }, lastVisit: 'Jan 9, 2026', provider: 'Dr. Lin',
+  },
+  {
+    id: 'p5', name: 'Grace Whitaker', mrn: '01488-71', nextAppt: 'Today 3:20', flag: 'follow-up',
+    dob: '2001-09-18', sex: 'X', phone: '(925) 555-0109', allergies: [],
+    conditions: ['Generalized anxiety disorder'],
+    medications: [{ name: 'Sertraline', dose: '50 mg daily' }],
+    vitals: { bp: '114/72', hr: 81, tempF: 98.2 }, lastVisit: 'Sep 2, 2026', provider: 'Dr. Okafor',
+  },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /patients/today -> PatientSummary[]
+export async function getPatients(): Promise<PatientSummary[]> {
+  await randomDelay(300, 800);
+  return PATIENTS.map((p) => ({ id: p.id, name: p.name, mrn: p.mrn, nextAppt: p.nextAppt, flag: p.flag }));
+}
+
+// GET /patients/:id -> PatientDetail
+// Margaret's chart is archived and always loads slowly (1.2–1.5 s). The others take 0.3–0.7 s.
+export async function getPatient(id: string): Promise<PatientDetail> {
+  if (id === 'p1') {
+    await randomDelay(1200, 1500);
+  } else {
+    await randomDelay(300, 700);
+  }
+  const found = PATIENTS.find((p) => p.id === id);
+  if (!found) {
+    throw new Error('Patient not found');
+  }
+  return {
+    ...found,
+    allergies: [...found.allergies],
+    conditions: [...found.conditions],
+    medications: found.medications.map((m) => ({ ...m })),
+    vitals: { ...found.vitals },
+  };
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#3B82F6', '#14B8A6', '#8B5CF6', '#F59E0B', '#EC4899'];
+
+// <Avatar name="Margaret Ellison" size={40} /> -> a colored circle with "ME"
+export function Avatar({ name, size }: { name: string; size?: number }) {
+  const initials = name
+    .split(' ')
+    .map((part) => {
+      return part[0];
+    })
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const color = COLORS[name.length % COLORS.length];
+  const px = size || 36;
+  return (
+    <span className="avatar" style={{ width: px, height: px, fontSize: px * 0.38, background: color }}>
+      {initials}
+    </span>
+  );
+}
+@@@ shared src/utils/age.ts
+// ageFrom("1951-03-12") -> 75 (as of today)
+export function ageFrom(isoDate: string): number {
+  const dob = new Date(isoDate + 'T00:00:00');
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const beforeBirthday = now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
+  if (beforeBirthday) {
+    age = age - 1;
+  }
+  return age;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPatients } from './api';
+import type { PatientSummary } from './api';
+import { Avatar } from './components/Avatar';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">✚ Carepoint</span>
+      <span className="clinic">Livermore Family Clinic · Thu, Oct 8</span>
+    </header>
+  );
+}
+
+function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
+  if (flag === 'none') {
+    return null;
+  }
+  let label = 'Follow-up';
+  if (flag === 'urgent') {
+    label = 'Urgent';
+  }
+  return <span className={'flag is-' + flag}>{label}</span>;
+}
+
+// TODO: clicking a row should select that patient.
+function PatientList() {
+  const [patients, setPatients] = useState<PatientSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPatients().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPatients(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="list-msg">Loading schedule…</p>;
+  } else {
+    body = (
+      <ul className="patient-list">
+        {patients.map((p) => {
+          return (
+            <li key={p.id}>
+              <button type="button" className="patient-row">
+                <Avatar name={p.name} />
+                <span className="patient-main">
+                  <span className="patient-name">{p.name}</span>
+                  <span className="patient-meta">{p.nextAppt} · MRN {p.mrn}</span>
+                </span>
+                <FlagDot flag={p.flag} />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <aside className="list-pane">
+      <h2 className="pane-title">Today’s patients</h2>
+      {body}
+    </aside>
+  );
+}
+
+function ChartPanel() {
+  return (
+    <section className="chart-pane">
+      <div className="chart-empty">
+        <span className="empty-icon">🩺</span>
+        <p>Select a patient to view their chart.</p>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <TopBar />
+      <div className="panes">
+        <PatientList />
+        <ChartPanel />
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F2F6FA;
+  --surface: #FFFFFF;
+  --border: #DCE5EE;
+  --text: #102A43;
+  --muted: #627D98;
+  --primary: #1F6FEB;
+  --primary-soft: #E6F0FF;
+  --warn: #B7791F;
+  --danger: #C53030;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; font-size: 17px; color: var(--primary); }
+.clinic { font-size: 13px; color: var(--muted); }
+
+.panes { flex: 1; display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 24px 24px; }
+.list-pane, .chart-pane { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.pane-title { margin: 0; padding: 14px 16px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.list-msg { padding: 16px; margin: 0; color: var(--muted); font-size: 14px; }
+
+.patient-list { list-style: none; margin: 0; padding: 6px; }
+.patient-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 0; border-radius: 10px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.patient-row:hover { background: #F5F8FB; }
+.patient-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.patient-name { font-weight: 600; font-size: 15px; }
+.patient-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.avatar { flex-shrink: 0; border-radius: 50%; color: #fff; display: inline-grid; place-items: center; font-weight: 700; }
+
+.flag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.flag.is-follow-up { background: #FEF3C7; color: var(--warn); }
+.flag.is-urgent { background: #FDE2E2; color: var(--danger); }
+
+.chart-empty { height: 100%; min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--muted); }
+.empty-icon { font-size: 34px; }
+
+@media (max-width: 700px) {
+  .panes { grid-template-columns: 1fr; padding: 12px; }
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPatient, getPatients } from './api';
+import type { PatientDetail, PatientSummary } from './api';
+import { Avatar } from './components/Avatar';
+import { ageFrom } from './utils/age';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">✚ Carepoint</span>
+      <span className="clinic">Livermore Family Clinic · Thu, Oct 8</span>
+    </header>
+  );
+}
+
+function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
+  if (flag === 'none') {
+    return null;
+  }
+  let label = 'Follow-up';
+  if (flag === 'urgent') {
+    label = 'Urgent';
+  }
+  return <span className={'flag is-' + flag}>{label}</span>;
+}
+
+type PatientListProps = {
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+};
+
+function PatientList({ selectedId, onSelect }: PatientListProps) {
+  const [patients, setPatients] = useState<PatientSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPatients().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPatients(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="list-msg">Loading schedule…</p>;
+  } else {
+    body = (
+      <ul className="patient-list">
+        {patients.map((p) => {
+          let cls = 'patient-row';
+          if (p.id === selectedId) {
+            cls = 'patient-row is-selected';
+          }
+          return (
+            <li key={p.id}>
+              <button type="button" className={cls} aria-current={p.id === selectedId} onClick={() => { onSelect(p.id); }}>
+                <Avatar name={p.name} />
+                <span className="patient-main">
+                  <span className="patient-name">{p.name}</span>
+                  <span className="patient-meta">{p.nextAppt} · MRN {p.mrn}</span>
+                </span>
+                <FlagDot flag={p.flag} />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <aside className="list-pane">
+      <h2 className="pane-title">Today’s patients</h2>
+      {body}
+    </aside>
+  );
+}
+
+function TagList({ items, empty }: { items: string[]; empty: string }) {
+  if (items.length === 0) {
+    return <p className="none">{empty}</p>;
+  }
+  return (
+    <div className="tags">
+      {items.map((item) => {
+        return <span key={item} className="tag">{item}</span>;
+      })}
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="chart-loading" aria-busy="true">
+      <div className="sk sk-head" />
+      <div className="sk sk-row" />
+      <div className="sk sk-row" />
+      <p className="loading-text">Loading chart…</p>
+    </div>
+  );
+}
+
+function ChartPanel({ patientId }: { patientId: string | null }) {
+  const [patient, setPatient] = useState<PatientDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!patientId) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getPatient(patientId).then((data) => {
+      // A newer click already started another request: drop this stale answer.
+      if (cancelled) {
+        return;
+      }
+      setPatient(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  if (!patientId) {
+    return (
+      <section className="chart-pane">
+        <div className="chart-empty">
+          <span className="empty-icon">🩺</span>
+          <p>Select a patient to view their chart.</p>
+        </div>
+      </section>
+    );
+  }
+
+  // Show the skeleton while loading, so the previous patient's chart never sits under a new name.
+  if (loading || !patient) {
+    return (
+      <section className="chart-pane">
+        <ChartSkeleton />
+      </section>
+    );
+  }
+
+  return (
+    <section className="chart-pane">
+      <header className="chart-head">
+        <Avatar name={patient.name} size={52} />
+        <div>
+          <h2 className="chart-name">{patient.name}</h2>
+          <p className="chart-meta">{ageFrom(patient.dob)} y · {patient.sex} · MRN {patient.mrn} · {patient.phone}</p>
+        </div>
+        <FlagDot flag={patient.flag} />
+      </header>
+      <div className="vitals">
+        <div className="vital"><span>Blood pressure</span><b>{patient.vitals.bp}</b></div>
+        <div className="vital"><span>Heart rate</span><b>{patient.vitals.hr} bpm</b></div>
+        <div className="vital"><span>Temperature</span><b>{patient.vitals.tempF} °F</b></div>
+      </div>
+      <div className="chart-grid">
+        <div className="chart-section">
+          <h3>Allergies</h3>
+          <TagList items={patient.allergies} empty="No known allergies" />
+        </div>
+        <div className="chart-section">
+          <h3>Conditions</h3>
+          <TagList items={patient.conditions} empty="None recorded" />
+        </div>
+        <div className="chart-section wide">
+          <h3>Medications</h3>
+          <ul className="meds">
+            {patient.medications.map((m) => {
+              return <li key={m.name}><b>{m.name}</b><span>{m.dose}</span></li>;
+            })}
+          </ul>
+        </div>
+      </div>
+      <p className="chart-foot">Last visit {patient.lastVisit} with {patient.provider}</p>
+    </section>
+  );
+}
+
+export default function App() {
+  // The list sets it, the chart reads it: so it lives in their parent. Store the id, not the patient.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  return (
+    <div className="app">
+      <TopBar />
+      <div className="panes">
+        <PatientList selectedId={selectedId} onSelect={(id) => { setSelectedId(id); }} />
+        <ChartPanel patientId={selectedId} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F2F6FA;
+  --surface: #FFFFFF;
+  --border: #DCE5EE;
+  --text: #102A43;
+  --muted: #627D98;
+  --primary: #1F6FEB;
+  --primary-soft: #E6F0FF;
+  --warn: #B7791F;
+  --danger: #C53030;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 700; font-size: 17px; color: var(--primary); }
+.clinic { font-size: 13px; color: var(--muted); }
+
+.panes { flex: 1; display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 24px 24px; }
+.list-pane, .chart-pane { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.pane-title { margin: 0; padding: 14px 16px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.list-msg { padding: 16px; margin: 0; color: var(--muted); font-size: 14px; }
+
+.patient-list { list-style: none; margin: 0; padding: 6px; }
+.patient-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 0; border-radius: 10px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.patient-row:hover { background: #F5F8FB; }
+.patient-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.patient-name { font-weight: 600; font-size: 15px; }
+.patient-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.avatar { flex-shrink: 0; border-radius: 50%; color: #fff; display: inline-grid; place-items: center; font-weight: 700; }
+
+.flag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.flag.is-follow-up { background: #FEF3C7; color: var(--warn); }
+.flag.is-urgent { background: #FDE2E2; color: var(--danger); }
+
+.chart-empty { height: 100%; min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--muted); }
+.empty-icon { font-size: 34px; }
+
+@media (max-width: 700px) {
+  .panes { grid-template-columns: 1fr; padding: 12px; }
+}
+
+/* ---- Added: selection + patient chart ---- */
+.patient-row.is-selected { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+
+.chart-pane { padding: 20px 24px; }
+.chart-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.chart-head > div { flex: 1; min-width: 0; }
+.chart-name { margin: 0; font-size: 22px; }
+.chart-meta { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+.vitals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+.vital { padding: 10px 12px; border-radius: 10px; background: #F5F8FB; display: flex; flex-direction: column; gap: 2px; }
+.vital span { font-size: 12px; color: var(--muted); }
+.vital b { font-size: 17px; }
+
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-section.wide { grid-column: 1 / -1; }
+.chart-section h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 13px; }
+.none { margin: 0; font-size: 14px; color: var(--muted); }
+.meds { list-style: none; margin: 0; padding: 0; }
+.meds li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.meds li span { color: var(--muted); }
+.chart-foot { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+
+.chart-loading { display: flex; flex-direction: column; gap: 12px; }
+.sk { border-radius: 8px; background: linear-gradient(90deg, #EDF2F7 25%, #F7FAFC 50%, #EDF2F7 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.sk-head { height: 52px; width: 60%; }
+.sk-row { height: 64px; }
+.loading-text { margin: 0; font-size: 13px; color: var(--muted); }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }

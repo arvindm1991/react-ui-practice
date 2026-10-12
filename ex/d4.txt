@@ -1,0 +1,201 @@
+@@@ shared src/data.js
+export const initialMessages = [
+  { id: 'm1', from: 'Priya Natarajan', subject: 'Design review moved to Thursday', time: '9:41 AM', read: false,
+    body: 'Hi! The design review for the billing flow moved to Thursday at 2pm. Same room. Bring the updated empty states if you have them.' },
+  { id: 'm2', from: 'Build bot', subject: 'Deploy #4182 succeeded', time: '8:15 AM', read: true,
+    body: 'Production deploy #4182 finished in 6m 12s. 0 errors, 2 warnings.' },
+  { id: 'm3', from: 'Jonas Weber', subject: 'Question about the usage chart', time: 'Yesterday', read: false,
+    body: 'Should the usage chart start at zero or at the minimum value? I think zero, but want to check with you first.' },
+  { id: 'm4', from: 'Lena Park', subject: 'Lunch?', time: 'Yesterday', read: true,
+    body: 'Noodles at 12:30?' },
+  { id: 'm5', from: 'Recruiting', subject: 'Interview schedule confirmed', time: 'Mon', read: false,
+    body: 'Your interview is confirmed for Wednesday. You will receive a CodeSignal link 30 minutes before.' },
+];
+@@@ shared src/components/MessageList.jsx
+import React from 'react';
+
+export default function MessageList({ messages, selectedId, onSelect }) {
+  return (
+    <ul className="msg-list">
+      {messages.map((m) => {
+        let className = 'msg';
+        if (m.id === selectedId) className += ' is-selected';
+        if (!m.read) className += ' is-unread';
+        return (
+          <li key={m.id}>
+            <button className={className} onClick={() => onSelect && onSelect(m.id)}>
+              <span className="msg-from">{m.from}</span>
+              <span className="msg-time">{m.time}</span>
+              <span className="msg-subject">{m.subject}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+@@@ shared src/components/MessageDetail.jsx
+import React from 'react';
+
+export default function MessageDetail({ message, onMarkUnread }) {
+  if (!message) {
+    return <section className="detail detail-empty">Select a message to read it.</section>;
+  }
+  return (
+    <section className="detail">
+      <header className="detail-header">
+        <div>
+          <h2 className="detail-subject">{message.subject}</h2>
+          <p className="detail-from">{message.from} · {message.time}</p>
+        </div>
+        <button className="btn" onClick={() => onMarkUnread && onMarkUnread(message.id)}>
+          Mark as unread
+        </button>
+      </header>
+      <p className="detail-body">{message.body}</p>
+    </section>
+  );
+}
+@@@ shared src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.app { padding: 20px; }
+.app-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.app-header h1 { margin: 0; font-size: 20px; }
+.unread-count {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #3451D1;
+  color: #fff;
+}
+.inbox {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 360px;
+  background: #fff;
+  border: 1px solid #E2E5EA;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.msg-list { list-style: none; margin: 0; padding: 0; border-right: 1px solid #E2E5EA; }
+.msg {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 10px 14px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #EEF0F3;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.msg:hover { background: #F6F7F9; }
+.msg.is-selected { background: #EEF1FA; box-shadow: inset 3px 0 0 #3451D1; }
+.msg-from { font-size: 14px; }
+.msg-time { font-size: 12px; color: #7A8292; }
+.msg-subject {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: #5A6273;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg.is-unread .msg-from,
+.msg.is-unread .msg-subject { font-weight: 700; color: #1A1F2B; }
+.detail { padding: 20px 24px; min-width: 0; }
+.detail-empty { display: grid; place-items: center; color: #7A8292; }
+.detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.detail-subject { margin: 0; font-size: 18px; }
+.detail-from { margin: 4px 0 0; font-size: 13px; color: #5A6273; }
+.detail-body { margin: 20px 0 0; line-height: 1.6; }
+.btn {
+  flex-shrink: 0;
+  border: 1px solid #D5D9E0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover { background: #F6F7F9; }
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+import { initialMessages } from './data';
+import MessageList from './components/MessageList';
+import MessageDetail from './components/MessageDetail';
+
+export default function App() {
+  // TODO:
+  // 1. Clicking a message opens it on the right and highlights it.
+  // 2. Opening a message marks it as read.
+  // 3. "Mark as unread" works.
+  // 4. Show the unread count next to the title (hide it when 0).
+  const messages = initialMessages;
+  const selected = messages[0];
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>Inbox</h1>
+      </header>
+      <div className="inbox">
+        <MessageList messages={messages} />
+        <MessageDetail message={selected} />
+      </div>
+    </div>
+  );
+}
+@@@ solution src/App.jsx
+import React, { useState } from 'react';
+import { initialMessages } from './data';
+import MessageList from './components/MessageList';
+import MessageDetail from './components/MessageDetail';
+
+export default function App() {
+  // State lives in the closest common parent of the list and the detail.
+  const [messages, setMessages] = useState(initialMessages);
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Derived values
+  const selected = messages.find((m) => m.id === selectedId) || null;
+  const unreadCount = messages.filter((m) => !m.read).length;
+
+  // Immutable update helper: never mutate the object in state
+  function setRead(id, read) {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read } : m)));
+  }
+
+  function handleSelect(id) {
+    setSelectedId(id);
+    setRead(id, true);
+  }
+
+  function handleMarkUnread(id) {
+    setRead(id, false);
+    setSelectedId(null); // like most mail apps: close it after marking unread
+  }
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>Inbox</h1>
+        {unreadCount > 0 && <span className="unread-count">{unreadCount} unread</span>}
+      </header>
+      <div className="inbox">
+        <MessageList messages={messages} selectedId={selectedId} onSelect={handleSelect} />
+        <MessageDetail message={selected} onMarkUnread={handleMarkUnread} />
+      </div>
+    </div>
+  );
+}

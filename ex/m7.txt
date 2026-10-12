@@ -1,0 +1,507 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Hashtag = {
+  id: string;
+  tag: string;     // without the "#"
+  posts: number;   // how many posts use it
+};
+
+const HASHTAGS: Hashtag[] = [
+  { id: 'h1', tag: 'buildinpublic', posts: 18400 },
+  { id: 'h2', tag: 'react', posts: 92100 },
+  { id: 'h3', tag: 'typescript', posts: 61300 },
+  { id: 'h4', tag: 'frontend', posts: 44800 },
+  { id: 'h5', tag: 'design', posts: 120500 },
+  { id: 'h6', tag: 'ai', posts: 310200 },
+  { id: 'h7', tag: 'startups', posts: 75600 },
+  { id: 'h8', tag: 'webdev', posts: 88900 },
+  { id: 'h9', tag: 'css', posts: 39700 },
+  { id: 'h10', tag: 'productivity', posts: 52300 },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /hashtags/trending -> Hashtag[]
+export async function getHashtags(): Promise<Hashtag[]> {
+  await randomDelay(400, 1400);
+  return HASHTAGS.map((h) => ({ ...h }));
+}
+@@@ shared src/utils/format.ts
+// formatCount(18400) -> "18.4K", formatCount(310200) -> "310.2K", formatCount(950) -> "950"
+export function formatCount(n: number): string {
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1) + 'M';
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + 'K';
+  }
+  return String(n);
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+
+const MAX_CHARS = 280;
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">◆</span>
+      <h1>Home</h1>
+    </header>
+  );
+}
+
+function CharCount({ count }: { count: number }) {
+  let cls = 'char-count';
+  if (count > MAX_CHARS) {
+    cls = 'char-count is-over';
+  }
+  return <span className={cls}>{count} / {MAX_CHARS}</span>;
+}
+
+function HashtagButton() {
+  // TODO: clicking this should open the hashtag picker
+  return (
+    <button type="button" className="hashtag-btn" aria-label="Add hashtag">
+      #
+    </button>
+  );
+}
+
+function Composer() {
+  const [text, setText] = useState('');
+
+  return (
+    <div className="composer">
+      <div className="avatar">A</div>
+      <div className="composer-body">
+        <div className="input-wrap">
+          <textarea
+            className="post-input"
+            placeholder="What's happening?"
+            value={text}
+            onChange={(e) => { setText(e.target.value); }}
+          />
+          <HashtagButton />
+        </div>
+        <div className="composer-footer">
+          <CharCount count={text.length} />
+          <button type="button" className="post-btn" disabled={text.trim() === ''}>Post</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Feed() {
+  return (
+    <div className="feed">
+      <article className="post">
+        <div className="avatar">G</div>
+        <div>
+          <p className="post-meta"><b>Grace</b> · 2h</p>
+          <p>Shipped the new onboarding flow today. #buildinpublic</p>
+        </div>
+      </article>
+      <article className="post">
+        <div className="avatar">K</div>
+        <div>
+          <p className="post-meta"><b>Kat</b> · 5h</p>
+          <p>Hot take: most modals should be pages.</p>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <Composer />
+      <Feed />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --border: #EFF3F4;
+  --text: #0F1419;
+  --muted: #536471;
+  --primary: #1D9BF0;
+  --primary-hover: #1A8CD8;
+  --primary-soft: #E8F5FD;
+  --danger: #F4212E;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: #F7F9F9; }
+
+.app { max-width: 600px; margin: 0 auto; min-height: 100vh; background: var(--bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+
+.header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.logo { color: var(--primary); font-size: 20px; }
+
+.composer { display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
+.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: #CFD9DE; display: grid; place-items: center; font-weight: 700; color: #fff; }
+.composer-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.input-wrap { position: relative; }
+.post-input { width: 100%; min-height: 110px; padding: 10px 48px 10px 12px; border: 1px solid #CFD9DE; border-radius: var(--radius); font: inherit; font-size: 18px; resize: vertical; color: var(--text); }
+.post-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+
+.hashtag-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hashtag-btn:hover { background: #D3ECFB; }
+
+.composer-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.char-count { font-size: 13px; color: var(--muted); }
+.char-count.is-over { color: var(--danger); font-weight: 600; }
+.post-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.post-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.feed { display: flex; flex-direction: column; }
+.post { display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.post p { margin: 0 0 4px; }
+.post-meta { color: var(--muted); }
+.post-meta b { color: var(--text); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getHashtags } from './api';
+import type { Hashtag } from './api';
+import { formatCount } from './utils/format';
+
+const MAX_CHARS = 280;
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">◆</span>
+      <h1>Home</h1>
+    </header>
+  );
+}
+
+function CharCount({ count }: { count: number }) {
+  let cls = 'char-count';
+  if (count > MAX_CHARS) {
+    cls = 'char-count is-over';
+  }
+  return <span className={cls}>{count} / {MAX_CHARS}</span>;
+}
+
+// 1. The button only reports the click. The Composer owns the state.
+function HashtagButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="hashtag-btn" aria-label="Add hashtag" onClick={() => { onClick(); }}>
+      #
+    </button>
+  );
+}
+
+type HashtagModalProps = {
+  usedTags: string[];
+  onPick: (tag: string) => void;
+  onClose: () => void;
+};
+
+// 2. The modal loads its own data. It is only rendered while open,
+//    so every open starts fresh (and refetches).
+function HashtagModal({ usedTags, onPick, onClose }: HashtagModalProps) {
+  const [hashtags, setHashtags] = useState<Hashtag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getHashtags().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setHashtags(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Escape closes
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  // Clicking the dark backdrop closes; clicks inside the panel don't.
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }
+
+  // derived
+  const q = query.trim().toLowerCase().replace(/^#/, '');
+  const visible = hashtags.filter((h) => {
+    return h.tag.includes(q);
+  });
+
+  // decisions
+  let body;
+  if (loading) {
+    body = <p className="modal-message">Loading hashtags…</p>;
+  } else if (visible.length === 0) {
+    body = <p className="modal-message">No hashtags match "{query}".</p>;
+  } else {
+    body = (
+      <ul className="tag-list">
+        {visible.map((h) => {
+          const used = usedTags.includes(h.tag);
+          let cls = 'tag-row';
+          if (used) {
+            cls = 'tag-row is-used';
+          }
+          return (
+            <li key={h.id}>
+              <button type="button" className={cls} disabled={used} onClick={() => { onPick(h.tag); }}>
+                <span className="tag-name">#{h.tag}</span>
+                <span className="tag-count">{formatCount(h.posts)} posts</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="backdrop" onClick={handleBackdropClick}>
+      <div className="modal" role="dialog" aria-label="Add a hashtag">
+        <div className="modal-head">
+          <h2>Trending hashtags</h2>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={() => { onClose(); }}>✕</button>
+        </div>
+        <input
+          className="modal-search"
+          placeholder="Search hashtags"
+          autoFocus
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); }}
+        />
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function Composer() {
+  const [text, setText] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // 3. Add "#tag" to the end of the text, with a space before it if needed.
+  function handlePick(tag: string) {
+    setText((prev) => {
+      if (prev === '' || prev.endsWith(' ')) {
+        return prev + '#' + tag + ' ';
+      }
+      return prev + ' #' + tag + ' ';
+    });
+    setPickerOpen(false);
+  }
+
+  // Tags already in the text, so the picker can disable them.
+  const usedTags = text
+    .split(/\s+/)
+    .filter((word) => {
+      return word.startsWith('#');
+    })
+    .map((word) => {
+      return word.slice(1).toLowerCase();
+    });
+
+  let modal = null;
+  if (pickerOpen) {
+    modal = (
+      <HashtagModal
+        usedTags={usedTags}
+        onPick={handlePick}
+        onClose={() => { setPickerOpen(false); }}
+      />
+    );
+  }
+
+  return (
+    <div className="composer">
+      <div className="avatar">A</div>
+      <div className="composer-body">
+        <div className="input-wrap">
+          <textarea
+            className="post-input"
+            placeholder="What's happening?"
+            value={text}
+            onChange={(e) => { setText(e.target.value); }}
+          />
+          <HashtagButton onClick={() => { setPickerOpen(true); }} />
+        </div>
+        <div className="composer-footer">
+          <CharCount count={text.length} />
+          <button type="button" className="post-btn" disabled={text.trim() === ''}>Post</button>
+        </div>
+      </div>
+      {modal}
+    </div>
+  );
+}
+
+function Feed() {
+  return (
+    <div className="feed">
+      <article className="post">
+        <div className="avatar">G</div>
+        <div>
+          <p className="post-meta"><b>Grace</b> · 2h</p>
+          <p>Shipped the new onboarding flow today. #buildinpublic</p>
+        </div>
+      </article>
+      <article className="post">
+        <div className="avatar">K</div>
+        <div>
+          <p className="post-meta"><b>Kat</b> · 5h</p>
+          <p>Hot take: most modals should be pages.</p>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <Composer />
+      <Feed />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --border: #EFF3F4;
+  --text: #0F1419;
+  --muted: #536471;
+  --primary: #1D9BF0;
+  --primary-hover: #1A8CD8;
+  --primary-soft: #E8F5FD;
+  --danger: #F4212E;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: #F7F9F9; }
+
+.app { max-width: 600px; margin: 0 auto; min-height: 100vh; background: var(--bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+
+.header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.logo { color: var(--primary); font-size: 20px; }
+
+.composer { display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
+.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: #CFD9DE; display: grid; place-items: center; font-weight: 700; color: #fff; }
+.composer-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.input-wrap { position: relative; }
+.post-input { width: 100%; min-height: 110px; padding: 10px 48px 10px 12px; border: 1px solid #CFD9DE; border-radius: var(--radius); font: inherit; font-size: 18px; resize: vertical; color: var(--text); }
+.post-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+
+.hashtag-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hashtag-btn:hover { background: #D3ECFB; }
+
+.composer-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.char-count { font-size: 13px; color: var(--muted); }
+.char-count.is-over { color: var(--danger); font-weight: 600; }
+.post-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.post-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.feed { display: flex; flex-direction: column; }
+.post { display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.post p { margin: 0 0 4px; }
+.post-meta { color: var(--muted); }
+.post-meta b { color: var(--text); }
+
+/* ---- Added: hashtag modal ---- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 25, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 64px 16px 16px;
+}
+.modal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(15, 20, 25, 0.2);
+  overflow: hidden;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.icon-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; font-size: 16px; cursor: pointer; color: var(--text); }
+.icon-btn:hover { background: #EFF3F4; }
+.modal-search { margin: 12px 16px 4px; height: 38px; padding: 0 14px; border: 1px solid #CFD9DE; border-radius: 999px; font: inherit; font-size: 15px; }
+.modal-search:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+.modal-message { margin: 0; padding: 24px 16px; text-align: center; color: var(--muted); }
+
+.tag-list { list-style: none; margin: 0; padding: 4px 0 8px; overflow-y: auto; }
+.tag-row { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.tag-row:hover:not(:disabled) { background: #F7F9F9; }
+.tag-name { font-weight: 700; color: var(--text); }
+.tag-count { font-size: 13px; color: var(--muted); }
+.tag-row.is-used { cursor: default; opacity: 0.45; }

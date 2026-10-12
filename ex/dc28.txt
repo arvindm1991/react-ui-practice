@@ -1,0 +1,522 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Reply = {
+  id: string;
+  author: string;
+  text: string;
+  minutesAgo: number;
+};
+
+export type Comment = Reply & {
+  replies: Reply[]; // one level only: replies can't have replies
+};
+
+const COMMENTS: Comment[] = [
+  {
+    id: 'c1', author: 'Nadia Q.', minutesAgo: 180,
+    text: 'Made this last night with brown butter instead of olive oil. Unreal. Would it work with orzo?',
+    replies: [
+      { id: 'r1', author: 'Chef Tomás', minutesAgo: 150, text: 'Orzo works! Cut the stock by about a third.' },
+      { id: 'r2', author: 'Ben K.', minutesAgo: 120, text: 'Did orzo last week, can confirm.' },
+      { id: 'r3', author: 'Nadia Q.', minutesAgo: 95, text: 'Trying it Friday, thank you both!' },
+    ],
+  },
+  {
+    id: 'c2', author: 'Ivy Chen', minutesAgo: 75,
+    text: 'How far ahead can I make the gremolata?',
+    replies: [],
+  },
+  {
+    id: 'c3', author: 'Marcus O.', minutesAgo: 30,
+    text: 'Doubled the lemon zest. My kids asked for seconds, which never happens.',
+    replies: [
+      { id: 'r4', author: 'Chef Tomás', minutesAgo: 20, text: 'Love that. Zest is free flavor.' },
+    ],
+  },
+];
+
+let nextId = 100;
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /recipes/lemon-risotto/comments -> Comment[]
+export async function getComments(): Promise<Comment[]> {
+  await randomDelay(400, 900);
+  return COMMENTS.map((c) => ({ ...c, replies: c.replies.map((r) => ({ ...r })) }));
+}
+
+// POST /comments/:id/replies { text } -> the created Reply
+export async function postReply(commentId: string, text: string): Promise<Reply> {
+  await randomDelay(700, 1200);
+  nextId += 1;
+  return { id: 'r' + nextId, author: 'You', text, minutesAgo: 0 };
+}
+@@@ shared src/utils/time.ts
+// timeAgo(0) -> "just now", timeAgo(30) -> "30m ago", timeAgo(180) -> "3h ago"
+export function timeAgo(minutes: number): string {
+  if (minutes < 1) {
+    return 'just now';
+  }
+  if (minutes < 60) {
+    return minutes + 'm ago';
+  }
+  return Math.floor(minutes / 60) + 'h ago';
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#7C9A5B', '#C2410C', '#B45309', '#0F766E', '#9D174D'];
+
+export default function Avatar({ name, small }: { name: string; small?: boolean }) {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i);
+  }
+  let cls = 'avatar';
+  if (small) {
+    cls = 'avatar avatar-sm';
+  }
+  return <span className={cls} style={{ background: COLORS[sum % COLORS.length] }}>{name[0]}</span>;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getComments } from './api';
+import type { Comment, Reply } from './api';
+import Avatar from './components/Avatar';
+import { timeAgo } from './utils/time';
+
+function RecipeHero() {
+  return (
+    <header className="hero">
+      <div className="hero-photo" aria-hidden="true">🍋</div>
+      <div className="hero-text">
+        <span className="eyebrow">Weeknight · 35 min</span>
+        <h1>Lemon risotto with gremolata</h1>
+        <p>Bright, creamy, and faster than you think. No constant stirring required.</p>
+      </div>
+    </header>
+  );
+}
+
+function ReplyItem({ reply }: { reply: Reply }) {
+  return (
+    <li className="reply">
+      <Avatar name={reply.author} small />
+      <div className="bubble">
+        <p className="meta"><b>{reply.author}</b> · {timeAgo(reply.minutesAgo)}</p>
+        <p className="text">{reply.text}</p>
+      </div>
+    </li>
+  );
+}
+
+// TODO: "Reply" should open an inline reply box under this comment only.
+function CommentItem({ comment }: { comment: Comment }) {
+  return (
+    <li className="comment">
+      <Avatar name={comment.author} />
+      <div className="comment-body">
+        <p className="meta"><b>{comment.author}</b> · {timeAgo(comment.minutesAgo)}</p>
+        <p className="text">{comment.text}</p>
+        <div className="comment-actions">
+          <button type="button" className="link-btn">Reply</button>
+        </div>
+        <ul className="replies">
+          {comment.replies.map((r) => {
+            return <ReplyItem key={r.id} reply={r} />;
+          })}
+        </ul>
+      </div>
+    </li>
+  );
+}
+
+function CommentSection() {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getComments().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setComments(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="muted">Loading comments…</p>;
+  } else {
+    body = (
+      <ul className="comments">
+        {comments.map((c) => {
+          return <CommentItem key={c.id} comment={c} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <section className="discussion">
+      <h2>Comments</h2>
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <nav className="nav"><span className="logo">simmer</span><span>Recipes</span><span>Collections</span><span>Cook mode</span></nav>
+      <main className="page">
+        <RecipeHero />
+        <CommentSection />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FAF7F0;
+  --surface: #FFFFFF;
+  --border: #E9E2D2;
+  --text: #2A2A22;
+  --muted: #7D7867;
+  --green: #2F6B3F;
+  --green-soft: #E3EFE3;
+  --lemon: #F4D35E;
+  --serif: 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.nav { display: flex; align-items: center; gap: 20px; padding: 14px 24px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.logo { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--green); margin-right: 12px; }
+
+.page { max-width: 680px; margin: 0 auto; padding: 24px 20px 48px; display: flex; flex-direction: column; gap: 28px; }
+
+.hero { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.hero-photo { width: 140px; height: 140px; flex-shrink: 0; border-radius: 22px; background: radial-gradient(circle at 30% 30%, #FFF6C9, var(--lemon) 60%, #E2B93B); display: grid; place-items: center; font-size: 64px; }
+.hero-text { flex: 1 1 260px; }
+.eyebrow { font-size: 12px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.08em; }
+.hero h1 { margin: 6px 0 8px; font-family: var(--serif); font-size: 30px; line-height: 1.15; }
+.hero p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+.discussion h2 { margin: 0 0 14px; font-family: var(--serif); font-size: 22px; }
+.muted { color: var(--muted); font-size: 14px; }
+.comments, .replies { list-style: none; margin: 0; padding: 0; }
+.comment { display: flex; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); }
+.comment-body { flex: 1; min-width: 0; }
+.avatar { width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 700; }
+.avatar-sm { width: 28px; height: 28px; font-size: 12px; }
+.meta { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--text); }
+.text { margin: 0; font-size: 15px; line-height: 1.5; }
+.comment-actions { display: flex; gap: 14px; margin-top: 6px; }
+.link-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--green); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
+.replies { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.reply { display: flex; gap: 8px; }
+.bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getComments, postReply } from './api';
+import type { Comment, Reply } from './api';
+import Avatar from './components/Avatar';
+import { timeAgo } from './utils/time';
+
+function RecipeHero() {
+  return (
+    <header className="hero">
+      <div className="hero-photo" aria-hidden="true">🍋</div>
+      <div className="hero-text">
+        <span className="eyebrow">Weeknight · 35 min</span>
+        <h1>Lemon risotto with gremolata</h1>
+        <p>Bright, creamy, and faster than you think. No constant stirring required.</p>
+      </div>
+    </header>
+  );
+}
+
+function ReplyItem({ reply }: { reply: Reply }) {
+  return (
+    <li className="reply">
+      <Avatar name={reply.author} small />
+      <div className="bubble">
+        <p className="meta"><b>{reply.author}</b> · {timeAgo(reply.minutesAgo)}</p>
+        <p className="text">{reply.text}</p>
+      </div>
+    </li>
+  );
+}
+
+type ReplyBoxProps = {
+  author: string;
+  onSubmit: (text: string) => Promise<void>;
+  onCancel: () => void;
+};
+
+// Owns its own draft + pending state. The parent unmounts it when the post succeeds.
+function ReplyBox({ author, onSubmit, onCancel }: ReplyBoxProps) {
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState(false);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (text.trim() === '' || pending) {
+      return;
+    }
+    setPending(true);
+    onSubmit(text.trim());
+  }
+
+  const blocked = pending || text.trim() === '';
+  let submitLabel = 'Post reply';
+  if (pending) {
+    submitLabel = 'Posting…';
+  }
+
+  return (
+    <form className="reply-box" onSubmit={handleSubmit}>
+      <textarea
+        className="reply-input"
+        placeholder={'Reply to ' + author + '…'}
+        autoFocus
+        disabled={pending}
+        value={text}
+        onChange={(e) => { setText(e.target.value); }}
+      />
+      <div className="reply-actions">
+        <button type="button" className="ghost-btn" disabled={pending} onClick={() => { onCancel(); }}>Cancel</button>
+        <button type="submit" className="post-btn" disabled={blocked}>{submitLabel}</button>
+      </div>
+    </form>
+  );
+}
+
+type CommentItemProps = {
+  comment: Comment;
+  replying: boolean;
+  expanded: boolean;
+  onReplyClick: (id: string) => void;
+  onToggleReplies: (id: string) => void;
+  onPostReply: (id: string, text: string) => Promise<void>;
+  onCancelReply: () => void;
+};
+
+function CommentItem({ comment, replying, expanded, onReplyClick, onToggleReplies, onPostReply, onCancelReply }: CommentItemProps) {
+  const count = comment.replies.length;
+
+  let toggle = null;
+  if (count > 0) {
+    let label = 'Hide replies';
+    if (!expanded) {
+      let noun = 'replies';
+      if (count === 1) {
+        noun = 'reply';
+      }
+      label = 'Show ' + count + ' ' + noun;
+    }
+    toggle = <button type="button" className="link-btn muted-link" onClick={() => { onToggleReplies(comment.id); }}>{label}</button>;
+  }
+
+  let replies = null;
+  if (expanded && count > 0) {
+    replies = (
+      <ul className="replies">
+        {comment.replies.map((r) => {
+          return <ReplyItem key={r.id} reply={r} />;
+        })}
+      </ul>
+    );
+  }
+
+  let box = null;
+  if (replying) {
+    box = (
+      <ReplyBox
+        author={comment.author}
+        onSubmit={(text) => { return onPostReply(comment.id, text); }}
+        onCancel={onCancelReply}
+      />
+    );
+  }
+
+  return (
+    <li className="comment">
+      <Avatar name={comment.author} />
+      <div className="comment-body">
+        <p className="meta"><b>{comment.author}</b> · {timeAgo(comment.minutesAgo)}</p>
+        <p className="text">{comment.text}</p>
+        <div className="comment-actions">
+          <button type="button" className="link-btn" onClick={() => { onReplyClick(comment.id); }}>Reply</button>
+          {toggle}
+        </div>
+        {replies}
+        {box}
+      </div>
+    </li>
+  );
+}
+
+function CommentSection() {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Only one reply box on the page: store WHICH comment, not a boolean per comment.
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    getComments().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setComments(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleToggleReplies(id: string) {
+    setExpanded((prev) => {
+      return { ...prev, [id]: !prev[id] };
+    });
+  }
+
+  function handlePostReply(commentId: string, text: string) {
+    return postReply(commentId, text).then((reply) => {
+      setComments((prev) => {
+        return prev.map((c) => {
+          if (c.id !== commentId) {
+            return c;
+          }
+          return { ...c, replies: [...c.replies, reply] };
+        });
+      });
+      setReplyingTo(null);
+      // Show the thread so the new reply is visible.
+      setExpanded((prev) => {
+        return { ...prev, [commentId]: true };
+      });
+    });
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="muted">Loading comments…</p>;
+  } else {
+    body = (
+      <ul className="comments">
+        {comments.map((c) => {
+          const replying = replyingTo === c.id;
+          const isExpanded = expanded[c.id] === true;
+          return (
+            <CommentItem
+              key={c.id}
+              comment={c}
+              replying={replying}
+              expanded={isExpanded}
+              onReplyClick={setReplyingTo}
+              onToggleReplies={handleToggleReplies}
+              onPostReply={handlePostReply}
+              onCancelReply={() => { setReplyingTo(null); }}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <section className="discussion">
+      <h2>Comments</h2>
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <nav className="nav"><span className="logo">simmer</span><span>Recipes</span><span>Collections</span><span>Cook mode</span></nav>
+      <main className="page">
+        <RecipeHero />
+        <CommentSection />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FAF7F0;
+  --surface: #FFFFFF;
+  --border: #E9E2D2;
+  --text: #2A2A22;
+  --muted: #7D7867;
+  --green: #2F6B3F;
+  --green-soft: #E3EFE3;
+  --lemon: #F4D35E;
+  --serif: 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.nav { display: flex; align-items: center; gap: 20px; padding: 14px 24px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.logo { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--green); margin-right: 12px; }
+
+.page { max-width: 680px; margin: 0 auto; padding: 24px 20px 48px; display: flex; flex-direction: column; gap: 28px; }
+
+.hero { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.hero-photo { width: 140px; height: 140px; flex-shrink: 0; border-radius: 22px; background: radial-gradient(circle at 30% 30%, #FFF6C9, var(--lemon) 60%, #E2B93B); display: grid; place-items: center; font-size: 64px; }
+.hero-text { flex: 1 1 260px; }
+.eyebrow { font-size: 12px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.08em; }
+.hero h1 { margin: 6px 0 8px; font-family: var(--serif); font-size: 30px; line-height: 1.15; }
+.hero p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+.discussion h2 { margin: 0 0 14px; font-family: var(--serif); font-size: 22px; }
+.muted { color: var(--muted); font-size: 14px; }
+.comments, .replies { list-style: none; margin: 0; padding: 0; }
+.comment { display: flex; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); }
+.comment-body { flex: 1; min-width: 0; }
+.avatar { width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 700; }
+.avatar-sm { width: 28px; height: 28px; font-size: 12px; }
+.meta { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--text); }
+.text { margin: 0; font-size: 15px; line-height: 1.5; }
+.comment-actions { display: flex; gap: 14px; margin-top: 6px; }
+.link-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--green); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
+.replies { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.reply { display: flex; gap: 8px; }
+.bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+
+/* ---- Added: reply box + collapsible replies ---- */
+.muted-link { color: var(--muted); }
+.reply-box { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.reply-input { width: 100%; min-height: 70px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; font-size: 14px; resize: vertical; color: var(--text); }
+.reply-input:focus { outline: 2px solid var(--green); outline-offset: -1px; }
+.reply-input:disabled { background: #F4F1E8; color: var(--muted); }
+.reply-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ghost-btn, .post-btn { height: 32px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ghost-btn { border: 1px solid var(--border); background: none; color: var(--text); }
+.post-btn { border: 0; background: var(--green); color: #fff; }
+.post-btn:disabled, .ghost-btn:disabled { opacity: 0.55; cursor: default; }

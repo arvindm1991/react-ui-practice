@@ -1,0 +1,401 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Stay = {
+  id: string;
+  name: string;
+  location: string;
+  pricePerNight: number; // in cents
+  rating: number; // 0-5, one decimal
+  reviews: number;
+  hue: number; // used to tint the photo placeholder
+};
+
+// Returned in "Recommended" order.
+const STAYS: Stay[] = [
+  { id: 'st1', name: 'Cliffside Cabin', location: 'Mendocino, CA', pricePerNight: 21500, rating: 4.9, reviews: 212, hue: 150 },
+  { id: 'st2', name: 'Adobe Courtyard House', location: 'Santa Fe, NM', pricePerNight: 16800, rating: 4.7, reviews: 98, hue: 25 },
+  { id: 'st3', name: 'Lakeview A-Frame', location: 'Lake Tahoe, CA', pricePerNight: 29900, rating: 4.8, reviews: 341, hue: 200 },
+  { id: 'st4', name: 'Desert Dome', location: 'Joshua Tree, CA', pricePerNight: 13200, rating: 4.6, reviews: 187, hue: 35 },
+  { id: 'st5', name: 'Treehouse Loft', location: 'Asheville, NC', pricePerNight: 18900, rating: 4.95, reviews: 76, hue: 110 },
+  { id: 'st6', name: 'Harbor Studio', location: 'Portland, ME', pricePerNight: 11900, rating: 4.5, reviews: 64, hue: 215 },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /stays?region=west -> Stay[]
+export async function getStays(): Promise<Stay[]> {
+  await randomDelay(300, 1000);
+  return STAYS.map((s) => {
+    return { ...s };
+  });
+}
+@@@ shared src/utils/format.ts
+// formatPrice(21500) -> "$215"  (whole dollars, for listing cards)
+export function formatPrice(cents: number): string {
+  return '$' + Math.round(cents / 100).toLocaleString('en-US');
+}
+@@@ shared src/components/StayCard.tsx
+import React from 'react';
+import type { Stay } from '../api';
+import { formatPrice } from '../utils/format';
+
+export function StayCard({ stay }: { stay: Stay }) {
+  const photoStyle = { background: 'linear-gradient(160deg, hsl(' + stay.hue + ' 45% 72%), hsl(' + stay.hue + ' 40% 42%))' };
+  return (
+    <li className="stay">
+      <div className="stay-photo" style={photoStyle} />
+      <div className="stay-body">
+        <div className="stay-top">
+          <p className="stay-name">{stay.name}</p>
+          <p className="stay-rating">★ {stay.rating}</p>
+        </div>
+        <p className="stay-loc">{stay.location}</p>
+        <p className="stay-price"><b>{formatPrice(stay.pricePerNight)}</b> night</p>
+      </div>
+    </li>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getStays } from './api';
+import type { Stay } from './api';
+import { StayCard } from './components/StayCard';
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">staybird</span>
+      <span className="search-pill">West Coast · Nov 20–23 · 2 guests</span>
+    </header>
+  );
+}
+
+function SortMenu() {
+  // TODO: open/close, options, selected label
+  return (
+    <div className="sort">
+      <button type="button" className="sort-btn">Sort by: <b>Recommended</b> <span className="caret">▾</span></button>
+    </div>
+  );
+}
+
+function StaysPage() {
+  const [stays, setStays] = useState<Stay[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getStays().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setStays(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body = <p className="loading">Finding stays…</p>;
+  if (!loading) {
+    body = (
+      <ul className="stay-grid">
+        {stays.map((stay) => {
+          return <StayCard key={stay.id} stay={stay} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <main className="page">
+      <div className="toolbar">
+        <h1>{stays.length} stays</h1>
+        <SortMenu />
+      </div>
+      {body}
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <StaysPage />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F2EA;
+  --surface: #FFFFFF;
+  --text: #1F2A24;
+  --muted: #6E7A72;
+  --line: #E5DED1;
+  --primary: #1F5C45;
+  --primary-soft: #E6F0EA;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Gill Sans', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.logo { font-weight: 700; font-size: 20px; color: var(--primary); letter-spacing: -0.4px; }
+.search-pill { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); box-shadow: 0 2px 6px rgba(31, 42, 36, 0.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.page { max-width: 960px; margin: 0 auto; padding: 24px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.toolbar h1 { margin: 0; font-size: 22px; font-weight: 600; }
+
+.sort { position: relative; }
+.sort-btn { height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.sort-btn:hover { border-color: var(--text); }
+.caret { margin-left: 4px; color: var(--muted); }
+
+.loading { color: var(--muted); }
+
+.stay-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.stay-photo { aspect-ratio: 1; border-radius: var(--radius); }
+.stay-body { padding-top: 10px; font-size: 14px; }
+.stay-body p { margin: 0 0 2px; }
+.stay-top { display: flex; justify-content: space-between; gap: 8px; }
+.stay-name { font-weight: 600; }
+.stay-rating { white-space: nowrap; }
+.stay-loc { color: var(--muted); }
+.stay-price { margin-top: 4px !important; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getStays } from './api';
+import type { Stay } from './api';
+import { StayCard } from './components/StayCard';
+
+type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'rating';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recommended', label: 'Recommended' },
+  { key: 'price-asc', label: 'Price: low to high' },
+  { key: 'price-desc', label: 'Price: high to low' },
+  { key: 'rating', label: 'Top rated' },
+];
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">staybird</span>
+      <span className="search-pill">West Coast · Nov 20–23 · 2 guests</span>
+    </header>
+  );
+}
+
+type SortMenuProps = {
+  value: SortKey;
+  onChange: (key: SortKey) => void;
+};
+
+// open is local UI state: nothing else on the page cares whether the menu is open.
+function SortMenu({ value, onChange }: SortMenuProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click (and Escape, from the change). Only listen while open.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function handleMouseDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  function handleToggle() {
+    setOpen((prev) => {
+      return !prev;
+    });
+  }
+
+  function handleSelect(key: SortKey) {
+    onChange(key);
+    setOpen(false);
+  }
+
+  const current = SORT_OPTIONS.find((o) => {
+    return o.key === value;
+  });
+  let currentLabel = 'Recommended';
+  if (current) {
+    currentLabel = current.label;
+  }
+
+  let menu = null;
+  if (open) {
+    menu = (
+      <ul className="sort-menu" role="listbox">
+        {SORT_OPTIONS.map((o) => {
+          const selected = o.key === value;
+          let cls = 'sort-option';
+          let check = null;
+          if (selected) {
+            cls = 'sort-option is-selected';
+            check = <span className="check">✓</span>;
+          }
+          return (
+            <li key={o.key} role="option" aria-selected={selected}>
+              <button type="button" className={cls} onClick={() => { handleSelect(o.key); }}>
+                {o.label}
+                {check}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="sort" ref={wrapRef}>
+      <button type="button" className="sort-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => { handleToggle(); }}>
+        Sort by: <b>{currentLabel}</b> <span className="caret">▾</span>
+      </button>
+      {menu}
+    </div>
+  );
+}
+
+// Pure: returns a NEW array. .sort() mutates, so copy first.
+function sortStays(stays: Stay[], key: SortKey): Stay[] {
+  if (key === 'recommended') {
+    return stays;
+  }
+  const copy = [...stays];
+  copy.sort((a, b) => {
+    if (key === 'price-asc') {
+      return a.pricePerNight - b.pricePerNight;
+    }
+    if (key === 'price-desc') {
+      return b.pricePerNight - a.pricePerNight;
+    }
+    return b.rating - a.rating;
+  });
+  return copy;
+}
+
+function StaysPage() {
+  const [stays, setStays] = useState<Stay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>('recommended');
+
+  useEffect(() => {
+    let cancelled = false;
+    getStays().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setStays(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived: never stored in state (stays keeps the API's recommended order)
+  const sorted = sortStays(stays, sortKey);
+
+  let body = <p className="loading">Finding stays…</p>;
+  if (!loading) {
+    body = (
+      <ul className="stay-grid">
+        {sorted.map((stay) => {
+          return <StayCard key={stay.id} stay={stay} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <main className="page">
+      <div className="toolbar">
+        <h1>{stays.length} stays</h1>
+        <SortMenu value={sortKey} onChange={setSortKey} />
+      </div>
+      {body}
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <StaysPage />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F2EA;
+  --surface: #FFFFFF;
+  --text: #1F2A24;
+  --muted: #6E7A72;
+  --line: #E5DED1;
+  --primary: #1F5C45;
+  --primary-soft: #E6F0EA;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Gill Sans', 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.logo { font-weight: 700; font-size: 20px; color: var(--primary); letter-spacing: -0.4px; }
+.search-pill { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); box-shadow: 0 2px 6px rgba(31, 42, 36, 0.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.page { max-width: 960px; margin: 0 auto; padding: 24px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.toolbar h1 { margin: 0; font-size: 22px; font-weight: 600; }
+
+.sort { position: relative; }
+.sort-btn { height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.sort-btn:hover { border-color: var(--text); }
+.caret { margin-left: 4px; color: var(--muted); }
+
+.loading { color: var(--muted); }
+
+.stay-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.stay-photo { aspect-ratio: 1; border-radius: var(--radius); }
+.stay-body { padding-top: 10px; font-size: 14px; }
+.stay-body p { margin: 0 0 2px; }
+.stay-top { display: flex; justify-content: space-between; gap: 8px; }
+.stay-name { font-weight: 600; }
+.stay-rating { white-space: nowrap; }
+.stay-loc { color: var(--muted); }
+.stay-price { margin-top: 4px !important; }
+
+/* ---- Added: sort dropdown ---- */
+.sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 210px; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 28px rgba(31, 42, 36, 0.14); }
+.sort-option { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.sort-option:hover { background: var(--bg); }
+.sort-option.is-selected { color: var(--primary); font-weight: 600; background: var(--primary-soft); }
+.check { font-size: 13px; }

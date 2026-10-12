@@ -1,0 +1,667 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Scope = {
+  id: string;            // e.g. "repo:contents:read"
+  label: string;
+  description: string;
+  children?: Scope[];    // groups have children, leaf scopes don't
+};
+
+const SCOPES: Scope[] = [
+  {
+    id: 'repo', label: 'Repositories', description: 'Code, pull requests and hooks',
+    children: [
+      {
+        id: 'repo:contents', label: 'Contents', description: 'Files, commits and branches',
+        children: [
+          { id: 'repo:contents:read', label: 'Read contents', description: 'Clone and browse files' },
+          { id: 'repo:contents:write', label: 'Write contents', description: 'Push commits and create branches' },
+        ],
+      },
+      {
+        id: 'repo:pulls', label: 'Pull requests', description: 'Reviews and merges',
+        children: [
+          { id: 'repo:pulls:read', label: 'Read pull requests', description: 'List PRs and review comments' },
+          { id: 'repo:pulls:write', label: 'Write pull requests', description: 'Open, review and merge PRs' },
+        ],
+      },
+      { id: 'repo:hooks', label: 'Webhooks', description: 'Create and delete repository webhooks' },
+    ],
+  },
+  {
+    id: 'issues', label: 'Issues', description: 'Issues, labels and milestones',
+    children: [
+      { id: 'issues:read', label: 'Read issues', description: 'List and search issues' },
+      { id: 'issues:write', label: 'Write issues', description: 'Open, edit and close issues' },
+    ],
+  },
+  {
+    id: 'org', label: 'Organization', description: 'Members and billing for acme-labs',
+    children: [
+      {
+        id: 'org:members', label: 'Members', description: 'People and teams',
+        children: [
+          { id: 'org:members:read', label: 'Read members', description: 'List members and teams' },
+          { id: 'org:members:write', label: 'Manage members', description: 'Invite and remove members' },
+        ],
+      },
+      { id: 'org:billing', label: 'Billing', description: 'View invoices and change plans' },
+    ],
+  },
+  {
+    id: 'actions', label: 'Actions', description: 'CI workflows and secrets',
+    children: [
+      { id: 'actions:run', label: 'Run workflows', description: 'Trigger and cancel workflow runs' },
+      { id: 'actions:secrets', label: 'Manage secrets', description: 'Read and write encrypted secrets' },
+    ],
+  },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function copy(node: Scope): Scope {
+  if (!node.children) {
+    return { ...node };
+  }
+  return { ...node, children: node.children.map(copy) };
+}
+
+// GET /tokens/scopes -> Scope[] (a tree)
+export async function getScopes(): Promise<Scope[]> {
+  await randomDelay(400, 1200);
+  return SCOPES.map(copy);
+}
+@@@ shared src/utils/tree.ts
+import type { Scope } from '../api';
+
+export function isLeaf(node: Scope): boolean {
+  return !node.children || node.children.length === 0;
+}
+
+// All leaf ids under a node. A leaf returns just itself.
+// getLeafIds(repoNode) -> ["repo:contents:read", "repo:contents:write", ...]
+export function getLeafIds(node: Scope): string[] {
+  if (isLeaf(node)) {
+    return [node.id];
+  }
+  let ids: string[] = [];
+  (node.children || []).forEach((child) => {
+    ids = ids.concat(getLeafIds(child));
+  });
+  return ids;
+}
+
+// Leaf count for a whole forest: countLeaves(scopes) -> 12
+export function countLeaves(nodes: Scope[]): number {
+  let total = 0;
+  nodes.forEach((node) => {
+    total += getLeafIds(node).length;
+  });
+  return total;
+}
+@@@ shared src/components/Field.tsx
+import React from 'react';
+
+type FieldProps = {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+};
+
+export default function Field({ label, hint, children }: FieldProps) {
+  let hintEl = null;
+  if (hint) {
+    hintEl = <span className="field-hint">{hint}</span>;
+  }
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      {children}
+      {hintEl}
+    </label>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getScopes } from './api';
+import type { Scope } from './api';
+import Field from './components/Field';
+import { isLeaf } from './utils/tree';
+
+function TopNav() {
+  return (
+    <nav className="topnav">
+      <span className="brand">▲ acme<b>cloud</b></span>
+      <span className="crumbs">Settings / Developer settings / <b>Tokens</b></span>
+    </nav>
+  );
+}
+
+// Read-only for now. TODO: checkboxes (see the task).
+function ScopeNode({ node }: { node: Scope }) {
+  let children = null;
+  if (!isLeaf(node)) {
+    children = (
+      <ul className="scope-children">
+        {(node.children || []).map((child) => {
+          return <ScopeNode key={child.id} node={child} />;
+        })}
+      </ul>
+    );
+  }
+  return (
+    <li className="scope">
+      <div className="scope-row">
+        <div className="scope-text">
+          <span className="scope-label">{node.label}</span>
+          <span className="scope-desc">{node.description}</span>
+        </div>
+        <code className="scope-code">{node.id}</code>
+      </div>
+      {children}
+    </li>
+  );
+}
+
+function PermissionsCard() {
+  const [scopes, setScopes] = useState<Scope[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getScopes().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setScopes(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="muted-msg">Loading scopes…</p>;
+  } else {
+    body = (
+      <ul className="scope-tree">
+        {scopes.map((node) => {
+          return <ScopeNode key={node.id} node={node} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <div>
+          <h2>Permissions</h2>
+          <p>Grant only what this token needs.</p>
+        </div>
+      </div>
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  const [name, setName] = useState('');
+  const [expiry, setExpiry] = useState('30');
+
+  return (
+    <div className="page">
+      <TopNav />
+      <main className="content">
+        <h1>New fine-grained token</h1>
+        <section className="card form-card">
+          <Field label="Token name" hint="What's this token for?">
+            <input className="input" value={name} placeholder="ci-deploy" onChange={(e) => { setName(e.target.value); }} />
+          </Field>
+          <Field label="Expiration">
+            <select className="input" value={expiry} onChange={(e) => { setExpiry(e.target.value); }}>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </Field>
+        </section>
+        <PermissionsCard />
+        <div className="actions">
+          <button type="button" className="btn-primary">Generate token</button>
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --nav: #0B1220;
+  --border: #E4E7EF;
+  --text: #111827;
+  --muted: #6B7280;
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-soft: #EEF2FF;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topnav { display: flex; align-items: center; gap: 20px; height: 52px; padding: 0 20px; background: var(--nav); color: #C7CEDB; }
+.brand { color: #fff; font-weight: 600; letter-spacing: 0.2px; }
+.brand b { color: #A5B4FC; }
+.crumbs { font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.crumbs b { color: #fff; font-weight: 500; }
+
+.content { max-width: 720px; margin: 0 auto; padding: 28px 20px 48px; }
+.content h1 { margin: 0 0 18px; font-size: 22px; letter-spacing: -0.2px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.form-card { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; padding: 18px; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.card-head h2 { margin: 0; font-size: 15px; }
+.card-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-weight: 600; font-size: 13px; }
+.field-hint { color: var(--muted); font-size: 12px; }
+.input { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: #fff; color: var(--text); }
+.input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.muted-msg { margin: 0; padding: 28px 18px; text-align: center; color: var(--muted); }
+
+.scope-tree { list-style: none; margin: 0; padding: 8px 0; }
+.scope-children { list-style: none; margin: 0 0 0 26px; padding: 0; border-left: 1px dashed var(--border); }
+.scope-row { display: flex; align-items: center; gap: 12px; padding: 8px 18px 8px 14px; }
+.scope-row:hover { background: #FAFBFF; }
+.scope-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.scope-label { font-weight: 500; }
+.scope-desc { color: var(--muted); font-size: 12px; }
+.scope-code { font-family: var(--mono); font-size: 11.5px; color: #4B5563; background: #F3F4F6; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+
+.actions { display: flex; justify-content: flex-end; }
+.btn-primary { height: 38px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .form-card { grid-template-columns: 1fr; }
+  .scope-code { display: none; }
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getScopes } from './api';
+import type { Scope } from './api';
+import Field from './components/Field';
+import { isLeaf, getLeafIds, countLeaves } from './utils/tree';
+
+function TopNav() {
+  return (
+    <nav className="topnav">
+      <span className="brand">▲ acme<b>cloud</b></span>
+      <span className="crumbs">Settings / Developer settings / <b>Tokens</b></span>
+    </nav>
+  );
+}
+
+type TriCheckboxProps = {
+  id: string;
+  checked: boolean;
+  indeterminate: boolean;
+  onToggle: () => void;
+};
+
+// "indeterminate" is a DOM property, not an attribute, so React can't set it.
+function TriCheckbox({ id, checked, indeterminate, onToggle }: TriCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  // No deps on purpose: the browser clears .indeterminate on every click,
+  // so re-apply the derived value after every render.
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate;
+    }
+  });
+
+  return (
+    <input
+      ref={ref}
+      id={id}
+      type="checkbox"
+      className="tri-check"
+      checked={checked}
+      onChange={() => { onToggle(); }}
+    />
+  );
+}
+
+function matches(node: Scope, q: string): boolean {
+  return node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q);
+}
+
+function addSubtree(node: Scope, out: Set<string>) {
+  out.add(node.id);
+  (node.children || []).forEach((child) => {
+    addSubtree(child, out);
+  });
+}
+
+// Fills `out` with ids to show: matches, everything under a matching group,
+// and the ancestors of any match. Returns true if anything in `nodes` is visible.
+function collectVisible(nodes: Scope[], q: string, out: Set<string>): boolean {
+  let any = false;
+  nodes.forEach((node) => {
+    if (matches(node, q)) {
+      addSubtree(node, out);
+      any = true;
+      return;
+    }
+    if (node.children && collectVisible(node.children, q, out)) {
+      out.add(node.id);
+      any = true;
+    }
+  });
+  return any;
+}
+
+type ScopeNodeProps = {
+  node: Scope;
+  selected: Set<string>;
+  visible: Set<string> | null;
+  onToggle: (node: Scope) => void;
+};
+
+function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
+  // derived: a group's state comes from its leaves, never stored
+  const leafIds = getLeafIds(node);
+  const onCount = leafIds.filter((id) => {
+    return selected.has(id);
+  }).length;
+  const checked = onCount === leafIds.length;
+  const indeterminate = onCount > 0 && !checked;
+
+  let children = null;
+  if (!isLeaf(node)) {
+    children = (
+      <ul className="scope-children" role="group">
+        {(node.children || []).map((child) => {
+          if (visible && !visible.has(child.id)) {
+            return null;
+          }
+          return <ScopeNode key={child.id} node={child} selected={selected} visible={visible} onToggle={onToggle} />;
+        })}
+      </ul>
+    );
+  }
+
+  let rowCls = 'scope-row';
+  if (checked) {
+    rowCls = 'scope-row is-on';
+  } else if (indeterminate) {
+    rowCls = 'scope-row is-mixed';
+  }
+
+  let count = null;
+  if (!isLeaf(node)) {
+    count = <span className="scope-count">{onCount}/{leafIds.length}</span>;
+  }
+
+  const inputId = 'scope-' + node.id;
+  return (
+    <li className="scope">
+      <div className={rowCls}>
+        <TriCheckbox id={inputId} checked={checked} indeterminate={indeterminate} onToggle={() => { onToggle(node); }} />
+        <label className="scope-text" htmlFor={inputId}>
+          <span className="scope-label">{node.label}</span>
+          <span className="scope-desc">{node.description}</span>
+        </label>
+        {count}
+        <code className="scope-code">{node.id}</code>
+      </div>
+      {children}
+    </li>
+  );
+}
+
+type PermissionsCardProps = {
+  selected: Set<string>;
+  onToggle: (node: Scope) => void;
+  onClear: () => void;
+};
+
+function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) {
+  const [scopes, setScopes] = useState<Scope[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getScopes().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setScopes(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived
+  const total = countLeaves(scopes);
+  const q = query.trim().toLowerCase();
+  let visible: Set<string> | null = null;
+  if (q !== '') {
+    visible = new Set<string>();
+    collectVisible(scopes, q, visible);
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="muted-msg">Loading scopes…</p>;
+  } else if (visible && visible.size === 0) {
+    body = <p className="muted-msg">No scopes match “{query}”.</p>;
+  } else {
+    body = (
+      <ul className="scope-tree">
+        {scopes.map((node) => {
+          if (visible && !visible.has(node.id)) {
+            return null;
+          }
+          return <ScopeNode key={node.id} node={node} selected={selected} visible={visible} onToggle={onToggle} />;
+        })}
+      </ul>
+    );
+  }
+
+  let clearBtn = null;
+  if (selected.size > 0) {
+    clearBtn = <button type="button" className="link-btn" onClick={() => { onClear(); }}>Clear</button>;
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <div>
+          <h2>Permissions</h2>
+          <p>Grant only what this token needs.</p>
+        </div>
+        <div className="selection-summary">
+          <span className="selected-count" aria-live="polite">{selected.size} of {total} selected</span>
+          {clearBtn}
+        </div>
+      </div>
+      <div className="scope-search-wrap">
+        <input
+          className="input scope-search"
+          type="search"
+          placeholder="Filter scopes"
+          aria-label="Filter scopes"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); }}
+        />
+      </div>
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  const [name, setName] = useState('');
+  const [expiry, setExpiry] = useState('30');
+  // Only LEAF ids live in state. Group checkboxes are derived from them.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [created, setCreated] = useState('');
+
+  // Checking a group selects every leaf under it (even hidden ones).
+  // An indeterminate group also selects all: only a fully checked group clears.
+  function handleToggle(node: Scope) {
+    const ids = getLeafIds(node);
+    setSelected((prev) => {
+      const allOn = ids.every((id) => {
+        return prev.has(id);
+      });
+      const next = new Set(prev);
+      ids.forEach((id) => {
+        if (allOn) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      });
+      return next;
+    });
+  }
+
+  function handleGenerate() {
+    let noun = 'scopes';
+    if (selected.size === 1) {
+      noun = 'scope';
+    }
+    setCreated('Token “' + name.trim() + '” created with ' + selected.size + ' ' + noun + '.');
+  }
+
+  const canGenerate = name.trim() !== '' && selected.size > 0;
+
+  let banner = null;
+  if (created) {
+    banner = <p className="success-banner" role="status">{created}</p>;
+  }
+
+  return (
+    <div className="page">
+      <TopNav />
+      <main className="content">
+        <h1>New fine-grained token</h1>
+        {banner}
+        <section className="card form-card">
+          <Field label="Token name" hint="What's this token for?">
+            <input className="input" value={name} placeholder="ci-deploy" onChange={(e) => { setName(e.target.value); }} />
+          </Field>
+          <Field label="Expiration">
+            <select className="input" value={expiry} onChange={(e) => { setExpiry(e.target.value); }}>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </Field>
+        </section>
+        <PermissionsCard selected={selected} onToggle={handleToggle} onClear={() => { setSelected(new Set()); }} />
+        <div className="actions">
+          <button type="button" className="btn-primary" disabled={!canGenerate} onClick={() => { handleGenerate(); }}>Generate token</button>
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --nav: #0B1220;
+  --border: #E4E7EF;
+  --text: #111827;
+  --muted: #6B7280;
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-soft: #EEF2FF;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topnav { display: flex; align-items: center; gap: 20px; height: 52px; padding: 0 20px; background: var(--nav); color: #C7CEDB; }
+.brand { color: #fff; font-weight: 600; letter-spacing: 0.2px; }
+.brand b { color: #A5B4FC; }
+.crumbs { font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.crumbs b { color: #fff; font-weight: 500; }
+
+.content { max-width: 720px; margin: 0 auto; padding: 28px 20px 48px; }
+.content h1 { margin: 0 0 18px; font-size: 22px; letter-spacing: -0.2px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.form-card { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; padding: 18px; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.card-head h2 { margin: 0; font-size: 15px; }
+.card-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-weight: 600; font-size: 13px; }
+.field-hint { color: var(--muted); font-size: 12px; }
+.input { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: #fff; color: var(--text); }
+.input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.muted-msg { margin: 0; padding: 28px 18px; text-align: center; color: var(--muted); }
+
+.scope-tree { list-style: none; margin: 0; padding: 8px 0; }
+.scope-children { list-style: none; margin: 0 0 0 26px; padding: 0; border-left: 1px dashed var(--border); }
+.scope-row { display: flex; align-items: center; gap: 12px; padding: 8px 18px 8px 14px; }
+.scope-row:hover { background: #FAFBFF; }
+.scope-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.scope-label { font-weight: 500; }
+.scope-desc { color: var(--muted); font-size: 12px; }
+.scope-code { font-family: var(--mono); font-size: 11.5px; color: #4B5563; background: #F3F4F6; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+
+.actions { display: flex; justify-content: flex-end; }
+.btn-primary { height: 38px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .form-card { grid-template-columns: 1fr; }
+  .scope-code { display: none; }
+}
+
+/* ---- Added: tri-state permission tree ---- */
+.tri-check { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+.scope-text { cursor: pointer; }
+.scope-row.is-on { background: var(--primary-soft); }
+.scope-row.is-on .scope-code { background: #E0E7FF; color: var(--primary-hover); }
+.scope-row.is-mixed .scope-label { color: var(--primary-hover); }
+.scope-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.selection-summary { display: flex; align-items: center; gap: 10px; }
+.selected-count { font-size: 12.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+.link-btn:hover { color: var(--text); }
+
+.scope-search-wrap { padding: 12px 18px 4px; }
+.scope-search { width: 100%; }
+
+.success-banner { margin: 0 0 16px; padding: 10px 14px; border-radius: 8px; background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-weight: 500; }

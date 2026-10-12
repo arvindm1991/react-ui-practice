@@ -1,0 +1,269 @@
+@@@ shared src/data.js
+// Deployed agents across environments.
+export const agents = [
+  { id: 'a1', name: 'support-triage', owner: 'Priya', version: 'v2.10.0', lastRun: '2026-10-03T14:20:00Z', successRate: 0.982 },
+  { id: 'a2', name: 'Billing-reconciler', owner: 'Jonas', version: 'v2.9.4', lastRun: '2026-10-04T09:05:00Z', successRate: 0.914 },
+  { id: 'a3', name: 'docs-indexer', owner: 'Lena', version: 'v1.12.1', lastRun: '2026-09-28T22:41:00Z', successRate: 0.997 },
+  { id: 'a4', name: 'eval-runner', owner: 'Mei', version: 'v3.0.0', lastRun: '2026-10-04T18:30:00Z', successRate: 0.876 },
+  { id: 'a5', name: 'éclair-summarizer', owner: 'Kwame', version: 'v1.2.0', lastRun: '2026-10-01T07:15:00Z', successRate: 0.953 },
+  { id: 'a6', name: 'alert-router', owner: 'Rosa', version: 'v2.2.11', lastRun: '2026-10-02T11:00:00Z', successRate: 0.991 },
+  { id: 'a7', name: 'changelog-writer', owner: 'Tomás', version: 'v0.9.3', lastRun: '2026-09-30T16:45:00Z', successRate: 0.938 },
+  { id: 'a8', name: 'Usage-forecaster', owner: 'Sofia', version: 'v1.10.2', lastRun: '2026-10-04T03:20:00Z', successRate: 0.962 },
+  { id: 'a9', name: 'pr-reviewer', owner: 'Daniel', version: 'v2.10.3', lastRun: '2026-10-03T20:10:00Z', successRate: 0.905 },
+  { id: 'a10', name: 'onboarding-guide', owner: 'Aisha', version: 'v1.1.0', lastRun: '2026-09-29T13:30:00Z', successRate: 0.978 },
+  { id: 'a11', name: 'spam-filter', owner: 'Ada', version: 'v4.0.1', lastRun: '2026-10-04T21:55:00Z', successRate: 0.999 },
+  { id: 'a12', name: 'release-notes', owner: 'Grace', version: 'v1.9.0', lastRun: '2026-10-01T19:40:00Z', successRate: 0.921 },
+];
+@@@ starter src/App.jsx
+import React, { useState } from 'react';
+import { agents } from './data';
+
+// Read the Task tab first. Several requirements use things this kit never
+// taught you. That's the point: name each one, then look it up.
+export default function App() {
+  return (
+    <div className="page">
+      <h1>Agents</h1>
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" aria-label="Select all" /></th>
+              <th>Name</th>
+              <th>Owner</th>
+              <th>Version</th>
+              <th>Last run</th>
+              <th>Success</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agents.map((a) => (
+              <tr key={a.id}>
+                <td><input type="checkbox" aria-label={'Select ' + a.name} /></td>
+                <td>{a.name}</td>
+                <td>{a.owner}</td>
+                <td>{a.version}</td>
+                <td>{a.lastRun}</td>
+                <td>{a.successRate}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 760px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+h1 { margin: 0; font-size: 20px; }
+
+.table-scroll {
+  max-height: 320px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #E2E5EA;
+  border-radius: 10px;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #EEF0F3; white-space: nowrap; }
+.table th { font-size: 12px; font-weight: 600; color: #5A6273; background: #FAFBFC; }
+@@@ solution src/App.jsx
+import React, { useEffect, useRef, useState } from 'react';
+import { agents } from './data';
+
+// Each column knows how to read and compare its own values.
+const COLUMNS = [
+  { key: 'name', label: 'Name', compare: (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) },
+  { key: 'owner', label: 'Owner', compare: (a, b) => a.owner.localeCompare(b.owner) },
+  // Lookup: "javascript natural sort strings with numbers" -> localeCompare with { numeric: true }
+  { key: 'version', label: 'Version', compare: (a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }) },
+  { key: 'lastRun', label: 'Last run', compare: (a, b) => new Date(a.lastRun) - new Date(b.lastRun) },
+  { key: 'successRate', label: 'Success', numeric: true, compare: (a, b) => a.successRate - b.successRate },
+];
+
+const pct = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1 });
+const when = (iso) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+// Lookup: "indeterminate checkbox react" -> it's a DOM property, not an attribute; set it via a ref
+function IndeterminateCheckbox({ checked, indeterminate, ...props }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} {...props} />;
+}
+
+export default function App() {
+  const [sort, setSort] = useState({ key: 'name', dir: 'asc' });
+  const [selected, setSelected] = useState(() => new Set());
+
+  // derived: sorted copy
+  const column = COLUMNS.find((c) => c.key === sort.key);
+  const rows = [...agents].sort((a, b) => (sort.dir === 'asc' ? 1 : -1) * column.compare(a, b));
+
+  const allChecked = selected.size === agents.length;
+  const someChecked = selected.size > 0 && !allChecked;
+
+  function toggleSort(key) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  }
+
+  // Sets are fine in state as long as you create a new Set on every change
+  function toggleRow(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allChecked ? new Set() : new Set(agents.map((a) => a.id)));
+  }
+
+  return (
+    <div className="page">
+      <h1>Agents</h1>
+
+      {selected.size > 0 && (
+        <div className="selection-bar" role="status">
+          <span>{selected.size} selected</span>
+          <button className="link-btn" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
+
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th className="check-col">
+                <IndeterminateCheckbox
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onChange={toggleAll}
+                  aria-label="Select all"
+                />
+              </th>
+              {COLUMNS.map((c) => {
+                const active = sort.key === c.key;
+                return (
+                  // Lookup: "aria-sort mdn"
+                  <th
+                    key={c.key}
+                    className={c.numeric ? 'num' : ''}
+                    aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    <button className={'sort-btn' + (active ? ' is-active' : '')} onClick={() => toggleSort(c.key)}>
+                      {c.label}
+                      <span className="sort-icon" aria-hidden="true">
+                        {active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((a) => {
+              const isSelected = selected.has(a.id);
+              return (
+                <tr key={a.id} className={isSelected ? 'is-selected' : ''}>
+                  <td className="check-col">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleRow(a.id)}
+                      aria-label={'Select ' + a.name}
+                    />
+                  </td>
+                  <td className="name-cell">{a.name}</td>
+                  <td>{a.owner}</td>
+                  <td><code>{a.version}</code></td>
+                  <td>{when(a.lastRun)}</td>
+                  <td className="num">{pct.format(a.successRate)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #F6F7F9;
+  color: #1A1F2B;
+}
+.page { max-width: 760px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+h1 { margin: 0; font-size: 20px; }
+
+.table-scroll {
+  max-height: 320px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #E2E5EA;
+  border-radius: 10px;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #EEF0F3; white-space: nowrap; }
+.table th { font-size: 12px; font-weight: 600; color: #5A6273; background: #FAFBFC; }
+
+/* Lookup: "sticky table header css" -> position: sticky on th, with a background */
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: inset 0 -1px 0 #E2E5EA;  /* borders on sticky cells scroll away; a shadow stays */
+}
+
+/* Lookup: "css zebra stripes nth-child" */
+.table tbody tr:nth-child(even) { background: #FBFBFD; }
+.table tbody tr:hover { background: #F2F5FF; }
+.table tbody tr.is-selected { background: #E8EEFF; }
+
+.check-col { width: 1%; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.name-cell { font-weight: 500; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #3B4252; }
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.num .sort-btn { flex-direction: row-reverse; }
+.sort-btn:hover, .sort-btn.is-active { color: #1A1F2B; }
+.sort-btn:focus-visible { outline: 2px solid #3451D1; outline-offset: 2px; border-radius: 4px; }
+.sort-icon { font-size: 9px; color: #98A0AE; }
+.sort-btn.is-active .sort-icon { color: #3451D1; }
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #E8EEFF;
+  color: #2A43B3;
+  font-size: 13px;
+  font-weight: 500;
+}
+.link-btn { border: 0; background: none; color: #3451D1; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }

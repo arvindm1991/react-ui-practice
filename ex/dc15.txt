@@ -1,0 +1,461 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Transaction = {
+  id: string;
+  date: string;        // ISO date, "2026-09-14"
+  description: string;
+  category: string;
+  amountCents: number; // negative = money out, positive = money in
+};
+
+// Returned in the order the bank posted them (not sorted by anything useful).
+const TRANSACTIONS: Transaction[] = [
+  { id: 't1', date: '2026-09-14', description: 'Figma', category: 'Software', amountCents: -4500 },
+  { id: 't2', date: '2026-09-02', description: 'Stripe payout', category: 'Income', amountCents: 1284000 },
+  { id: 't3', date: '2026-09-21', description: 'WeWork', category: 'Rent', amountCents: -320000 },
+  { id: 't4', date: '2026-08-29', description: 'Amazon Web Services', category: 'Infrastructure', amountCents: -86743 },
+  { id: 't5', date: '2026-09-18', description: 'Delta Air Lines', category: 'Travel', amountCents: -61220 },
+  { id: 't6', date: '2026-09-09', description: 'Gusto payroll', category: 'Payroll', amountCents: -1450000 },
+  { id: 't7', date: '2026-09-25', description: 'Acme Corp invoice #1042', category: 'Income', amountCents: 450000 },
+  { id: 't8', date: '2026-09-05', description: 'Blue Bottle Coffee', category: 'Meals', amountCents: -2870 },
+  { id: 't9', date: '2026-09-11', description: 'Notion', category: 'Software', amountCents: -1600 },
+  { id: 't10', date: '2026-08-31', description: 'Uber', category: 'Travel', amountCents: -3415 },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /accounts/checking/transactions -> Transaction[]
+export async function getTransactions(): Promise<Transaction[]> {
+  await randomDelay(300, 1000);
+  return TRANSACTIONS.map((t) => ({ ...t }));
+}
+@@@ shared src/utils/format.ts
+// formatMoney(-4500) -> "−$45.00"   formatMoney(1284000) -> "+$12,840.00"
+export function formatMoney(cents: number): string {
+  const abs = Math.abs(cents) / 100;
+  const text = abs.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  if (cents < 0) {
+    return '−' + text;
+  }
+  return '+' + text;
+}
+
+// formatDate("2026-09-14") -> "Sep 14, 2026"
+export function formatDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTransactions } from './api';
+import type { Transaction } from './api';
+import { formatDate, formatMoney } from './utils/format';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="brand">ledgerly</div>
+      <a className="side-link">Overview</a>
+      <a className="side-link is-active">Transactions</a>
+      <a className="side-link">Cards</a>
+      <a className="side-link">Bill pay</a>
+    </aside>
+  );
+}
+
+function BalanceStrip() {
+  return (
+    <div className="balances">
+      <div className="balance">
+        <span>Checking ••4821</span>
+        <b>$184,220.18</b>
+      </div>
+      <div className="balance">
+        <span>Money in (30d)</span>
+        <b className="pos">+$17,340.00</b>
+      </div>
+      <div className="balance">
+        <span>Money out (30d)</span>
+        <b>−$19,577.48</b>
+      </div>
+    </div>
+  );
+}
+
+function TransactionRow({ tx }: { tx: Transaction }) {
+  let amountCls = 'amount';
+  if (tx.amountCents > 0) {
+    amountCls = 'amount pos';
+  }
+  return (
+    <tr>
+      <td className="date">{formatDate(tx.date)}</td>
+      <td className="desc">{tx.description}</td>
+      <td><span className="cat">{tx.category}</span></td>
+      <td className={amountCls}>{formatMoney(tx.amountCents)}</td>
+    </tr>
+  );
+}
+
+// TODO: make the column headers sortable.
+function TransactionsTable() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTransactions().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTransactions(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <tr><td colSpan={4} className="table-msg">Loading transactions…</td></tr>;
+  } else {
+    body = transactions.map((tx) => {
+      return <TransactionRow key={tx.id} tx={tx} />;
+    });
+  }
+
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th className="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>{body}</tbody>
+    </table>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>Transactions</h1>
+        <BalanceStrip />
+        <div className="table-card">
+          <TransactionsTable />
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F3F5F4;
+  --surface: #FFFFFF;
+  --border: #E1E6E4;
+  --text: #0D1F1A;
+  --muted: #61716C;
+  --primary: #0B6E4F;
+  --primary-soft: #E2F1EB;
+  --positive: #0B8A5F;
+  --sidebar: #0D1F1A;
+  --radius: 10px;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 190px; flex-shrink: 0; padding: 22px 14px; background: var(--sidebar); color: #B9C7C2; display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 22px; color: #fff; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.side-link { padding: 8px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.side-link:hover { background: rgba(255, 255, 255, 0.06); }
+.side-link.is-active { background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 600; }
+
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+.main h1 { margin: 0 0 18px; font-size: 22px; }
+
+.balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.balance { padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 4px; }
+.balance span { font-size: 12px; color: var(--muted); }
+.balance b { font-family: var(--mono); font-size: 18px; }
+.pos { color: var(--positive); }
+
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); background: #F8FAF9; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #FAFCFB; }
+.table .num { text-align: right; }
+.date { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.desc { font-weight: 500; }
+.cat { padding: 3px 8px; border-radius: 6px; background: #EEF2F0; font-size: 12px; color: var(--muted); }
+.amount { text-align: right; font-family: var(--mono); font-size: 13px; }
+.table-msg { text-align: center; color: var(--muted); padding: 32px 16px; }
+
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+}
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTransactions } from './api';
+import type { Transaction } from './api';
+import { formatDate, formatMoney } from './utils/format';
+
+type SortKey = 'date' | 'description' | 'category' | 'amountCents';
+type SortDir = 'asc' | 'desc';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="brand">ledgerly</div>
+      <a className="side-link">Overview</a>
+      <a className="side-link is-active">Transactions</a>
+      <a className="side-link">Cards</a>
+      <a className="side-link">Bill pay</a>
+    </aside>
+  );
+}
+
+function BalanceStrip() {
+  return (
+    <div className="balances">
+      <div className="balance">
+        <span>Checking ••4821</span>
+        <b>$184,220.18</b>
+      </div>
+      <div className="balance">
+        <span>Money in (30d)</span>
+        <b className="pos">+$17,340.00</b>
+      </div>
+      <div className="balance">
+        <span>Money out (30d)</span>
+        <b>−$19,577.48</b>
+      </div>
+    </div>
+  );
+}
+
+function TransactionRow({ tx }: { tx: Transaction }) {
+  let amountCls = 'amount';
+  if (tx.amountCents > 0) {
+    amountCls = 'amount pos';
+  }
+  return (
+    <tr>
+      <td className="date">{formatDate(tx.date)}</td>
+      <td className="desc">{tx.description}</td>
+      <td><span className="cat">{tx.category}</span></td>
+      <td className={amountCls}>{formatMoney(tx.amountCents)}</td>
+    </tr>
+  );
+}
+
+type SortHeaderProps = {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey | null;
+  sortDir: SortDir;
+  onSort: (column: SortKey) => void;
+  numeric?: boolean;
+};
+
+function SortHeader({ label, column, sortKey, sortDir, onSort, numeric }: SortHeaderProps) {
+  const active = sortKey === column;
+  let arrow = '↕';
+  let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
+  let btnCls = 'sort-btn';
+  if (active && sortDir === 'asc') {
+    arrow = '▲';
+    ariaSort = 'ascending';
+    btnCls = 'sort-btn is-active';
+  }
+  if (active && sortDir === 'desc') {
+    arrow = '▼';
+    ariaSort = 'descending';
+    btnCls = 'sort-btn is-active';
+  }
+  let thCls = '';
+  if (numeric) {
+    thCls = 'num';
+  }
+  return (
+    <th className={thCls} aria-sort={ariaSort}>
+      <button type="button" className={btnCls} onClick={() => { onSort(column); }}>
+        {label} <span className="arrow">{arrow}</span>
+      </button>
+    </th>
+  );
+}
+
+// Returns a NEW sorted array. .sort() sorts in place, so copy first.
+function sortTransactions(list: Transaction[], key: SortKey, dir: SortDir): Transaction[] {
+  const sorted = [...list].sort((a, b) => {
+    if (key === 'amountCents') {
+      return a.amountCents - b.amountCents;
+    }
+    if (key === 'date') {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }
+    return a[key].localeCompare(b[key]);
+  });
+  if (dir === 'desc') {
+    sorted.reverse(); // fine: `sorted` is already our own copy
+  }
+  return sorted;
+}
+
+function TransactionsTable() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  useEffect(() => {
+    let cancelled = false;
+    getTransactions().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTransactions(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // New column: asc. Same column: asc -> desc -> off (back to the bank's order).
+  function handleSort(column: SortKey) {
+    if (column !== sortKey) {
+      setSortKey(column);
+      setSortDir('asc');
+      return;
+    }
+    if (sortDir === 'asc') {
+      setSortDir('desc');
+      return;
+    }
+    setSortKey(null);
+    setSortDir('asc');
+  }
+
+  // derived: the original list is never touched, so "off" can show it again
+  let visible = transactions;
+  if (sortKey) {
+    visible = sortTransactions(transactions, sortKey, sortDir);
+  }
+
+  let body;
+  if (loading) {
+    body = <tr><td colSpan={4} className="table-msg">Loading transactions…</td></tr>;
+  } else {
+    body = visible.map((tx) => {
+      return <TransactionRow key={tx.id} tx={tx} />;
+    });
+  }
+
+  const headerProps = { sortKey: sortKey, sortDir: sortDir, onSort: handleSort };
+
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <SortHeader label="Date" column="date" {...headerProps} />
+          <SortHeader label="Description" column="description" {...headerProps} />
+          <SortHeader label="Category" column="category" {...headerProps} />
+          <SortHeader label="Amount" column="amountCents" numeric {...headerProps} />
+        </tr>
+      </thead>
+      <tbody>{body}</tbody>
+    </table>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>Transactions</h1>
+        <BalanceStrip />
+        <div className="table-card">
+          <TransactionsTable />
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F3F5F4;
+  --surface: #FFFFFF;
+  --border: #E1E6E4;
+  --text: #0D1F1A;
+  --muted: #61716C;
+  --primary: #0B6E4F;
+  --primary-soft: #E2F1EB;
+  --positive: #0B8A5F;
+  --sidebar: #0D1F1A;
+  --radius: 10px;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 190px; flex-shrink: 0; padding: 22px 14px; background: var(--sidebar); color: #B9C7C2; display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 22px; color: #fff; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.side-link { padding: 8px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.side-link:hover { background: rgba(255, 255, 255, 0.06); }
+.side-link.is-active { background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 600; }
+
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+.main h1 { margin: 0 0 18px; font-size: 22px; }
+
+.balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.balance { padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 4px; }
+.balance span { font-size: 12px; color: var(--muted); }
+.balance b { font-family: var(--mono); font-size: 18px; }
+.pos { color: var(--positive); }
+
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); background: #F8FAF9; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #FAFCFB; }
+.table .num { text-align: right; }
+.date { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.desc { font-weight: 500; }
+.cat { padding: 3px 8px; border-radius: 6px; background: #EEF2F0; font-size: 12px; color: var(--muted); }
+.amount { text-align: right; font-family: var(--mono); font-size: 13px; }
+.table-msg { text-align: center; color: var(--muted); padding: 32px 16px; }
+
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+}
+
+/* ---- Added: sortable headers ---- */
+.sort-btn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.sort-btn:hover { color: var(--text); }
+.sort-btn.is-active { color: var(--primary); }
+.arrow { font-size: 10px; color: #A4B1AC; }
+.sort-btn.is-active .arrow { color: var(--primary); }

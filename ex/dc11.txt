@@ -1,0 +1,364 @@
+@@@ shared src/components/Toggle.tsx
+import React from 'react';
+
+type ToggleProps = {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string; // read by screen readers
+};
+
+// A controlled switch. It owns no state: the parent passes `checked`
+// and is told the new value through `onChange`.
+export function Toggle({ checked, onChange, label }: ToggleProps) {
+  let cls = 'toggle';
+  if (checked) {
+    cls = 'toggle is-on';
+  }
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={cls}
+      onClick={() => { onChange(!checked); }}
+    >
+      <span className="toggle-knob" />
+    </button>
+  );
+}
+@@@ shared src/data/notifications.ts
+export type NotificationSetting = {
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+};
+
+// What the server says the user has today. Treat it as read-only.
+export const DEFAULT_SETTINGS: NotificationSetting[] = [
+  { id: 'dm', label: 'Direct messages', description: 'When someone sends you a message', enabled: true },
+  { id: 'mentions', label: 'Mentions', description: 'When someone @mentions you in a channel', enabled: true },
+  { id: 'threads', label: 'Thread replies', description: 'Replies in threads you follow', enabled: true },
+  { id: 'channels', label: 'Channel activity', description: 'Every new message in channels you joined', enabled: false },
+  { id: 'reminders', label: 'Reminders', description: 'Reminders you set with /remind', enabled: true },
+  { id: 'digest', label: 'Weekly digest', description: 'A Monday email with what you missed', enabled: false },
+  { id: 'product', label: 'Product updates', description: 'New features and tips from Tandem', enabled: false },
+];
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { Toggle } from './components/Toggle';
+import { DEFAULT_SETTINGS } from './data/notifications';
+
+function Sidebar() {
+  const items = ['Profile', 'Notifications', 'Appearance', 'Security', 'Billing'];
+  return (
+    <nav className="sidebar">
+      <div className="brand"><span className="brand-mark">t</span> Tandem</div>
+      <p className="sidebar-label">Settings</p>
+      {items.map((item) => {
+        let cls = 'nav-item';
+        if (item === 'Notifications') {
+          cls = 'nav-item is-active';
+        }
+        return <a key={item} className={cls}>{item}</a>;
+      })}
+    </nav>
+  );
+}
+
+// Already works: an example of using <Toggle /> with state.
+function DoNotDisturbCard() {
+  const [paused, setPaused] = useState(false);
+
+  let status = 'Notifications are on';
+  if (paused) {
+    status = 'Paused until tomorrow, 9:00 AM';
+  }
+
+  return (
+    <section className="card dnd">
+      <div>
+        <h3>Do not disturb</h3>
+        <p className="muted">{status}</p>
+      </div>
+      <Toggle checked={paused} onChange={(next) => { setPaused(next); }} label="Do not disturb" />
+    </section>
+  );
+}
+
+function NotificationsCard() {
+  // TODO: make each row switchable, show "4 of 7 enabled", wire "Turn all off".
+  return (
+    <section className="card">
+      <header className="card-head">
+        <div>
+          <h3>Notify me about</h3>
+        </div>
+        <button type="button" className="link-btn">Turn all off</button>
+      </header>
+      <ul className="setting-list">
+        {DEFAULT_SETTINGS.map((s) => {
+          return (
+            <li key={s.id} className="setting-row">
+              <div>
+                <p className="setting-label">{s.label}</p>
+                <p className="muted">{s.description}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>Notifications</h1>
+        <p className="muted lead">Choose what Tandem pings you about on desktop and mobile.</p>
+        <DoNotDisturbCard />
+        <NotificationsCard />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F5F1;
+  --surface: #FFFFFF;
+  --border: #E7E4DC;
+  --text: #22201B;
+  --muted: #77726A;
+  --primary: #0F9D6E;
+  --primary-soft: #E3F4EC;
+  --toggle-off: #D6D2C8;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar { width: 210px; flex-shrink: 0; padding: 24px 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; margin-bottom: 24px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.sidebar-label { margin: 0 0 6px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.nav-item { padding: 8px 10px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-item:hover { background: #EEECE6; color: var(--text); }
+.nav-item.is-active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(34, 32, 27, 0.08); }
+
+.main { flex: 1; min-width: 0; max-width: 680px; padding: 32px 32px 48px; }
+.main h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.main .lead { margin: 6px 0 24px; }
+.muted { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.card h3 { margin: 0; font-size: 15px; }
+.dnd { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+
+.card-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.link-btn { border: 0; background: none; padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:hover { background: var(--primary-soft); }
+
+.setting-list { list-style: none; margin: 0; padding: 0; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: 0; }
+.setting-label { margin: 0; font-size: 14px; font-weight: 600; }
+
+/* Toggle (components/Toggle.tsx) */
+.toggle { position: relative; width: 40px; height: 24px; flex-shrink: 0; padding: 0; border: 0; border-radius: 999px; background: var(--toggle-off); cursor: pointer; transition: background 0.15s; }
+.toggle-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 0.15s; }
+.toggle.is-on { background: var(--primary); }
+.toggle.is-on .toggle-knob { transform: translateX(16px); }
+.toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { Toggle } from './components/Toggle';
+import { DEFAULT_SETTINGS } from './data/notifications';
+import type { NotificationSetting } from './data/notifications';
+
+function Sidebar() {
+  const items = ['Profile', 'Notifications', 'Appearance', 'Security', 'Billing'];
+  return (
+    <nav className="sidebar">
+      <div className="brand"><span className="brand-mark">t</span> Tandem</div>
+      <p className="sidebar-label">Settings</p>
+      {items.map((item) => {
+        let cls = 'nav-item';
+        if (item === 'Notifications') {
+          cls = 'nav-item is-active';
+        }
+        return <a key={item} className={cls}>{item}</a>;
+      })}
+    </nav>
+  );
+}
+
+// Already works: an example of using <Toggle /> with state.
+function DoNotDisturbCard() {
+  const [paused, setPaused] = useState(false);
+
+  let status = 'Notifications are on';
+  if (paused) {
+    status = 'Paused until tomorrow, 9:00 AM';
+  }
+
+  return (
+    <section className="card dnd">
+      <div>
+        <h3>Do not disturb</h3>
+        <p className="muted">{status}</p>
+      </div>
+      <Toggle checked={paused} onChange={(next) => { setPaused(next); }} label="Do not disturb" />
+    </section>
+  );
+}
+
+function NotificationsCard() {
+  // The list is the single source of truth. Copy the defaults into state once.
+  const [settings, setSettings] = useState<NotificationSetting[]>(DEFAULT_SETTINGS);
+
+  function handleToggle(id: string, next: boolean) {
+    setSettings((prev) => {
+      return prev.map((s) => {
+        if (s.id !== id) {
+          return s;
+        }
+        return { ...s, enabled: next };
+      });
+    });
+  }
+
+  function setAll(enabled: boolean) {
+    setSettings((prev) => {
+      return prev.map((s) => {
+        return { ...s, enabled: enabled };
+      });
+    });
+  }
+
+  // derived: never stored in state
+  const enabledCount = settings.filter((s) => {
+    return s.enabled;
+  }).length;
+
+  // Change: when everything is off, the same button turns everything back on.
+  let bulkLabel = 'Turn all off';
+  let bulkNext = false;
+  if (enabledCount === 0) {
+    bulkLabel = 'Turn all on';
+    bulkNext = true;
+  }
+
+  return (
+    <section className="card">
+      <header className="card-head">
+        <div>
+          <h3>Notify me about</h3>
+          <p className="muted enabled-count">{enabledCount} of {settings.length} enabled</p>
+        </div>
+        <button type="button" className="link-btn" onClick={() => { setAll(bulkNext); }}>{bulkLabel}</button>
+      </header>
+      <ul className="setting-list">
+        {settings.map((s) => {
+          let cls = 'setting-row';
+          if (!s.enabled) {
+            cls = 'setting-row is-off';
+          }
+          return (
+            <li key={s.id} className={cls}>
+              <div>
+                <p className="setting-label">{s.label}</p>
+                <p className="muted">{s.description}</p>
+              </div>
+              <Toggle checked={s.enabled} onChange={(next) => { handleToggle(s.id, next); }} label={s.label} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main">
+        <h1>Notifications</h1>
+        <p className="muted lead">Choose what Tandem pings you about on desktop and mobile.</p>
+        <DoNotDisturbCard />
+        <NotificationsCard />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F5F1;
+  --surface: #FFFFFF;
+  --border: #E7E4DC;
+  --text: #22201B;
+  --muted: #77726A;
+  --primary: #0F9D6E;
+  --primary-soft: #E3F4EC;
+  --toggle-off: #D6D2C8;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar { width: 210px; flex-shrink: 0; padding: 24px 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; margin-bottom: 24px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.sidebar-label { margin: 0 0 6px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.nav-item { padding: 8px 10px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-item:hover { background: #EEECE6; color: var(--text); }
+.nav-item.is-active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(34, 32, 27, 0.08); }
+
+.main { flex: 1; min-width: 0; max-width: 680px; padding: 32px 32px 48px; }
+.main h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.main .lead { margin: 6px 0 24px; }
+.muted { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.card h3 { margin: 0; font-size: 15px; }
+.dnd { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+
+.card-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.link-btn { border: 0; background: none; padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:hover { background: var(--primary-soft); }
+
+.setting-list { list-style: none; margin: 0; padding: 0; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: 0; }
+.setting-label { margin: 0; font-size: 14px; font-weight: 600; }
+
+/* Toggle (components/Toggle.tsx) */
+.toggle { position: relative; width: 40px; height: 24px; flex-shrink: 0; padding: 0; border: 0; border-radius: 999px; background: var(--toggle-off); cursor: pointer; transition: background 0.15s; }
+.toggle-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 0.15s; }
+.toggle.is-on { background: var(--primary); }
+.toggle.is-on .toggle-knob { transform: translateX(16px); }
+.toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+}
+
+/* ---- Added: notification toggles ---- */
+.enabled-count { font-variant-numeric: tabular-nums; }
+.setting-row.is-off .setting-label { color: var(--muted); }

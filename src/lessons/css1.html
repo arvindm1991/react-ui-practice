@@ -1,0 +1,182 @@
+<template id="tpl-css">
+  <h1>Boxes, flow and the cascade</h1>
+  <p class="lede">Before flexbox and grid make sense, you need the three ideas underneath every layout: every element is a box, boxes are placed by "normal flow" unless you say otherwise, and when two rules disagree the cascade decides who wins.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain why a box is wider than the width you gave it, and fix it</li>
+    <li>Choose between padding, margin and gap without guessing</li>
+    <li>Work out why a style "isn't applying"</li>
+  </ul></div>
+
+  <h2>1. Every element is a box</h2>
+  <p>The browser draws every element as a rectangle made of four layers, from the inside out:</p>
+  <div class="boxmodel"><span>margin · space outside, between this box and its neighbors</span>
+    <div class="bm-border"><span>border</span>
+      <div class="bm-pad"><span>padding · space inside, painted with the background</span>
+        <div class="bm-content">content · the text or child elements</div>
+      </div>
+    </div>
+  </div>
+  <ul>
+    <li><b>Content</b> is the text or the child elements.</li>
+    <li><b>Padding</b> is breathing room <em>inside</em> the box. The background color fills it, so a button's padding is the colored area around its label.</li>
+    <li><b>Border</b> is the line around the padding.</li>
+    <li><b>Margin</b> is space <em>outside</em> the box. It's always transparent. It pushes neighbors away.</li>
+  </ul>
+
+  <h3>The surprise: width doesn't include padding by default</h3>
+  <p>By default, <code>width: 200px</code> sets the width of the <em>content</em> only. Add <code>padding: 20px</code> and a <code>2px</code> border and the box is actually 200 + 20 + 20 + 2 + 2 = <b>244px</b> wide. That's almost never what you want, because designs give you the outer size.</p>
+  <p><code>box-sizing: border-box</code> changes the rule so that <code>width</code> means the outer edge, including padding and border. The padding then eats into the content instead of growing the box. That's why nearly every codebase starts with <code>* { box-sizing: border-box; }</code>, and why you should check the codebase has it.</p>
+
+  <script type="text/x-play" data-title="See box-sizing" data-h="200" data-console="off">
+export default function App() {
+  return (
+    <div className="stack">
+      <div className="box content-box">content-box: 200 wide?</div>
+      <div className="box border-box">border-box: 200 wide</div>
+      <div className="ruler">← 200px →</div>
+    </div>
+  );
+}
+/*** css ***/
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.box {
+  width: 200px;
+  padding: 20px;
+  border: 2px solid #3451D1;
+  background: #E8EEFF;
+  font-size: 13px;
+}
+.content-box { box-sizing: content-box; }
+.border-box { box-sizing: border-box; }
+.ruler { width: 200px; text-align: center; font-size: 12px; color: #6B7385; border-top: 2px solid #6B7385; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Compare both boxes with the ruler. The first is 244px wide.</li>
+    <li>In styles.css, change <code>padding: 20px</code> to <code>padding: 40px</code>. The content-box version grows; the border-box version stays 200px and its text gets squeezed.</li>
+  </ol></div>
+
+  <h2>2. Block and inline: the two default behaviors</h2>
+  <p>Before you write any layout CSS, every element already has a default way of being placed. There are two you need to know:</p>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Block</th><th>Inline</th></tr>
+    <tr><td>Examples</td><td><code>div</code>, <code>p</code>, <code>h1</code>–<code>h6</code>, <code>ul</code>, <code>li</code>, <code>section</code>, <code>header</code>, <code>form</code></td><td><code>span</code>, <code>a</code>, <code>strong</code>, <code>em</code>, <code>code</code>, <code>img</code></td></tr>
+    <tr><td>Placement</td><td>Starts on a new line. Stacks top to bottom.</td><td>Sits inside a line of text, like a word.</td></tr>
+    <tr><td>Width</td><td>Stretches to fill its parent's width</td><td>Only as wide as its content</td></tr>
+    <tr><td>width / height / vertical margin</td><td>Work</td><td><b>Ignored</b></td></tr>
+  </table></div>
+  <p>This explains a whole class of "why doesn't this work?" moments. If you give a <code>&lt;span&gt;</code> a width or a top margin and nothing happens, it's because it's inline. Fix it with <code>display: inline-block</code> (sits in a line but accepts sizes) or <code>display: block</code>, or put it inside a flex container, which turns its children into blocks for layout purposes.</p>
+  <p><code>button</code>, <code>input</code> and <code>select</code> are <em>inline-block</em> by default: they sit in a line but accept width and height.</p>
+
+  <h2>3. Normal flow, and who controls layout</h2>
+  <p>With no layout CSS at all, the browser uses <b>normal flow</b>: block children stack vertically, each full width; inline children flow left to right and wrap like text. That's what you see when you render unstyled JSX.</p>
+  <p>The key idea for everything that follows: <b>layout is controlled by the parent</b>. When you write <code>display: flex</code> or <code>display: grid</code>, you put it on the <em>container</em>, and it changes how that container's <em>direct children</em> are arranged. Grandchildren are not affected. They follow their own parent's rules. When a layout looks wrong, the first question is: "which element is the parent of the things I'm trying to arrange, and what display does it have?"</p>
+
+  <h2>4. Padding, margin or gap?</h2>
+  <p>All three create space. Choosing the right one is mostly about <em>where</em> the space belongs:</p>
+  <ul>
+    <li><b>Padding</b>: space between a box's edge and its own content. "The card has 20px of padding." Belongs to the box.</li>
+    <li><b>Gap</b>: space <em>between</em> children of a flex or grid container. "The items are 12px apart." Belongs to the parent, and only appears between items, never before the first or after the last.</li>
+    <li><b>Margin</b>: space outside one specific box. Useful for one-off nudges and for <code>margin-left: auto</code> tricks (next lesson).</li>
+  </ul>
+  <p>Why prefer gap over margins between siblings? Margins have two awkward behaviors. You have to remember to remove the margin on the last item, and <b>vertical margins collapse</b>: when a block with <code>margin-bottom: 16px</code> sits above one with <code>margin-top: 16px</code>, the space between them is 16px, not 32px. The larger margin wins. Gap has neither problem.</p>
+  <p>Figma's auto layout has exactly the same split: "padding" is padding, "spacing between items" is gap. That's why it translates so cleanly.</p>
+
+  <script type="text/x-play" data-title="Padding, margin, gap" data-h="250" data-console="off">
+export default function App() {
+  return (
+    <div>
+      <p className="label">Spaced with margins (note the collapse)</p>
+      <div className="list-margins">
+        <div className="item">One</div>
+        <div className="item">Two</div>
+        <div className="item">Three</div>
+      </div>
+      <p className="label">Spaced with gap</p>
+      <div className="list-gap">
+        <div className="item">One</div>
+        <div className="item">Two</div>
+        <div className="item">Three</div>
+      </div>
+    </div>
+  );
+}
+/*** css ***/
+.label { margin: 12px 0 6px; font-size: 12px; color: #6B7385; }
+.item { padding: 8px 12px; background: #E8EEFF; border: 1px solid #C5D0F5; }
+
+/* each item: 16px above AND 16px below. Gap between items is still 16, not 32 */
+.list-margins .item { margin: 16px 0; }
+
+.list-gap { display: flex; flex-direction: column; gap: 16px; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Notice the margin version has extra space above "One" and below "Three". Gap only adds space <em>between</em>.</li>
+    <li>Change the gap to <code>4px</code>, then to <code>32px</code>.</li>
+    <li>Change the item padding to <code>16px 20px</code>. Padding makes the colored box itself bigger.</li>
+  </ol></div>
+
+  <h2>5. Units you'll actually use</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Unit</th><th>Means</th><th>Use it for</th></tr>
+    <tr><td><code>px</code></td><td>Fixed size</td><td>Almost everything from a Figma spec: padding, gap, radius, font size</td></tr>
+    <tr><td><code>%</code></td><td>Percentage of the parent</td><td>Widths like "fill half", and progress bars</td></tr>
+    <tr><td><code>em</code></td><td>Multiple of this element's font size</td><td>Letter spacing (<code>0.02em</code>), spacing that should scale with text</td></tr>
+    <tr><td><code>rem</code></td><td>Multiple of the root font size (usually 16px)</td><td>Codebases that size type in rem. Match them</td></tr>
+    <tr><td><code>vh</code> / <code>vw</code></td><td>1% of the viewport height / width</td><td>Full-height app shells: <code>height: 100vh</code></td></tr>
+    <tr><td><code>fr</code></td><td>A share of leftover space (grid only)</td><td>Grid columns</td></tr>
+  </table></div>
+  <p>Line height without a unit (<code>line-height: 1.5</code>) means "1.5 times the font size", and it's the usual way to write it.</p>
+
+  <h2>6. The cascade: why your style isn't applying</h2>
+  <p>"Cascading" means many rules can target the same element, and the browser has to pick a winner for each property. It decides in this order:</p>
+  <ol>
+    <li><b>Specificity.</b> More specific selectors win. Roughly: an id (<code>#x</code>) beats a class (<code>.x</code>), which beats an element (<code>p</code>). Combining adds up: <code>.card .title</code> (two classes) beats <code>.title</code> (one class). Inline <code>style={…}</code> beats any class.</li>
+    <li><b>Order.</b> If specificity is equal, the rule that comes <em>later</em> in the CSS wins.</li>
+  </ol>
+  <p>So when a style seems ignored, it's usually being <em>overridden</em> by a more specific or later rule. Right-click the element → Inspect, and DevTools shows every matching rule with the losing properties crossed out. That tells you exactly what's winning and from where.</p>
+  <p>Practical habit for the interview: use one class per element (<code>.card-title</code>), don't nest selectors deeply, and don't use ids for styling. Equal, low specificity everywhere means "later wins", which is easy to reason about.</p>
+
+  <script type="text/x-play" data-title="Which rule wins?" data-h="210" data-console="off">
+export default function App() {
+  return (
+    <div className="card">
+      <p className="title">What color am I?</p>
+      <p>Plain paragraph</p>
+    </div>
+  );
+}
+/*** css ***/
+.title { color: green; }
+.card p { color: red; }   /* class + element: more specific than .title */
+p { color: gray; }        /* element only: least specific */
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>The title is red: <code>.card p</code> (a class plus an element) is more specific than <code>.title</code> (one class), even though <code>.title</code> was written first.</li>
+    <li>Change the first selector to <code>.card .title</code>. Two classes beat one class plus an element, so the title turns green.</li>
+    <li>Move the <code>p</code> rule to the top. Nothing changes: order only matters when specificity ties.</li>
+  </ol></div>
+
+  <h2>7. Inheritance</h2>
+  <p>Some properties pass down from parent to children automatically: <code>color</code>, <code>font-family</code>, <code>font-size</code>, <code>font-weight</code>, <code>line-height</code>, <code>text-align</code>. That's why setting <code>font-family</code> on <code>body</code> styles the whole page.</p>
+  <p>Box properties do <b>not</b> inherit: <code>margin</code>, <code>padding</code>, <code>border</code>, <code>background</code>, <code>width</code>, <code>display</code>.</p>
+  <p>One trap: form controls (<code>button</code>, <code>input</code>, <code>select</code>, <code>textarea</code>) don't inherit fonts in most browsers. They use a small system font. That's why codebases include <code>button, input { font: inherit; }</code>, and why your button text might look different from the design.</p>
+
+  <h2>8. A reset worth knowing</h2>
+  <p>Browsers add default styles: margins on headings, paragraphs and lists, bullets on lists, 8px of margin on the body. Designs never include those. A typical reset:</p>
+  <script type="text/x-code" data-lang="css" data-title="reset">
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2, h3, p, ul, ol { margin: 0; }
+ul { padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; }
+</script>
+  <p>Check whether the interview codebase already has one before adding your own.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Box is wider than the design and overflows its parent</b><p>Missing <code>box-sizing: border-box</code>, or <code>width: 100%</code> plus padding on a content-box element.</p></div>
+  <div class="mistake"><b>Width or margin-top on a span does nothing</b><p>It's inline. Use <code>display: inline-block</code>, or make the parent a flex container.</p></div>
+  <div class="mistake"><b>Mysterious space above a heading</b><p>Browser default margin on <code>h1</code>/<code>p</code>. Reset it.</p></div>
+  <div class="mistake"><b>A style "doesn't work"</b><p>Inspect it. It's crossed out because something more specific or later wins, the class name is misspelled, or you wrote <code>class</code> instead of <code>className</code> in JSX.</p></div>
+
+  <div data-quiz="box"></div>
+</template>

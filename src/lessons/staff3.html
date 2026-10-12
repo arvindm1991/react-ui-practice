@@ -1,0 +1,371 @@
+<template id="tpl-st-render">
+  <h1>Where your code runs: CSR, SSR and Server Components</h1>
+  <p class="lede">Every React screen has to become HTML somewhere: in the user's browser, on a server when they ask for it, or on a build machine before anyone asks. Where that happens decides how fast the page appears, whether search engines can read it, how much JavaScript the user downloads, and whether your database password could end up in someone's browser. This lesson builds the mental model one step at a time, using one app.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Say what the browser actually receives under client rendering, server rendering, static generation and streaming</li>
+    <li>Explain hydration, and why "text content does not match" errors happen</li>
+    <li>Draw the server/client boundary in a React Server Components app and say what may cross it</li>
+    <li>Read a Next.js App Router folder and know what each special file does</li>
+    <li>Decide, screen by screen, what should render where, and defend the choice in a design review</li>
+  </ul></div>
+
+  <h2>1. The app: Lexi, and three very different screens</h2>
+  <p><b>Lexi</b> is a reading app for schools. Students read books in short sessions, teachers watch their class's progress, and district staff pull reports. We'll carry three of its screens through the whole lesson, because they want different things:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Screen</th><th>Who sees it</th><th>What it needs most</th></tr>
+    <tr><td><b>Marketing page</b> (<code>/</code>)</td><td>Anyone, including Google</td><td>Shows up fast, readable by search engines, same for everyone</td></tr>
+    <tr><td><b>Teacher dashboard</b> (<code>/classes/[id]</code>)</td><td>One logged-in teacher</td><td>Personal data, search box, filters, live-ish numbers</td></tr>
+    <tr><td><b>District report</b> (<code>/reports/district</code>)</td><td>District admins</td><td>Heavy queries over thousands of students, big charts, mostly read-only</td></tr>
+  </table></div>
+  <p>A junior answer is "it's a React app, so it's all React." A staff answer starts with: "these three screens have different jobs, so they might not render the same way."</p>
+
+  <h2>2. What the browser actually receives</h2>
+  <p>The clearest way to tell the strategies apart is to ask: <b>when the first response arrives, what's in it?</b></p>
+
+  <h3>Client-side rendering (CSR)</h3>
+  <p>The server sends an almost empty HTML file: a <code>&lt;div id="root"&gt;&lt;/div&gt;</code> and a <code>&lt;script&gt;</code> tag. The browser downloads the JavaScript bundle, runs React, React fetches data, and only then does anything appear. This is what a classic Vite or Create React App single-page app does. The user stares at a blank page (or a spinner) for the whole download-run-fetch chain, and a search crawler that doesn't run JavaScript sees nothing.</p>
+
+  <h3>Server-side rendering (SSR)</h3>
+  <p>When the request arrives, the server runs your React components, fetches the data, and sends back <b>complete HTML</b>: the teacher's actual class list, already there. The browser can paint it immediately. The JavaScript still downloads afterwards, because the buttons and search box need it to work. Until it arrives, the page is visible but not yet interactive.</p>
+
+  <h3>Static generation (SSG)</h3>
+  <p>Same as SSR, but done <b>once at build time</b> instead of per request. The HTML files sit on a CDN (a network of servers close to users) and are served instantly. Perfect for the marketing page, which is the same for everyone. Useless for the teacher dashboard, which is different for every teacher and changes every few minutes. A middle ground, often called <b>incremental regeneration</b>, rebuilds a static page in the background every N minutes or when data changes.</p>
+
+  <h3>Streaming SSR</h3>
+  <p>Plain SSR has a weakness: the server can't send anything until <em>all</em> the data is ready. If the district report's slowest query takes 4 seconds, the user waits 4 seconds for the first byte. Streaming fixes this. The server sends the <b>shell</b> (header, navigation, layout, placeholder skeletons) right away, keeps the connection open, and sends each slow section's HTML as soon as its data is ready, with a tiny inline script that swaps it into place.</p>
+
+  <svg viewBox="0 0 680 310" width="100%" role="img" aria-label="Timeline comparing CSR, SSR, SSG and streaming: when content becomes visible and when it becomes interactive" style="font-family:var(--font-body);font-size:12px;margin:12px 0 20px">
+    <g>
+      <rect x="120" y="6" width="14" height="12" rx="2" style="fill:var(--surface-2);stroke:var(--line)"/><text x="140" y="16" style="fill:var(--muted)">server work</text>
+      <rect x="230" y="6" width="14" height="12" rx="2" style="fill:none;stroke:var(--muted);stroke-dasharray:3 3"/><text x="250" y="16" style="fill:var(--muted)">blank screen</text>
+      <rect x="350" y="6" width="14" height="12" rx="2" style="fill:var(--warn-soft);stroke:var(--warn)"/><text x="370" y="16" style="fill:var(--muted)">visible, not clickable yet</text>
+      <rect x="550" y="6" width="14" height="12" rx="2" style="fill:var(--ok-soft);stroke:var(--ok)"/><text x="570" y="16" style="fill:var(--muted)">interactive</text>
+    </g>
+    <text x="0" y="62" style="fill:currentColor;font-weight:600;font-size:13px">CSR</text>
+    <rect x="120" y="44" width="350" height="28" rx="4" style="fill:none;stroke:var(--muted);stroke-dasharray:4 3"/>
+    <text x="130" y="62" style="fill:var(--muted)">download JS → run React → fetch data</text>
+    <rect x="470" y="44" width="200" height="28" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="480" y="62" style="fill:currentColor">content + clicks, together</text>
+
+    <text x="0" y="122" style="fill:currentColor;font-weight:600;font-size:13px">SSR</text>
+    <rect x="120" y="104" width="170" height="28" rx="4" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="130" y="122" style="fill:currentColor">fetch + render</text>
+    <rect x="290" y="104" width="180" height="28" rx="4" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="300" y="122" style="fill:currentColor">HTML painted, JS loading</text>
+    <rect x="470" y="104" width="200" height="28" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="480" y="122" style="fill:currentColor">hydrated</text>
+
+    <text x="0" y="182" style="fill:currentColor;font-weight:600;font-size:13px">SSG</text>
+    <rect x="120" y="164" width="36" height="28" rx="4" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="124" y="182" style="fill:currentColor">CDN</text>
+    <rect x="156" y="164" width="180" height="28" rx="4" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="166" y="182" style="fill:currentColor">HTML painted, JS loading</text>
+    <rect x="336" y="164" width="334" height="28" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="346" y="182" style="fill:currentColor">hydrated (built once, same for everyone)</text>
+
+    <text x="0" y="242" style="fill:currentColor;font-weight:600;font-size:13px">Streaming</text>
+    <rect x="120" y="224" width="50" height="28" rx="4" style="fill:var(--surface-2);stroke:var(--line)"/>
+    <text x="126" y="242" style="fill:currentColor">shell</text>
+    <rect x="170" y="224" width="250" height="28" rx="4" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+    <text x="180" y="242" style="fill:currentColor">shell + skeletons, slow parts arrive</text>
+    <rect x="420" y="224" width="250" height="28" rx="4" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+    <text x="430" y="242" style="fill:currentColor">sections hydrate as they land</text>
+
+    <line x1="120" y1="282" x2="664" y2="282" style="stroke:var(--muted)"/>
+    <path d="M664 277 L674 282 L664 287 Z" style="fill:var(--muted)"/>
+    <text x="120" y="302" style="fill:var(--muted)">request sent</text>
+    <text x="620" y="302" style="fill:var(--muted)">time</text>
+  </svg>
+  <p>Read the diagram top to bottom. CSR shows nothing for the longest time, then everything at once. SSR and SSG show content early but have a "looks ready, isn't" window. Streaming shows <em>something</em> almost immediately and fills in.</p>
+
+  <h2>3. Hydration: bringing server HTML to life</h2>
+  <p>Server HTML is just markup. The search box is drawn, but typing in it does nothing because no JavaScript is attached. <b>Hydration</b> is the step where React, running in the browser, renders the same components again, walks the existing HTML, and attaches event handlers and state to it, instead of throwing it away and rebuilding it.</p>
+  <p>For that to work, React has a strict expectation: <b>the browser's first render must produce exactly the same output as the server's render.</b> When it doesn't, you get a <b>hydration mismatch</b>. React logs an error, and for that part of the tree it may throw away the server HTML and re-render it on the client, which costs time and can flash.</p>
+  <p>Mismatches come from anything that gives a different answer on the server than in the browser:</p>
+  <ul>
+    <li>Dates and times: the server runs in UTC, the teacher's laptop is in Pacific time.</li>
+    <li><code>Math.random()</code> or <code>Date.now()</code> during render.</li>
+    <li>Reading <code>window</code>, <code>localStorage</code> or the screen width during render ("if there's a window, show the compact layout").</li>
+    <li>Locale formatting that depends on the machine: <code>toLocaleString()</code> with no locale given.</li>
+    <li>Browser extensions that inject markup (you can't fix those, but you should recognise them).</li>
+  </ul>
+  <p>Here's the one that bites Lexi. The dashboard shows when the class last synced:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="LastSynced.tsx (bug)">
+'use client';
+
+export function LastSynced({ at }: { at: string }) {
+  // Server formats in UTC; the teacher's browser formats in Pacific time.
+  // "Synced 17:05" on the server, "Synced 10:05 AM" in the browser → mismatch.
+  return <span>Synced {new Date(at).toLocaleTimeString()}</span>;
+}
+</script>
+  <p>The fix is to make both sides compute the same string. The cleanest way is to stop depending on the machine: pass the teacher's time zone and locale in explicitly, so the server and browser agree.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="LastSynced.tsx (fixed)">
+'use client';
+
+type Props = { at: string; timeZone: string; locale: string };
+
+export function LastSynced({ at, timeZone, locale }: Props) {
+  // Same inputs on server and client → same string → no mismatch
+  const label = new Intl.DateTimeFormat(locale, {
+    timeStyle: 'short',
+    timeZone,
+  }).format(new Date(at));
+
+  return <span>Synced {label}</span>;
+}
+</script>
+  <p>When a value truly only exists in the browser (window width, something saved in <code>localStorage</code>), render a neutral placeholder first and fill it in inside a <code>useEffect</code>, which only runs in the browser after hydration. For values that are known to differ and harmless, like a "seconds ago" timestamp, React offers <code>suppressHydrationWarning</code> on that one element. Treat it as a scalpel, not a blanket.</p>
+
+  <h2>4. React Server Components: two kinds of component</h2>
+  <p>SSR alone still has a cost: every component's code ships to the browser so it can hydrate, even the ones that just display text and will never respond to a click. Lexi's district report imports a date library, a markdown renderer and a stats package purely to <em>display</em> numbers. With plain SSR, all of that goes into the bundle.</p>
+  <p><b>React Server Components (RSC)</b> split components into two kinds:</p>
+  <ul>
+    <li><b>Server Components</b> run only on the server (or at build time). They can be <code>async</code>, can read the database directly, and their code is <b>never sent to the browser</b>. What gets sent is their <em>output</em>: a compact description of the rendered tree, called the RSC payload. They can't use state, effects or event handlers, because they never run in the browser.</li>
+    <li><b>Client Components</b> are the React you already know: <code>useState</code>, <code>onClick</code>, effects. They are still rendered to HTML on the server for the first load, then their code ships and they hydrate.</li>
+  </ul>
+  <p>In the App Router, <b>every component is a Server Component by default</b>. You opt into the client with the <code>'use client'</code> directive at the top of a file. That line marks a <b>boundary</b>: this file, and every file it imports, becomes part of the client bundle.</p>
+
+  <svg viewBox="0 0 680 330" width="100%" role="img" aria-label="Component tree for the teacher dashboard showing which components are server and which are client, and the use client boundary" style="font-family:var(--font-body);font-size:12px;margin:12px 0 20px">
+    <g style="stroke:var(--muted);stroke-width:1.2;fill:none">
+      <path d="M340 54 L120 96"/><path d="M340 54 L450 96"/>
+      <path d="M450 140 L260 186"/><path d="M450 140 L420 186"/><path d="M450 140 L580 186"/>
+      <path d="M420 230 L420 266"/>
+    </g>
+    <line x1="340" y1="164" x2="670" y2="164" style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4"/>
+    <text x="538" y="156" style="fill:var(--accent);font-weight:600">'use client' boundary</text>
+    <text x="20" y="270" style="fill:var(--muted)">Props crossing the dashed</text><text x="20" y="286" style="fill:var(--muted)">line must be serializable</text>
+
+    <rect x="250" y="12" width="180" height="42" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="340" y="30" text-anchor="middle" style="fill:currentColor;font-weight:600">RootLayout</text>
+    <text x="340" y="46" text-anchor="middle" style="fill:var(--muted)">server</text>
+
+    <rect x="40" y="96" width="160" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="120" y="114" text-anchor="middle" style="fill:currentColor;font-weight:600">NavBar</text>
+    <text x="120" y="131" text-anchor="middle" style="fill:var(--muted)">server · 0 KB JS</text>
+
+    <rect x="360" y="96" width="180" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="450" y="114" text-anchor="middle" style="fill:currentColor;font-weight:600">ClassPage (async)</text>
+    <text x="450" y="131" text-anchor="middle" style="fill:var(--muted)">server · awaits the database</text>
+
+    <rect x="190" y="186" width="140" height="44" rx="8" style="fill:var(--surface);stroke:var(--line)"/>
+    <text x="260" y="204" text-anchor="middle" style="fill:currentColor;font-weight:600">StudentTable</text>
+    <text x="260" y="221" text-anchor="middle" style="fill:var(--muted)">server · 0 KB JS</text>
+
+    <rect x="350" y="186" width="140" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="420" y="204" text-anchor="middle" style="fill:currentColor;font-weight:600">SearchBox</text>
+    <text x="420" y="221" text-anchor="middle" style="fill:var(--muted)">client · useState</text>
+
+    <rect x="510" y="186" width="140" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="580" y="204" text-anchor="middle" style="fill:currentColor;font-weight:600">TrendChart</text>
+    <text x="580" y="221" text-anchor="middle" style="fill:var(--muted)">client · hover tooltips</text>
+
+    <rect x="330" y="266" width="180" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+    <text x="420" y="284" text-anchor="middle" style="fill:currentColor;font-weight:600">FilterChips</text>
+    <text x="420" y="301" text-anchor="middle" style="fill:var(--muted)">client because SearchBox imports it</text>
+  </svg>
+
+  <p>Two things to notice. First, the client parts are <b>leaves</b>: small islands of interactivity inside a mostly server-rendered page. Second, <code>FilterChips</code> never wrote <code>'use client'</code>, but it's a client component anyway, because a client file imported it. The boundary flows down through imports.</p>
+
+  <h3>What can cross the boundary</h3>
+  <p>When a Server Component renders <code>&lt;SearchBox studentNames={…} /&gt;</code>, those props have to travel from the server to the browser inside the RSC payload. So they must be <b>serializable</b>: turnable into data and back.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Can cross</th><th>Can't cross</th></tr>
+    <tr><td>Strings, numbers, booleans, <code>null</code>, <code>undefined</code>, bigint</td><td>Ordinary functions, like <code>onSelect={(id) =&gt; …}</code> written in a server file</td></tr>
+    <tr><td>Plain objects and arrays of those</td><td>Class instances (a <code>Student</code> model object with methods, a database row object)</td></tr>
+    <tr><td><code>Date</code>, <code>Map</code>, <code>Set</code>, typed arrays</td><td>Symbols that aren't globally registered</td></tr>
+    <tr><td>JSX, including Server Components passed as <code>children</code></td><td>Anything holding a live connection: a DB client, a stream you haven't wrapped</td></tr>
+    <tr><td>Promises (the client can unwrap them with <code>use()</code>)</td><td></td></tr>
+    <tr><td>Server Functions (marked <code>'use server'</code>)</td><td></td></tr>
+  </table></div>
+  <p>The JSX row is the most useful one. A client component can't <em>import</em> a server component, but it can <em>receive one as <code>children</code></em>. That's how you get an interactive wrapper around server-rendered content:</p>
+  <script type="text/x-code" data-lang="tsx" data-title="CollapsiblePanel.tsx (client)">
+'use client';
+import { useState, type ReactNode } from 'react';
+
+type Props = { title: string; children: ReactNode };
+
+export function CollapsiblePanel({ title, children }: Props) {
+  const [open, setOpen] = useState(true);
+
+  let body: ReactNode = null;
+  if (open) {
+    body = children;
+  }
+
+  return (
+    <section>
+      <button onClick={() => setOpen(!open)}>{title}</button>
+      {body}
+    </section>
+  );
+}
+</script>
+  <script type="text/x-code" data-lang="tsx" data-title="page.tsx (server) uses it">
+<CollapsiblePanel title="Students who need help">
+  {/* StrugglingReaders stays a Server Component: it queries the DB, ships no JS */}
+  <StrugglingReaders classId={classId} />
+</CollapsiblePanel>
+</script>
+
+  <h3>Fetching data on the server</h3>
+  <p>Because Server Components can be <code>async</code>, data fetching becomes plain <code>await</code>. No <code>useEffect</code>, no loading state for the first render, no API route that exists only so the browser can call it.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="app/classes/[classId]/page.tsx">
+import { Suspense } from 'react';
+import { getRoster } from '@/server/roster';
+import { requireTeacher } from '@/server/auth';
+import { SearchBox } from './SearchBox';
+import { ReadingTrend } from './ReadingTrend';
+import { TrendSkeleton } from './TrendSkeleton';
+
+type Props = { params: Promise<{ classId: string }> };
+
+export default async function ClassPage({ params }: Props) {
+  const { classId } = await params;
+  const teacher = await requireTeacher();        // reads the session cookie, server-side
+  const roster = await getRoster(classId, teacher.id);
+
+  // Only what the client needs crosses the boundary: names, not whole records
+  const names = roster.students.map((s) => s.name);
+
+  return (
+    <main>
+      <h1>{roster.className}</h1>
+      <SearchBox studentNames={names} />
+      <Suspense fallback={<TrendSkeleton />}>
+        <ReadingTrend classId={classId} />
+      </Suspense>
+    </main>
+  );
+}
+</script>
+
+  <h2>5. Suspense boundaries and streaming</h2>
+  <p>In the code above, <code>ReadingTrend</code> runs a slow analytics query (about 2 seconds). Without the <code>&lt;Suspense&gt;</code>, the whole page waits for it. With it, here is what happens:</p>
+  <div class="trace"><b>One request, streamed</b>
+    <ol>
+      <li>Server renders <code>ClassPage</code>. Roster query: 80 ms.</li>
+      <li><code>ReadingTrend</code> starts its query and isn't done. React hits the <code>Suspense</code> boundary and uses the fallback.</li>
+      <li>Server <b>sends the shell now</b>: heading, search box, and <code>TrendSkeleton</code> in the chart's spot. The teacher sees the page at ~150 ms.</li>
+      <li>2 seconds later the query finishes. Server sends the chart's HTML plus a small script on the same open response. It replaces the skeleton.</li>
+      <li>Hydration happens per boundary too, so the search box can become interactive before the chart has even arrived.</li>
+    </ol>
+  </div>
+  <p>Think of each <code>Suspense</code> boundary as a promise to the user: "everything outside me appears together; I'll show a placeholder until I'm ready." Where you put boundaries is a <b>product decision</b>: what should appear together, and what's allowed to pop in later.</p>
+
+  <h2>6. The Next.js App Router, as a mental model</h2>
+  <p>Next.js's App Router is the most common way to use Server Components today. Its folder structure <em>is</em> the route structure, and a few special file names have fixed jobs:</p>
+  <div class="table-wrap"><table>
+    <tr><th>File</th><th>Job</th><th>Lexi example</th></tr>
+    <tr><td><code>layout.tsx</code></td><td>Wraps every page below it. Stays mounted while you navigate between those pages, so its state and DOM persist.</td><td>Teacher sidebar with class list, around every <code>/classes/…</code> page</td></tr>
+    <tr><td><code>page.tsx</code></td><td>The unique content for that URL. Makes the route exist.</td><td><code>app/classes/[classId]/page.tsx</code></td></tr>
+    <tr><td><code>loading.tsx</code></td><td>Automatic <code>Suspense</code> fallback around the page. Shows instantly on navigation.</td><td>Skeleton of the class table</td></tr>
+    <tr><td><code>error.tsx</code></td><td>An error boundary around the page. Must be a client component, because it offers a "try again" button.</td><td>"Couldn't load this class. Retry."</td></tr>
+    <tr><td><code>route.ts</code></td><td>A plain HTTP endpoint (no UI), for webhooks or external callers.</td><td>Clever / Google Classroom roster sync webhook</td></tr>
+  </table></div>
+  <p><b>Server Actions</b> (React calls them Server Functions) are the write side of the model. You write an <code>async</code> function marked <code>'use server'</code>, and you can pass it to a form's <code>action</code> or call it from a client component. Under the hood the framework turns it into a POST endpoint and handles the request for you.</p>
+  <script type="text/x-code" data-lang="ts" data-title="app/classes/[classId]/actions.ts">
+'use server';
+import { revalidatePath } from 'next/cache';
+import { requireTeacher } from '@/server/auth';
+import { db } from '@/server/db';
+
+export async function assignBook(formData: FormData) {
+  // A Server Action is a public endpoint. Anyone can call it with any input.
+  // So: authenticate, authorize, validate. Every time.
+  const teacher = await requireTeacher();
+  const classId = String(formData.get('classId'));
+  const bookId = String(formData.get('bookId'));
+
+  const ownsClass = await db.classes.isTaughtBy(classId, teacher.id);
+  if (!ownsClass) {
+    throw new Error('Not your class');
+  }
+
+  await db.assignments.create({ classId, bookId, assignedBy: teacher.id });
+  revalidatePath(`/classes/${classId}`);   // tell Next the cached page is stale
+}
+</script>
+  <div class="callout is-key"><span class="callout-label">The trap with Server Actions</span>
+    <p>Because they feel like "calling a function", people forget they're an HTTP endpoint. The fact that only your form calls it doesn't protect it. Put the same authorization checks in every action you'd put in an API route.</p></div>
+
+  <h2>7. Caching, at the level that matters</h2>
+  <p>Rendering on the server per request is only "fast" if the server isn't repeating expensive work. So server-rendering frameworks cache at several layers. The names and defaults have changed across Next.js versions (it moved from caching aggressively by default to making caching opt-in and explicit), so learn the layers, then check the docs for the version you're on:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Layer</th><th>What's remembered</th><th>Lives for</th></tr>
+    <tr><td>Per-request dedupe</td><td>The same data call made by three components in one render runs once</td><td>One request</td></tr>
+    <tr><td>Data cache</td><td>Results of a query or fetch, shared across requests and users</td><td>Until a time limit or an explicit invalidation</td></tr>
+    <tr><td>Rendered route cache</td><td>The finished HTML and RSC payload of a page (this is what SSG is)</td><td>Until rebuilt or invalidated</td></tr>
+    <tr><td>Client router cache</td><td>Pages the browser already visited or prefetched</td><td>The browser session, briefly</td></tr>
+  </table></div>
+  <p>For every piece of data, a staff engineer asks three questions. <b>How stale may it be?</b> (Book catalogue: hours. A student's live session: seconds.) <b>Who may see a cached copy?</b> (Catalogue: everyone. Class roster: one teacher, so never cache it in a shared layer keyed only by URL.) <b>What makes it stale?</b> (A teacher assigning a book should invalidate that class's page, which is what <code>revalidatePath</code> did above.)</p>
+
+  <h2>8. Deciding what renders where</h2>
+  <p>Now apply it to Lexi. Score each screen against the five things that actually drive the decision:</p>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Marketing</th><th>Teacher dashboard</th><th>District report</th></tr>
+    <tr><td><b>SEO</b></td><td>Critical</td><td>None (behind login)</td><td>None</td></tr>
+    <tr><td><b>Time to first content</b></td><td>Critical (first impression)</td><td>Important (opened every morning)</td><td>Tolerant, but slow queries need streaming</td></tr>
+    <tr><td><b>Interactivity</b></td><td>Low (a signup form)</td><td>High in places (search, filters)</td><td>Medium (chart hovers, export)</td></tr>
+    <tr><td><b>Personalization</b></td><td>None</td><td>Total</td><td>Per district</td></tr>
+    <tr><td><b>Bundle size risk</b></td><td>Low</td><td>Medium</td><td>High (charting and stats libraries)</td></tr>
+    <tr><td><b>Choice</b></td><td><b>Static</b>, rebuilt on content change</td><td><b>Dynamic server render</b>, client leaves for search/filters</td><td><b>Streamed server render</b>, one Suspense per heavy section</td></tr>
+  </table></div>
+  <p>And the student reading session, which is basically a full-screen interactive reader with audio and word highlighting? That's mostly a client component tree, and that's fine. Client rendering isn't wrong; it's right when the screen is almost all interaction and has nothing for a crawler.</p>
+
+  <h2>9. How a staff engineer approaches this</h2>
+  <p>They don't start with "should we use Next.js". They start with questions about each screen:</p>
+  <ul>
+    <li>Does anyone who isn't logged in need to see this, including search engines and link previews?</li>
+    <li>Is it the same for everyone, the same for a group, or unique per user?</li>
+    <li>What's the slowest piece of data, and can the rest of the page appear without it?</li>
+    <li>Which parts truly need the browser (state, events, browser APIs), and how small can those parts be?</li>
+    <li>What must never leave the server (keys, other students' data, internal IDs)?</li>
+  </ul>
+  <p>Then the trade-offs, stated plainly:</p>
+  <ul>
+    <li><b>Static generation</b> gives you the fastest possible load and near-zero server cost, at the cost of freshness and personalization. Choose it when the content is the same for everyone and changes on a human schedule.</li>
+    <li><b>Server rendering per request</b> gives you fresh, personalized HTML that's visible early, at the cost of server load and a time-to-first-byte that depends on your slowest query. Choose it for logged-in pages built from data you already have on the server.</li>
+    <li><b>Streaming</b> gives you a fast shell even when some data is slow, at the cost of more design work (skeletons, deciding boundaries) and layout shift if skeletons don't match. Choose it when one section is much slower than the rest.</li>
+    <li><b>Client rendering</b> gives you simple hosting and very rich interactivity, at the cost of a blank first load and a bigger bundle. Choose it for app-like screens behind a login where the first load happens once and the session lasts a long time.</li>
+    <li><b>Server Components</b> give you less JavaScript and direct data access, at the cost of a new boundary to reason about and framework coupling. Choose them when a big share of the UI is display-only.</li>
+  </ul>
+
+  <h2>10. Common mistakes</h2>
+  <div class="mistake"><b>Making everything a client component</b><p>One <code>onClick</code> in a page leads someone to put <code>'use client'</code> at the top of the page file, or worse, the root layout. Now every import below it ships to the browser and nothing can fetch on the server. Fix: push <code>'use client'</code> down to the smallest leaf that needs it (the button, not the page). Context providers are fine as client components: wrap <code>children</code> with them and the children can still be Server Components.</p></div>
+  <div class="mistake"><b>Leaking secrets across the boundary</b><p>Passing the whole <code>teacher</code> record (with an email, an internal SIS id, maybe a token) to a client component puts all of it into the page source. Pass only the fields the component shows. Mark server-only modules with <code>import 'server-only'</code> so the build fails if a client file imports your database code. In Next.js, only environment variables prefixed <code>NEXT_PUBLIC_</code> are bundled for the browser; never give a secret that prefix.</p></div>
+  <div class="mistake"><b>Waterfalls on the server</b><p>Three <code>await</code>s in a row, where none needs the others' results, take the sum of their times. Start them together with <code>Promise.all</code>, or give each slow section its own component and <code>Suspense</code> boundary so they fetch in parallel and stream independently.</p></div>
+  <div class="ba"><div><span>Waterfall: 80 + 900 + 600 ms</span><pre>const roster = await getRoster(id);
+const trend  = await getTrend(id);
+const alerts = await getAlerts(id);</pre></div><i>→</i><div><span>Parallel: ~900 ms</span><pre>const [roster, trend, alerts] =
+  await Promise.all([
+    getRoster(id),
+    getTrend(id),
+    getAlerts(id),
+  ]);</pre></div></div>
+  <div class="mistake"><b>Fetching in useEffect what the server already has</b><p>A client component that mounts and then calls <code>/api/roster</code> recreates the CSR waterfall inside an SSR app. If the data is known at request time, fetch it in the Server Component and pass it down.</p></div>
+  <div class="mistake"><b>Ignoring hydration warnings</b><p>"It only flickers a bit" usually means React is discarding and re-rendering part of the page. Find the value that differs between server and client and make it deterministic.</p></div>
+  <div class="mistake"><b>Caching personal data in a shared cache</b><p>Caching the rendered class page by URL alone means teacher B might be served teacher A's page if a URL is ever reused or guessed. Personal data is cached per user or not at all.</p></div>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"I'd decide rendering per screen, not per app. The marketing page is static because it's public and identical for everyone. The teacher dashboard is server-rendered per request with Server Components, so the roster comes straight from the database and ships no JS; only the search box and filters are client components. The district report streams: the summary appears immediately and each heavy chart has its own Suspense boundary. On the boundary, I only pass serializable, minimal props, so no record with private fields reaches the browser, and every Server Action re-checks authorization. Caching is per-data: the catalogue is shared and long-lived, rosters are per teacher and invalidated when a teacher changes an assignment."</p></div>
+
+  <h2>11. Recap</h2>
+  <ul>
+    <li><b>CSR</b> sends an empty page plus JavaScript. <b>SSR</b> sends finished HTML per request. <b>SSG</b> sends HTML built ahead of time. <b>Streaming</b> sends the shell first and the slow parts as they're ready.</li>
+    <li><b>Hydration</b> attaches React to server HTML. It needs identical output on both sides; dates, randomness and browser-only values cause mismatches.</li>
+    <li><b>Server Components</b> run only on the server and ship no code. <b>Client Components</b> are regular React. <code>'use client'</code> marks the boundary, and it flows down through imports.</li>
+    <li>Only <b>serializable</b> props cross. Server content can be passed into a client component as <code>children</code>.</li>
+    <li><b>Suspense</b> boundaries decide what appears together and what streams in later.</li>
+    <li>The App Router maps folders to routes: <code>layout</code>, <code>page</code>, <code>loading</code>, <code>error</code>. <b>Server Actions</b> are public endpoints: always authorize.</li>
+    <li>Decide per screen using SEO, time to first content, interactivity, personalization and bundle size.</li>
+  </ul>
+
+  <details class="details"><summary>Check yourself</summary><div>
+    <p><b>1. A teacher reports the dashboard briefly shows "Synced 17:05" and then "Synced 10:05 AM". What's happening?</b><br>A hydration mismatch: the server formatted the time in its own time zone, the browser in the teacher's. Pass the time zone and locale explicitly so both render the same string.</p>
+    <p><b>2. Can a Server Component pass <code>onSelect={(id) =&gt; …}</code> to a client component?</b><br>No. Ordinary functions aren't serializable. Either move the handler into the client component, or pass a Server Action if the work belongs on the server.</p>
+    <p><b>3. A colleague adds <code>'use client'</code> to <code>app/layout.tsx</code> so a theme toggle works. What's the cost, and what's the fix?</b><br>Everything imported by the layout becomes client code, and nothing under it can be an async Server Component that fetches. Fix: make a small <code>ThemeToggle</code> client component (or a client <code>ThemeProvider</code> that wraps <code>children</code>) and keep the layout a Server Component.</p>
+    <p><b>4. The district report takes 4 s to show anything. Two of its five sections are slow. What do you change?</b><br>Wrap each slow section in its own <code>Suspense</code> boundary (or give the route a <code>loading.tsx</code>) so the shell and fast sections stream immediately; check that the queries aren't running one after another.</p>
+    <p><b>5. Why must a Server Action check that the teacher owns the class, when only that teacher's form calls it?</b><br>Because it's an HTTP endpoint. Anyone can send it any input. The form is not a security boundary.</p>
+  </div></details>
+</template>

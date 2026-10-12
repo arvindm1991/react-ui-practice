@@ -1,0 +1,574 @@
+@@@ shared src/api.ts
+// Fake streaming API. Treat it like a real LLM endpoint you can't change.
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+};
+
+const REPLIES: { keyword: string; variants: string[] }[] = [
+  {
+    keyword: 'headline',
+    variants: [
+      'Here are three options, from safest to boldest:\n\n1. "The Quiet Cost of Always Being Online"\n2. "Your Inbox Is Not Your Job"\n3. "Log Off Like You Mean It"\n\nThe second one works best if the piece is aimed at managers. It names the problem and the reader in five words, and it reads like an argument rather than a topic.',
+      'A different angle, leaning on curiosity instead of a claim:\n\n1. "What Happens When Nobody Answers at 9pm?"\n2. "The Week We Turned Off Slack"\n3. "Rest Is a Team Sport"\n\nI would test the first one. Questions in headlines tend to lift click-through when the answer is genuinely surprising, and your third section delivers that.',
+    ],
+  },
+  {
+    keyword: 'email',
+    variants: [
+      'Here is a shorter version that keeps the warmth but gets to the ask faster:\n\nHi Maya, thanks again for the walkthrough on Tuesday. The team loved the reporting view. Could we get a quote for 40 seats by Friday, so I can take it to our budget review next week? Happy to jump on a call if that is easier.\n\nIt drops the recap of the demo, which Maya already knows.',
+      'A more direct option:\n\nHi Maya, we would like to move forward. Could you send pricing for 40 seats by Friday? Our budget review is on the 14th and I want this on the agenda.\n\nThis version reads as decided rather than exploring, which usually speeds up the vendor side. Keep the softer draft if the deal still needs internal buy-in.',
+    ],
+  },
+];
+
+const FALLBACK = [
+  'Good question. The short answer is to cut anything the reader already believes and spend those words on the one thing they do not. In your draft, the first two sentences restate the premise. Start at "Most teams never measure this", which is where the piece actually begins, and move the statistic up so it lands in the first screen.',
+  'Another way to approach it: read the draft out loud and mark every place you take a breath mid-sentence. Those are your split points. Your third paragraph has two of them, and breaking it there turns one dense block into a clear claim followed by its evidence. The ending can stay as it is.',
+  'If you only change one thing, change the verbs. "Is able to help" becomes "helps", "make a decision" becomes "decide". That alone trims about ten percent and makes the tone more confident without touching the structure you already like.',
+];
+
+const attempts: Record<string, number> = {};
+
+function pickReply(prompt: string): string {
+  const key = prompt.trim().toLowerCase();
+  const n = attempts[key] || 0;
+  attempts[key] = n + 1;
+  const match = REPLIES.find((r) => key.includes(r.keyword));
+  const variants = match ? match.variants : FALLBACK;
+  // Asking the same prompt again (regenerate) gives the next variant.
+  return variants[n % variants.length];
+}
+
+// POST /chat/stream
+// Calls onToken(token) for each chunk of the reply, like a server-sent event stream.
+// Resolves when the reply is complete.
+// If `signal` is aborted, stops emitting and rejects with a DOMException named "AbortError".
+export function streamReply(prompt: string, onToken: (token: string) => void, signal: AbortSignal): Promise<void> {
+  const tokens = pickReply(prompt).match(/\S+\s*/g) || [];
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function abort() {
+      clearTimeout(timer);
+      reject(new DOMException('The stream was aborted.', 'AbortError'));
+    }
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener('abort', abort, { once: true });
+
+    function next() {
+      if (i >= tokens.length) {
+        signal.removeEventListener('abort', abort);
+        resolve();
+        return;
+      }
+      onToken(tokens[i]);
+      i += 1;
+      timer = setTimeout(next, 15 + Math.random() * 45);
+    }
+    // time to first token
+    timer = setTimeout(next, 300 + Math.random() * 400);
+  });
+}
+@@@ shared src/utils/id.ts
+let counter = 0;
+
+// makeId('msg') -> "msg-1", "msg-2", ...
+export function makeId(prefix: string): string {
+  counter += 1;
+  return prefix + '-' + counter;
+}
+@@@ shared src/seed.ts
+import type { ChatMessage } from './api';
+
+export const SEED: ChatMessage[] = [
+  {
+    id: 'seed-1',
+    role: 'user',
+    text: 'I am writing a post about teams answering messages late at night. Here is my intro: "In today\'s world, it is more important than ever for teams to be able to have boundaries around their communication."',
+  },
+  {
+    id: 'seed-2',
+    role: 'assistant',
+    text: 'The idea is strong, but the sentence warms up for a long time before it says anything. "In today\'s world" and "more important than ever" are throat-clearing; readers skip them.\n\nTry leading with the tension instead:\n\n"Your team answered 212 messages after 9pm last month. Nobody asked them to."\n\nIt is concrete, it is a little uncomfortable, and it makes the reader want the next sentence.',
+  },
+  {
+    id: 'seed-3',
+    role: 'user',
+    text: 'Love that. Is 212 believable?',
+  },
+  {
+    id: 'seed-4',
+    role: 'assistant',
+    text: 'For a team of about twenty, yes: that is roughly one late message per person every other night. If you have your real numbers from the Slack analytics export, use those instead. A real, slightly odd number is more convincing than a round one.',
+  },
+];
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import type { ChatMessage } from './api';
+import { makeId } from './utils/id';
+import { SEED } from './seed';
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">✒</span>
+      <div>
+        <h1>Quill</h1>
+        <p>Draft: “After hours”</p>
+      </div>
+    </header>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  if (message.role === 'user') {
+    return (
+      <div className="msg msg-user">
+        <p className="bubble">{message.text}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="msg msg-assistant">
+      <span className="avatar" aria-hidden="true">✦</span>
+      <div className="assistant-body">
+        <p className="assistant-text">{message.text}</p>
+      </div>
+    </div>
+  );
+}
+
+type ComposerProps = {
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+};
+
+function Composer({ value, onChange, onSend }: ComposerProps) {
+  // Enter sends, Shift+Enter makes a new line
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSend();
+    }
+  }
+
+  return (
+    <div className="composer">
+      <textarea
+        className="composer-input"
+        rows={2}
+        placeholder="Ask Quill to rewrite, shorten, or suggest…"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); }}
+        onKeyDown={handleKeyDown}
+      />
+      <button type="button" className="send-btn" disabled={value.trim() === ''} onClick={() => { onSend(); }}>Send</button>
+    </div>
+  );
+}
+
+export default function App() {
+  const [messages, setMessages] = useState<ChatMessage[]>(SEED);
+  const [input, setInput] = useState('');
+
+  function handleSend() {
+    const prompt = input.trim();
+    if (prompt === '') {
+      return;
+    }
+    const userMsg: ChatMessage = { id: makeId('msg'), role: 'user', text: prompt };
+    setMessages((prev) => {
+      return [...prev, userMsg];
+    });
+    setInput('');
+    // TODO: stream the assistant's reply (see the task)
+  }
+
+  return (
+    <div className="app">
+      <Header />
+      <div className="thread">
+        <div className="thread-inner">
+          {messages.map((m) => {
+            return <MessageBubble key={m.id} message={m} />;
+          })}
+        </div>
+      </div>
+      <Composer value={input} onChange={setInput} onSend={handleSend} />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0F1115;
+  --surface: #171A21;
+  --surface-2: #1F232C;
+  --border: #2A2F3A;
+  --text: #E8E6E1;
+  --muted: #8B909C;
+  --accent: #F5A524;
+  --accent-soft: rgba(245, 165, 36, 0.14);
+  --danger: #F87171;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { height: 100vh; display: flex; flex-direction: column; max-width: 760px; margin: 0 auto; }
+
+.header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.header h1 { margin: 0; font: 600 17px/1.2 var(--serif); letter-spacing: 0.2px; }
+.header p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 17px; }
+
+.thread { flex: 1; overflow-y: auto; }
+.thread-inner { display: flex; flex-direction: column; gap: 22px; padding: 24px 20px 32px; }
+
+.msg { display: flex; gap: 12px; }
+.msg-user { justify-content: flex-end; }
+.bubble { margin: 0; max-width: 80%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--surface-2); white-space: pre-wrap; }
+.avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #1A1300; font-size: 13px; }
+.assistant-body { flex: 1; min-width: 0; }
+.assistant-text { margin: 0; font: 16.5px/1.65 var(--serif); white-space: pre-wrap; }
+
+.composer { display: flex; gap: 10px; align-items: flex-end; margin: 0 20px 20px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.composer:focus-within { border-color: #4A505E; }
+.composer-input { flex: 1; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 6px 8px; }
+.composer-input:focus { outline: none; }
+.composer-input::placeholder { color: var(--muted); }
+.send-btn { height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent); color: #1A1300; font: inherit; font-weight: 600; cursor: pointer; }
+.send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { streamReply } from './api';
+import type { ChatMessage } from './api';
+import { makeId } from './utils/id';
+import { SEED } from './seed';
+
+type Status = 'streaming' | 'done' | 'stopped' | 'error';
+type Message = ChatMessage & { status?: Status };
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">✒</span>
+      <div>
+        <h1>Quill</h1>
+        <p>Draft: “After hours”</p>
+      </div>
+    </header>
+  );
+}
+
+type MessageBubbleProps = {
+  message: Message;
+  canRegenerate: boolean;
+  onRegenerate: () => void;
+};
+
+function MessageBubble({ message, canRegenerate, onRegenerate }: MessageBubbleProps) {
+  if (message.role === 'user') {
+    return (
+      <div className="msg msg-user">
+        <p className="bubble">{message.text}</p>
+      </div>
+    );
+  }
+
+  const streaming = message.status === 'streaming';
+
+  let cursor = null;
+  if (streaming) {
+    cursor = <span className="cursor" aria-hidden="true" />;
+  }
+
+  // Before the first token arrives, show "thinking" dots instead of an empty line.
+  let text = <p className="assistant-text">{message.text}{cursor}</p>;
+  if (streaming && message.text === '') {
+    text = <p className="thinking" aria-label="Quill is thinking"><span /><span /><span /></p>;
+  }
+
+  let note = null;
+  if (message.status === 'stopped') {
+    note = <span className="msg-note">Stopped</span>;
+  } else if (message.status === 'error') {
+    note = <span className="msg-note is-error">Something went wrong</span>;
+  }
+
+  let regen = null;
+  if (canRegenerate) {
+    regen = <button type="button" className="regen-btn" onClick={() => { onRegenerate(); }}>↻ Regenerate</button>;
+  }
+
+  let footer = null;
+  if (note || regen) {
+    footer = <div className="msg-footer">{note}{regen}</div>;
+  }
+
+  return (
+    <div className="msg msg-assistant">
+      <span className="avatar" aria-hidden="true">✦</span>
+      <div className="assistant-body" aria-busy={streaming}>
+        {text}
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+type ComposerProps = {
+  value: string;
+  streaming: boolean;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  onStop: () => void;
+};
+
+function Composer({ value, streaming, onChange, onSend, onStop }: ComposerProps) {
+  // Enter sends, Shift+Enter makes a new line. Never while a reply is streaming.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!streaming) {
+        onSend();
+      }
+    }
+  }
+
+  let button = <button type="button" className="send-btn" disabled={value.trim() === ''} onClick={() => { onSend(); }}>Send</button>;
+  if (streaming) {
+    button = <button type="button" className="stop-btn" onClick={() => { onStop(); }}><span className="stop-icon" aria-hidden="true" />Stop</button>;
+  }
+
+  return (
+    <div className="composer">
+      <textarea
+        className="composer-input"
+        rows={2}
+        placeholder="Ask Quill to rewrite, shorten, or suggest…"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); }}
+        onKeyDown={handleKeyDown}
+      />
+      {button}
+    </div>
+  );
+}
+
+export default function App() {
+  const [messages, setMessages] = useState<Message[]>(SEED);
+  const [input, setInput] = useState('');
+  const [streamingId, setStreamingId] = useState<string | null>(null);
+  // Is the user scrolled to the bottom? Only then do new tokens auto-scroll.
+  const [atBottom, setAtBottom] = useState(true);
+  const controllerRef = useRef<AbortController | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+
+  // Follow the stream, but never yank someone who scrolled up to read.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el && atBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, atBottom]);
+
+  // Leaving the page mid-stream must not keep the request running.
+  useEffect(() => {
+    return () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  function patchMessage(id: string, patch: Partial<Message>) {
+    setMessages((prev) => {
+      return prev.map((m) => {
+        if (m.id !== id) {
+          return m;
+        }
+        return { ...m, ...patch };
+      });
+    });
+  }
+
+  function finish(id: string, status: Status) {
+    patchMessage(id, { status });
+    setStreamingId(null);
+    controllerRef.current = null;
+  }
+
+  function runStream(assistantId: string, prompt: string) {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setStreamingId(assistantId);
+    setAtBottom(true);
+
+    function handleToken(token: string) {
+      // updater form: tokens arrive faster than renders
+      setMessages((prev) => {
+        return prev.map((m) => {
+          if (m.id !== assistantId) {
+            return m;
+          }
+          return { ...m, text: m.text + token };
+        });
+      });
+    }
+
+    streamReply(prompt, handleToken, controller.signal)
+      .then(() => {
+        finish(assistantId, 'done');
+      })
+      .catch((err) => {
+        if (err && err.name === 'AbortError') {
+          finish(assistantId, 'stopped');
+          return;
+        }
+        finish(assistantId, 'error');
+      });
+  }
+
+  function handleSend() {
+    const prompt = input.trim();
+    if (prompt === '' || streamingId) {
+      return;
+    }
+    const userMsg: Message = { id: makeId('msg'), role: 'user', text: prompt };
+    const assistantMsg: Message = { id: makeId('msg'), role: 'assistant', text: '', status: 'streaming' };
+    setMessages((prev) => {
+      return [...prev, userMsg, assistantMsg];
+    });
+    setInput('');
+    runStream(assistantMsg.id, prompt);
+  }
+
+  function handleStop() {
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+  }
+
+  // Change: clear the last answer in place and stream it again for the same prompt.
+  function handleRegenerate() {
+    const last = messages[messages.length - 1];
+    const prev = messages[messages.length - 2];
+    if (!last || !prev || last.role !== 'assistant' || prev.role !== 'user' || streamingId) {
+      return;
+    }
+    patchMessage(last.id, { text: '', status: 'streaming' });
+    runStream(last.id, prev.text);
+  }
+
+  function handleScroll() {
+    const el = threadRef.current;
+    if (!el) {
+      return;
+    }
+    // a few px of slack: sub-pixel rounding means "bottom" is rarely exactly 0
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+  }
+
+  function jumpToLatest() {
+    setAtBottom(true);
+  }
+
+  // derived
+  const lastId = messages[messages.length - 1].id;
+
+  let jump = null;
+  if (!atBottom && streamingId) {
+    jump = <button type="button" className="jump-btn" onClick={() => { jumpToLatest(); }}>↓ Jump to latest</button>;
+  }
+
+  return (
+    <div className="app">
+      <Header />
+      <div className="thread-wrap">
+        <div className="thread" ref={threadRef} onScroll={handleScroll}>
+          <div className="thread-inner">
+            {messages.map((m) => {
+              const canRegenerate = m.id === lastId && m.role === 'assistant' && !streamingId;
+              return <MessageBubble key={m.id} message={m} canRegenerate={canRegenerate} onRegenerate={handleRegenerate} />;
+            })}
+          </div>
+        </div>
+        {jump}
+      </div>
+      <Composer value={input} streaming={streamingId !== null} onChange={setInput} onSend={handleSend} onStop={handleStop} />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0F1115;
+  --surface: #171A21;
+  --surface-2: #1F232C;
+  --border: #2A2F3A;
+  --text: #E8E6E1;
+  --muted: #8B909C;
+  --accent: #F5A524;
+  --accent-soft: rgba(245, 165, 36, 0.14);
+  --danger: #F87171;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { height: 100vh; display: flex; flex-direction: column; max-width: 760px; margin: 0 auto; }
+
+.header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.header h1 { margin: 0; font: 600 17px/1.2 var(--serif); letter-spacing: 0.2px; }
+.header p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 17px; }
+
+.thread { flex: 1; overflow-y: auto; }
+.thread-inner { display: flex; flex-direction: column; gap: 22px; padding: 24px 20px 32px; }
+
+.msg { display: flex; gap: 12px; }
+.msg-user { justify-content: flex-end; }
+.bubble { margin: 0; max-width: 80%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--surface-2); white-space: pre-wrap; }
+.avatar { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #1A1300; font-size: 13px; }
+.assistant-body { flex: 1; min-width: 0; }
+.assistant-text { margin: 0; font: 16.5px/1.65 var(--serif); white-space: pre-wrap; }
+
+.composer { display: flex; gap: 10px; align-items: flex-end; margin: 0 20px 20px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.composer:focus-within { border-color: #4A505E; }
+.composer-input { flex: 1; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; padding: 6px 8px; }
+.composer-input:focus { outline: none; }
+.composer-input::placeholder { color: var(--muted); }
+.send-btn { height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent); color: #1A1300; font: inherit; font-weight: 600; cursor: pointer; }
+.send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ---- Added: streaming, stop, auto-scroll, regenerate ---- */
+.thread-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+
+.cursor { display: inline-block; width: 8px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: var(--accent); border-radius: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.thinking { margin: 0; height: 27px; display: flex; align-items: center; gap: 5px; }
+.thinking span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+.thinking span:nth-child(2) { animation-delay: 0.15s; }
+.thinking span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes pulse { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+.msg-footer { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.msg-note { font-size: 12px; color: var(--muted); padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; }
+.msg-note.is-error { color: var(--danger); border-color: rgba(248, 113, 113, 0.4); }
+.regen-btn { border: 0; background: none; padding: 4px 8px; margin-left: -8px; border-radius: 8px; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.regen-btn:hover { background: var(--surface-2); color: var(--text); }
+
+.stop-btn { height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.stop-btn:hover { border-color: #4A505E; }
+.stop-icon { width: 10px; height: 10px; border-radius: 2px; background: var(--text); }
+
+.jump-btn { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); height: 32px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }

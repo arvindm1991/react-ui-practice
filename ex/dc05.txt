@@ -1,0 +1,354 @@
+@@@ shared src/data/faqs.ts
+export type Faq = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
+export const FAQS: Faq[] = [
+  { id: 'q1', question: 'Can I change plans later?', answer: 'Yes. Upgrade or downgrade any time from Billing. We prorate the difference to the day.' },
+  { id: 'q2', question: 'What counts as a build minute?', answer: 'Time spent running your build command on our runners. Cached steps and idle time are free.' },
+  { id: 'q3', question: 'Do you offer discounts for open source?', answer: 'Public repositories with an OSI-approved license get the Pro plan free. Apply from your team settings.' },
+  { id: 'q4', question: 'Where are your servers located?', answer: 'We run in 14 regions across North America, Europe and Asia-Pacific. You choose the primary region per project.' },
+  { id: 'q5', question: 'How do I cancel?', answer: 'Delete your team from Settings → Danger zone. Nothing is billed after the current period ends.' },
+];
+@@@ shared src/components/ChevronIcon.tsx
+// Points DOWN by default. Rotate it with CSS.
+export function ChevronIcon() {
+  return (
+    <svg className="chevron" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { FAQS } from './data/faqs';
+import type { Faq } from './data/faqs';
+import { ChevronIcon } from './components/ChevronIcon';
+
+type Plan = {
+  id: string;
+  name: string;
+  price: string;
+  blurb: string;
+  featured: boolean;
+};
+
+const PLANS: Plan[] = [
+  { id: 'hobby', name: 'Hobby', price: '$0', blurb: 'Personal projects', featured: false },
+  { id: 'pro', name: 'Pro', price: '$20', blurb: 'Small teams shipping daily', featured: true },
+  { id: 'scale', name: 'Scale', price: '$90', blurb: 'SLAs and SSO', featured: false },
+];
+
+function Hero() {
+  return (
+    <header className="hero">
+      <p className="kicker">Skyport pricing</p>
+      <h1>Deploy on push. Pay for what you ship.</h1>
+    </header>
+  );
+}
+
+function PlanCards() {
+  return (
+    <div className="plans">
+      {PLANS.map((plan) => {
+        let cls = 'plan';
+        if (plan.featured) {
+          cls = 'plan is-featured';
+        }
+        return (
+          <div key={plan.id} className={cls}>
+            <p className="plan-name">{plan.name}</p>
+            <p className="plan-price">{plan.price}<span>/mo</span></p>
+            <p className="plan-blurb">{plan.blurb}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FaqItem({ faq }: { faq: Faq }) {
+  return (
+    <li className="faq-item">
+      <button type="button" className="faq-question">
+        <span>{faq.question}</span>
+        <ChevronIcon />
+      </button>
+      {/* TODO: show faq.answer when this item is open */}
+    </li>
+  );
+}
+
+function FaqSection() {
+  return (
+    <section className="faq">
+      <h2>Frequently asked questions</h2>
+      <ul className="faq-list">
+        {FAQS.map((faq) => {
+          return <FaqItem key={faq.id} faq={faq} />;
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <Hero />
+      <PlanCards />
+      <FaqSection />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0B0B1A;
+  --surface: #14142B;
+  --surface-2: #1B1B38;
+  --line: #2A2A4D;
+  --text: #EDEDF7;
+  --muted: #9A9AC0;
+  --primary: #8B7CFF;
+  --accent: #43E6C4;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; background: radial-gradient(1200px 500px at 50% -10%, #2B2370 0%, var(--bg) 60%) no-repeat, var(--bg); color: var(--text); }
+
+.page { max-width: 760px; margin: 0 auto; padding: 48px 20px 64px; }
+
+.hero { text-align: center; margin-bottom: 32px; }
+.kicker { margin: 0 0 10px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.hero h1 { margin: 0; font-size: 34px; line-height: 1.15; letter-spacing: -0.8px; }
+
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 56px; }
+.plan { padding: 18px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+.plan.is-featured { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 10px 40px rgba(139, 124, 255, 0.25); }
+.plan p { margin: 0; }
+.plan-name { font-weight: 600; color: var(--muted); font-size: 14px; }
+.plan-price { font-size: 30px; font-weight: 700; margin: 6px 0 4px !important; }
+.plan-price span { font-size: 14px; font-weight: 400; color: var(--muted); }
+.plan-blurb { font-size: 13px; color: var(--muted); }
+
+.faq h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: -0.3px; }
+.faq-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.faq-item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.faq-question { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+.faq-question:hover { background: var(--surface-2); }
+.faq-question:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.chevron { flex-shrink: 0; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .plans { grid-template-columns: 1fr; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { FAQS } from './data/faqs';
+import type { Faq } from './data/faqs';
+import { ChevronIcon } from './components/ChevronIcon';
+
+type Plan = {
+  id: string;
+  name: string;
+  price: string;
+  blurb: string;
+  featured: boolean;
+};
+
+type Vote = 'yes' | 'no';
+
+const PLANS: Plan[] = [
+  { id: 'hobby', name: 'Hobby', price: '$0', blurb: 'Personal projects', featured: false },
+  { id: 'pro', name: 'Pro', price: '$20', blurb: 'Small teams shipping daily', featured: true },
+  { id: 'scale', name: 'Scale', price: '$90', blurb: 'SLAs and SSO', featured: false },
+];
+
+function Hero() {
+  return (
+    <header className="hero">
+      <p className="kicker">Skyport pricing</p>
+      <h1>Deploy on push. Pay for what you ship.</h1>
+    </header>
+  );
+}
+
+function PlanCards() {
+  return (
+    <div className="plans">
+      {PLANS.map((plan) => {
+        let cls = 'plan';
+        if (plan.featured) {
+          cls = 'plan is-featured';
+        }
+        return (
+          <div key={plan.id} className={cls}>
+            <p className="plan-name">{plan.name}</p>
+            <p className="plan-price">{plan.price}<span>/mo</span></p>
+            <p className="plan-blurb">{plan.blurb}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+type FaqItemProps = {
+  faq: Faq;
+  isOpen: boolean;
+  vote: Vote | undefined;
+  onToggle: (id: string) => void;
+  onVote: (id: string, vote: Vote) => void;
+};
+
+function FaqItem({ faq, isOpen, vote, onToggle, onVote }: FaqItemProps) {
+  let cls = 'faq-item';
+  let answer = null;
+
+  if (isOpen) {
+    cls = 'faq-item is-open';
+
+    // Change: once voted, the buttons are replaced by a thank-you line.
+    let feedback = (
+      <div className="feedback">
+        <span>Was this helpful?</span>
+        <button type="button" className="vote-btn" onClick={() => { onVote(faq.id, 'yes'); }}>Yes</button>
+        <button type="button" className="vote-btn" onClick={() => { onVote(faq.id, 'no'); }}>No</button>
+      </div>
+    );
+    if (vote) {
+      feedback = <p className="feedback thanks">Thanks for the feedback!</p>;
+    }
+
+    answer = (
+      <div className="faq-answer">
+        <p>{faq.answer}</p>
+        {feedback}
+      </div>
+    );
+  }
+
+  return (
+    <li className={cls}>
+      <button type="button" className="faq-question" aria-expanded={isOpen} onClick={() => { onToggle(faq.id); }}>
+        <span>{faq.question}</span>
+        <ChevronIcon />
+      </button>
+      {answer}
+    </li>
+  );
+}
+
+function FaqSection() {
+  // One id (or null), not a boolean per item: that is what makes "one open at a time" automatic.
+  const [openId, setOpenId] = useState<string | null>(null);
+  // Change: votes by question id. Lives here so it survives closing an item.
+  const [votes, setVotes] = useState<Record<string, Vote>>({});
+
+  function handleToggle(id: string) {
+    setOpenId((prev) => {
+      if (prev === id) {
+        return null;
+      }
+      return id;
+    });
+  }
+
+  function handleVote(id: string, vote: Vote) {
+    setVotes((prev) => {
+      return { ...prev, [id]: vote };
+    });
+  }
+
+  return (
+    <section className="faq">
+      <h2>Frequently asked questions</h2>
+      <ul className="faq-list">
+        {FAQS.map((faq) => {
+          const isOpen = faq.id === openId;
+          const vote = votes[faq.id];
+          return (
+            <FaqItem
+              key={faq.id}
+              faq={faq}
+              isOpen={isOpen}
+              vote={vote}
+              onToggle={handleToggle}
+              onVote={handleVote}
+            />
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="page">
+      <Hero />
+      <PlanCards />
+      <FaqSection />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0B0B1A;
+  --surface: #14142B;
+  --surface-2: #1B1B38;
+  --line: #2A2A4D;
+  --text: #EDEDF7;
+  --muted: #9A9AC0;
+  --primary: #8B7CFF;
+  --accent: #43E6C4;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; background: radial-gradient(1200px 500px at 50% -10%, #2B2370 0%, var(--bg) 60%) no-repeat, var(--bg); color: var(--text); }
+
+.page { max-width: 760px; margin: 0 auto; padding: 48px 20px 64px; }
+
+.hero { text-align: center; margin-bottom: 32px; }
+.kicker { margin: 0 0 10px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.hero h1 { margin: 0; font-size: 34px; line-height: 1.15; letter-spacing: -0.8px; }
+
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 56px; }
+.plan { padding: 18px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+.plan.is-featured { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 10px 40px rgba(139, 124, 255, 0.25); }
+.plan p { margin: 0; }
+.plan-name { font-weight: 600; color: var(--muted); font-size: 14px; }
+.plan-price { font-size: 30px; font-weight: 700; margin: 6px 0 4px !important; }
+.plan-price span { font-size: 14px; font-weight: 400; color: var(--muted); }
+.plan-blurb { font-size: 13px; color: var(--muted); }
+
+.faq h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: -0.3px; }
+.faq-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.faq-item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.faq-question { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+.faq-question:hover { background: var(--surface-2); }
+.faq-question:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.chevron { flex-shrink: 0; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .plans { grid-template-columns: 1fr; }
+}
+
+/* ---- Added: accordion ---- */
+.chevron { transition: transform 0.2s ease; }
+.faq-item.is-open { border-color: #3B3470; background: var(--surface-2); }
+.faq-item.is-open .faq-question { color: var(--primary); }
+.faq-item.is-open .chevron { transform: rotate(180deg); color: var(--primary); }
+.faq-answer { padding: 0 18px 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.faq-answer p { margin: 0; }
+
+/* Change: helpful? */
+.feedback { display: flex; align-items: center; gap: 8px; margin-top: 14px !important; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.vote-btn { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.vote-btn:hover { border-color: var(--primary); color: var(--primary); }
+.thanks { color: var(--accent); }

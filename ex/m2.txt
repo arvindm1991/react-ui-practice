@@ -1,0 +1,574 @@
+@@@ shared src/App.jsx
+import React from 'react';
+import MembersPage from './pages/MembersPage';
+
+export default function App() {
+  return (
+    <div className="layout">
+      <nav className="settings-nav">
+        <p className="settings-nav-title">Settings</p>
+        <a className="settings-link">General</a>
+        <a className="settings-link is-current">Members</a>
+        <a className="settings-link">Billing</a>
+        <a className="settings-link">API keys</a>
+      </nav>
+      <main className="settings-main">
+        <MembersPage />
+      </main>
+    </div>
+  );
+}
+@@@ shared src/api.js
+// Fake API. Treat it like a real backend you can't change.
+let members = [
+  { id: 'u1', name: 'Rosa Diaz', email: 'rosa@acme.dev', role: 'owner', status: 'active', joinedAt: '2023-03-14' },
+  { id: 'u2', name: 'Tomás Herrera', email: 'tomas@acme.dev', role: 'admin', status: 'active', joinedAt: '2023-06-02' },
+  { id: 'u3', name: 'Mei Lin', email: 'mei@acme.dev', role: 'member', status: 'active', joinedAt: '2024-01-19' },
+  { id: 'u4', name: 'Kwame Asante', email: 'kwame@acme.dev', role: 'member', status: 'active', joinedAt: '2024-05-07' },
+  { id: 'u5', name: 'Sofia Rossi', email: 'sofia@acme.dev', role: 'viewer', status: 'active', joinedAt: '2024-08-23' },
+  { id: 'u6', name: 'Daniel Novak', email: 'daniel@acme.dev', role: 'admin', status: 'active', joinedAt: '2025-02-10' },
+  { id: 'u7', name: 'Aisha Bello', email: 'aisha@acme.dev', role: 'member', status: 'active', joinedAt: '2025-09-30' },
+];
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// GET /members -> Member[]
+// Member: { id, name, email, role: 'owner'|'admin'|'member'|'viewer',
+//           status: 'active'|'invited', joinedAt: 'YYYY-MM-DD' | null }
+export async function getMembers() {
+  await wait(600);
+  return members.map((m) => ({ ...m }));
+}
+
+// POST /invites -> the new Member (status 'invited', name null, joinedAt null)
+// Rejects with an Error if the email is already on the team.
+export async function inviteMember(email, role) {
+  await wait(500);
+  if (members.some((m) => m.email.toLowerCase() === email.toLowerCase())) {
+    throw new Error('Someone with that email is already on the team.');
+  }
+  const member = { id: 'u' + Date.now(), name: null, email, role, status: 'invited', joinedAt: null };
+  members = [...members, member];
+  return { ...member };
+}
+
+// PATCH /members/:id
+export async function updateRole(id, role) {
+  await wait(300);
+  members = members.map((m) => (m.id === id ? { ...m, role } : m));
+}
+
+// DELETE /members/:id (also cancels an invite)
+export async function removeMember(id) {
+  await wait(300);
+  members = members.filter((m) => m.id !== id);
+}
+@@@ shared src/components/Avatar.jsx
+import React from 'react';
+
+const COLORS = ['#3451D1', '#1C7A43', '#B54708', '#7A2E9E', '#0E7490', '#B42318'];
+
+function initialsFor(name, email) {
+  const source = name || email;
+  const parts = source.split(/[\s@.]+/).filter(Boolean);
+  return ((parts[0] || '')[0] + ((parts[1] || '')[0] || '')).toUpperCase();
+}
+
+export default function Avatar({ name, email, size = 32 }) {
+  const key = (name || email).length % COLORS.length;
+  return (
+    <span
+      className="avatar"
+      style={{ width: size, height: size, fontSize: size * 0.4, background: COLORS[key] }}
+      aria-hidden="true"
+    >
+      {initialsFor(name, email)}
+    </span>
+  );
+}
+@@@ shared src/components/Button.jsx
+import React from 'react';
+
+// variant: 'primary' | 'secondary' | 'ghost'
+export default function Button({ variant = 'secondary', className = '', ...props }) {
+  return <button className={`btn btn-${variant} ${className}`.trim()} {...props} />;
+}
+@@@ shared src/utils/format.js
+export function formatDate(isoDate) {
+  if (!isoDate) return '';
+  return new Date(isoDate + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+export function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+@@@ starter src/pages/MembersPage.jsx
+import React, { useEffect, useState } from 'react';
+import { getMembers } from '../api';
+
+// TODO: Build the Members page from the design. Read the Task tab first.
+export default function MembersPage() {
+  const [members, setMembers] = useState(null);
+
+  useEffect(() => {
+    getMembers().then(setMembers);
+  }, []);
+
+  return (
+    <div>
+      <h1>Members</h1>
+      <pre>{JSON.stringify(members, null, 2)}</pre>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --border: #E2E5EA;
+  --border-strong: #D0D5DD;
+  --text: #1A1F2B;
+  --muted: #667085;
+  --primary: #3451D1;
+  --primary-hover: #2A43B3;
+  --danger: #B42318;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.layout { display: flex; min-height: 100vh; }
+
+.settings-nav {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 20px 12px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-nav-title {
+  margin: 0 8px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.settings-link { padding: 6px 8px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer; }
+.settings-link.is-current { background: #E6E9F2; font-weight: 500; }
+
+.settings-main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+/* ---- Shared components ---- */
+.btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid transparent; height: 30px; padding: 0 10px; }
+.btn-ghost:hover:not(:disabled) { background: #F2F4F7; color: var(--danger); }
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+}
+@@@ solution src/pages/MembersPage.jsx
+import React, { useEffect, useState } from 'react';
+import { getMembers, inviteMember, updateRole, removeMember } from '../api';
+import Avatar from '../components/Avatar';
+import Button from '../components/Button';
+import { formatDate, capitalize } from '../utils/format';
+
+const ROLES = ['admin', 'member', 'viewer'];
+const FILTERS = ['all', ...ROLES];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Includes the mid-session change (pending invites).
+export default function MembersPage() {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    getMembers().then((data) => {
+      setMembers(data);
+      setLoading(false);
+    });
+  }, []);
+
+  // Optimistic updates: change the UI now, call the API in the background.
+  function handleRoleChange(id, role) {
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)));
+    updateRole(id, role);
+  }
+
+  function handleRemove(id) {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+    removeMember(id);
+  }
+
+  function handleInvited(member) {
+    setMembers((prev) => [...prev, member]);
+  }
+
+  // ---- derived data ----
+  const owner = members.find((m) => m.role === 'owner');
+  const others = members.filter((m) => m.role !== 'owner');
+  const ordered = owner ? [owner, ...others] : others;
+  const visible = filter === 'all' ? ordered : ordered.filter((m) => m.role === filter);
+  const countFor = (f) => (f === 'all' ? members.length : members.filter((m) => m.role === f).length);
+  const pendingCount = members.filter((m) => m.status === 'invited').length;
+
+  return (
+    <div className="members">
+      <header className="members-header">
+        <h1>Members</h1>
+        <p className="members-sub">
+          {members.length} {members.length === 1 ? 'member' : 'members'}
+          {pendingCount > 0 && ` · ${pendingCount} pending ${pendingCount === 1 ? 'invite' : 'invites'}`}
+        </p>
+      </header>
+
+      <InviteForm onInvited={handleInvited} />
+
+      <div className="chips" role="tablist">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            role="tab"
+            aria-selected={filter === f}
+            className={'chip' + (filter === f ? ' is-active' : '')}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'all' ? 'All' : capitalize(f) + 's'}
+            <span className="chip-count">{countFor(f)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="table-card">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={4} className="table-message">Loading members…</td>
+              </tr>
+            )}
+            {!loading && visible.length === 0 && (
+              <tr>
+                <td colSpan={4} className="table-message">No {filter}s yet.</td>
+              </tr>
+            )}
+            {visible.map((m) => (
+              <MemberRow key={m.id} member={m} onRoleChange={handleRoleChange} onRemove={handleRemove} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MemberRow({ member, onRoleChange, onRemove }) {
+  const isOwner = member.role === 'owner';
+  const isInvited = member.status === 'invited';
+
+  return (
+    <tr>
+      <td>
+        <div className="member-cell">
+          <Avatar name={member.name} email={member.email} />
+          <div className="member-text">
+            <span className="member-name">{member.name || member.email}</span>
+            {member.name && <span className="member-email">{member.email}</span>}
+          </div>
+        </div>
+      </td>
+      <td>
+        {isOwner ? (
+          <span className="role-static">Owner</span>
+        ) : (
+          <select
+            className="role-select"
+            value={member.role}
+            onChange={(e) => onRoleChange(member.id, e.target.value)}
+            aria-label={`Role for ${member.name || member.email}`}
+          >
+            {ROLES.map((r) => (
+              <option key={r} value={r}>{capitalize(r)}</option>
+            ))}
+          </select>
+        )}
+      </td>
+      <td className="muted">
+        {isInvited ? <span className="badge-invited">Invited</span> : formatDate(member.joinedAt)}
+      </td>
+      <td className="actions">
+        {!isOwner && (
+          <Button variant="ghost" onClick={() => onRemove(member.id)}>
+            {isInvited ? 'Cancel invite' : 'Remove'}
+          </Button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function InviteForm({ onInvited }) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('member');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const value = email.trim();
+    if (!EMAIL_RE.test(value)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const member = await inviteMember(value, role);
+      onInvited(member);
+      setEmail('');
+      setRole('member');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="invite" onSubmit={handleSubmit} noValidate>
+      <div className="invite-row">
+        <input
+          className={'input' + (error ? ' has-error' : '')}
+          type="email"
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError('');
+          }}
+        />
+        <select className="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
+          {ROLES.map((r) => (
+            <option key={r} value={r}>{capitalize(r)}</option>
+          ))}
+        </select>
+        <Button variant="primary" type="submit" disabled={submitting}>
+          {submitting ? 'Inviting…' : 'Invite'}
+        </Button>
+      </div>
+      {error && <p className="field-error">{error}</p>}
+    </form>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --border: #E2E5EA;
+  --border-strong: #D0D5DD;
+  --text: #1A1F2B;
+  --muted: #667085;
+  --primary: #3451D1;
+  --primary-hover: #2A43B3;
+  --danger: #B42318;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.layout { display: flex; min-height: 100vh; }
+
+.settings-nav {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 20px 12px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-nav-title {
+  margin: 0 8px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.settings-link { padding: 6px 8px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer; }
+.settings-link.is-current { background: #E6E9F2; font-weight: 500; }
+
+.settings-main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+/* ---- Shared components ---- */
+.btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid transparent; height: 30px; padding: 0 10px; }
+.btn-ghost:hover:not(:disabled) { background: #F2F4F7; color: var(--danger); }
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---- Members page ---- */
+.members { max-width: 760px; display: flex; flex-direction: column; gap: 16px; }
+
+.members-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.members-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+.invite-row { display: flex; gap: 8px; }
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+}
+.input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+.input.has-error { border-color: var(--danger); }
+.field-error { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
+
+.role-select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font: inherit;
+  font-size: 14px;
+}
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.chip.is-active { background: var(--text); border-color: var(--text); color: #fff; }
+.chip-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #EEF0F3;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.chip.is-active .chip-count { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: #FAFBFC;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 10px 16px; border-bottom: 1px solid #EEF0F3; vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table-message { text-align: center; color: var(--muted); padding: 28px 16px; }
+
+.member-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.member-text { display: flex; flex-direction: column; min-width: 0; }
+.member-name { font-weight: 500; }
+.member-email { font-size: 13px; color: var(--muted); }
+.role-static { font-size: 14px; color: var(--muted); padding-left: 9px; }
+.muted { color: var(--muted); }
+.actions { text-align: right; width: 1%; white-space: nowrap; }
+
+.badge-invited {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #FFF3DC;
+  color: #93600B;
+  font-size: 12px;
+  font-weight: 600;
+}

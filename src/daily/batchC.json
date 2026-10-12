@@ -1,0 +1,951 @@
+{
+  "dc21": {
+    "kind": "drill",
+    "level": 2,
+    "order": 21,
+    "minutes": 15,
+    "title": "Activity feed: Load more",
+    "focus": "src/App.tsx",
+    "summary": "A deploy dashboard needs its activity feed: load page 1 on mount, then append pages with a Load more button until there are none left.",
+    "skills": [
+      "useEffect fetch",
+      "pagination",
+      "append with updater",
+      "loading button state"
+    ],
+    "brief": "<p>Shipyard is a deploy dashboard. <code>App.tsx</code> has <code>Sidebar</code>, <code>StatCard</code> and an empty <code>ActivityFeed</code> card. Your job is the feed.</p><p>Read <code>api.ts</code> first: <code>getActivity(page)</code> returns <code>{ items, nextPage }</code>, where <code>nextPage</code> is <code>null</code> on the last page. It takes a random 0.5–1.2 s. There are 13 events, 5 per page.</p><p>Worth reading too: <code>components/ActivityItem.tsx</code> already renders one row (icon, text, time via <code>utils/time.ts</code>). Reuse it; don't rebuild the row.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–2 read · 2–4 plan · 4–12 Core · 12–15 Next + check</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"All the state lives in <code>ActivityFeed</code>: <code>items</code>, <code>nextPage</code> and <code>loading</code>. The API tells me the next page, so I store <code>nextPage</code> instead of counting pages myself. On mount I fetch page 1 with a cancelled guard. Load more fetches <code>nextPage</code> and appends with <code>setItems((prev) =&gt; [...prev, ...page.items])</code>. The button only renders while <code>nextPage !== null</code>, says Loading… and is disabled while a request is in flight, which also stops double clicks from fetching the same page twice.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next"
+    ],
+    "requirements": [
+      "On mount the card shows \"Loading activity…\", then the first 5 events, each rendered with the existing <code>&lt;ActivityItem /&gt;</code>",
+      "A <b>Load more</b> button under the list fetches the next page and <b>appends</b> it (the first 5 stay; now 10 rows). While it loads, the button reads <b>Loading…</b> and is disabled",
+      "After the last page (13 rows) the button disappears",
+      "In its place a muted line reads \"You're all caught up · 13 events\". Rapid double clicks never load the same page twice"
+    ],
+    "hints": [
+      "Three pieces of state: the list, the next page number (or <code>null</code>), and a loading flag. Where does each one come from?",
+      "Mount fetch: <code>useEffect(() =&gt; { let cancelled = false; getActivity(1).then((page) =&gt; { if (cancelled) { return; } ... }); return () =&gt; { cancelled = true; }; }, []);</code>",
+      "Appending must use the updater form, because the old list is what you add to: <code>setItems((prev) =&gt; { return [...prev, ...page.items]; });</code>",
+      "Search: \"react disable button while loading\". Disabled buttons don't fire <code>onClick</code>, which is your double-click guard. Add an early <code>if (loading || nextPage === null) { return; }</code> too.",
+      "Shape: <code>let footer = null; if (items.length &gt; 0 &amp;&amp; nextPage !== null) { footer = &lt;button ...&gt;{label}&lt;/button&gt;; } else if (items.length &gt; 0) { footer = &lt;p&gt;You're all caught up&lt;/p&gt;; }</code>"
+    ],
+    "rubric": [
+      "Stored nextPage from the API instead of computing pages by hand",
+      "Mount fetch has a cancelled guard and cleanup",
+      "Appends with the updater form; never mutates or replaces the list",
+      "Reused ActivityItem instead of rebuilding the row",
+      "Button label/disabled derived from loading; no duplicate requests",
+      "End state handled (button removed, caught-up line)"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--primary",
+          "#5B5BD6"
+        ],
+        [
+          "--primary-soft",
+          "#EEEEFC"
+        ],
+        [
+          "--border",
+          "#E4E7EC"
+        ],
+        [
+          "--muted",
+          "#667085"
+        ],
+        [
+          "Card",
+          "#FFFFFF"
+        ]
+      ],
+      "notes": [
+        [
+          "Footer",
+          "pad 14 18 · centered"
+        ],
+        [
+          "Load more",
+          "h 34 · min-w 120 · radius 8 · 1px border · 14/600"
+        ],
+        [
+          "Load more hover",
+          "primary-soft bg · primary text"
+        ],
+        [
+          "Loading…",
+          "disabled · muted text"
+        ],
+        [
+          "Caught up",
+          "13 · muted · centered · pad 16"
+        ]
+      ]
+    }
+  },
+  "dc22": {
+    "kind": "drill",
+    "level": 2,
+    "order": 22,
+    "minutes": 18,
+    "title": "Blog editor: tag input",
+    "focus": "src/App.tsx",
+    "summary": "Turn the plain Tags field of a blog editor into a chip input: Enter or comma adds, Backspace removes, no duplicates, max 5.",
+    "skills": [
+      "onKeyDown",
+      "preventDefault",
+      "array state",
+      "case-insensitive dedupe",
+      "lifting state"
+    ],
+    "brief": "<p>Inkwell is a blogging editor. <code>App.tsx</code> has <code>TopBar</code>, <code>Editor</code>, <code>PostSettings</code> and a <code>TagField</code> that is just a text input for now.</p><p>Read <code>utils/tags.ts</code> (<code>cleanTag</code> and <code>MAX_TAGS</code>) and <code>components/Chip.tsx</code> (a chip that shows a × when you pass <code>onRemove</code>). Both are meant to be reused. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–2 read · 2–4 plan · 4–14 Core · 14–18 Next</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The tags belong to the post, so <code>tags</code> goes in <code>App</code> and comes down to <code>TagField</code> with an <code>onChange</code>. The half-typed text and the error message are local to <code>TagField</code>. Everything happens in one <code>onKeyDown</code>: Enter or comma calls <code>addTag</code> (with <code>preventDefault</code> so the comma isn't typed), and Backspace on an empty draft drops the last tag. <code>addTag</code> cleans the text, then checks max, then duplicates with <code>some</code> on lowercase.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next",
+      "Next"
+    ],
+    "requirements": [
+      "Typing a tag and pressing <b>Enter</b> or <b>,</b> adds it as a <code>&lt;Chip&gt;</code> inside the box, before the input, and clears the input. The comma is never typed. Text is cleaned with <code>cleanTag</code>; empty tags are ignored",
+      "Each chip's <b>×</b> removes it. <b>Backspace</b> in an empty input removes the last chip",
+      "Duplicates are ignored case-insensitively (\"React\" then \"react\" adds one chip) and show <i>\"react\" is already added.</i>",
+      "At 5 tags, adding another shows <i>You can add up to 5 tags.</i> and does not add it. Normally the help line reads \"Press Enter or comma to add · 2 / 5\"",
+      "<code>tags</code> lives in <code>App</code> (the post owns it); <code>TagField</code> only owns the draft and the message"
+    ],
+    "hints": [
+      "Which component needs the tags when you click Publish later? That's where <code>tags</code> lives.",
+      "Search: \"mdn keydown event key\". <code>e.key</code> is <code>\"Enter\"</code>, <code>\",\"</code> or <code>\"Backspace\"</code>.",
+      "Search: \"react onKeyDown preventDefault\". Without <code>e.preventDefault()</code> the comma lands in the input.",
+      "Duplicate check: <code>tags.some((t) =&gt; { return t.toLowerCase() === tag.toLowerCase(); })</code>",
+      "Shape: <code>function handleKeyDown(e: React.KeyboardEvent&lt;HTMLInputElement&gt;) { if (e.key === \"Enter\" || e.key === \",\") { e.preventDefault(); addTag(); return; } if (e.key === \"Backspace\" &amp;&amp; draft === \"\" &amp;&amp; tags.length &gt; 0) { onChange(tags.slice(0, -1)); } }</code>"
+    ],
+    "rubric": [
+      "Put tags in the owner (App) and passed an onChange down",
+      "One onKeyDown handler; preventDefault for Enter/comma",
+      "Reused cleanTag, MAX_TAGS and Chip",
+      "Case-insensitive duplicate check with some()",
+      "New arrays only (spread, filter, slice); no push/splice on state",
+      "Message state cleared on success; help line derived"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--accent",
+          "#B5532C"
+        ],
+        [
+          "--accent-soft",
+          "#F7E7DE"
+        ],
+        [
+          "--border",
+          "#E8E1D6"
+        ],
+        [
+          "--muted",
+          "#8A7F73"
+        ],
+        [
+          "Error",
+          "#B42318"
+        ]
+      ],
+      "notes": [
+        [
+          "Tag box",
+          "min-h 42 · pad 6 8 · radius 10 · wrap · gap 6"
+        ],
+        [
+          "Focus ring",
+          "accent border + 3px accent-soft"
+        ],
+        [
+          "Chip",
+          "h 28 · pill · 13/600 · accent on accent-soft"
+        ],
+        [
+          "Chip ×",
+          "18×18 circle"
+        ],
+        [
+          "Help",
+          "13 · muted; error 500 red"
+        ]
+      ]
+    }
+  },
+  "dc23": {
+    "kind": "drill",
+    "level": 2,
+    "order": 23,
+    "minutes": 18,
+    "title": "Pomodoro timer",
+    "focus": "src/App.tsx",
+    "summary": "Make a focus timer actually tick: Start/Pause, Reset, mm:ss, and an automatic 5-minute break at 00:00, with exactly one interval.",
+    "skills": [
+      "setInterval in useEffect",
+      "cleanup",
+      "updater form",
+      "derived display"
+    ],
+    "brief": "<p>Ripe is a focus app. <code>App.tsx</code> has <code>Header</code>, <code>Timer</code> (static 25:00 with Start/Reset buttons that do nothing), <code>SessionDots</code> and a <code>TaskList</code> from <code>components/</code>.</p><p>Read <code>utils/time.ts</code>: <code>formatTime(seconds)</code> gives \"mm:ss\", and <code>FOCUS_SECONDS</code> / <code>BREAK_SECONDS</code> are already defined. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–2 read · 2–4 plan · 4–14 Core · 14–18 Next</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I store <code>secondsLeft</code>, <code>running</code> and <code>mode</code> in <code>Timer</code>. The display is <code>formatTime(secondsLeft)</code>, never a stored string. One effect depends on <code>running</code>: if running, it starts <code>setInterval</code> and the cleanup clears it, so pausing, resetting or unmounting always kills it and there's never a second one. The tick uses <code>setSecondsLeft((s) =&gt; s - 1)</code> because the interval closure would see a stale value. A second effect watches for 0 and switches mode. The finished-session count goes up to <code>App</code> through an <code>onFocusComplete</code> callback, because <code>SessionDots</code> needs it.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next",
+      "Stretch"
+    ],
+    "requirements": [
+      "<b>Start</b> counts down once per second from 25:00 in mm:ss (24:59, 24:58…). While running the button reads <b>Pause</b>; Pause stops it, Start resumes from the same time",
+      "Exactly one interval ever runs: clicking Start/Pause quickly many times never makes it tick faster, and the interval is cleared on pause, reset and unmount",
+      "At 00:00 the timer switches to <b>Break</b> (pill reads \"Break\", green style) at 05:00 and keeps running. When the break hits 00:00 it returns to Focus 25:00 and stops",
+      "<b>Reset</b> stops the timer and returns to Focus 25:00. Each completed focus session fills one dot: \"1 of 4 sessions\"",
+      "A thin progress bar under the time fills as the current session runs (derived from <code>secondsLeft</code>)"
+    ],
+    "hints": [
+      "What has to be state? Seconds left, running or not, focus or break. The \"mm:ss\" text is derived.",
+      "Search: \"react setInterval useEffect cleanup\". The effect depends on <code>[running]</code>; return <code>() =&gt; { clearInterval(id); }</code>.",
+      "Inside <code>setInterval</code>, <code>secondsLeft</code> is frozen at the value from when the effect ran. Use <code>setSecondsLeft((s) =&gt; { return s - 1; });</code>",
+      "Switching at zero: a second effect on <code>[secondsLeft, mode]</code>: <code>if (secondsLeft &gt; 0) { return; } if (mode === \"focus\") { setMode(\"break\"); setSecondsLeft(BREAK_SECONDS); onFocusComplete(); } else { ... }</code>",
+      "Shape: <code>useEffect(() =&gt; { if (!running) { return; } const id = setInterval(() =&gt; { setSecondsLeft((s) =&gt; { return s - 1; }); }, 1000); return () =&gt; { clearInterval(id); }; }, [running]);</code>"
+    ],
+    "rubric": [
+      "Interval lives in an effect keyed on running, with clearInterval cleanup",
+      "Tick uses the updater form (no stale closure)",
+      "Display derived with the existing formatTime helper",
+      "Mode switch at zero handled once, cleanly",
+      "Session count lifted to App through a callback",
+      "Explained why double intervals can't happen"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--tomato",
+          "#E5484D"
+        ],
+        [
+          "--tomato-soft",
+          "#FDE2E1"
+        ],
+        [
+          "--leaf (break)",
+          "#2F9E6B"
+        ],
+        [
+          "--leaf-soft",
+          "#DDF3E8"
+        ],
+        [
+          "--bg",
+          "#FFF5F3"
+        ]
+      ],
+      "notes": [
+        [
+          "Timer card",
+          "radius 28 · top border 6 · pad 28 24"
+        ],
+        [
+          "Time",
+          "72/700 · tabular-nums"
+        ],
+        [
+          "Buttons",
+          "h 44 · min-w 110 · pill"
+        ],
+        [
+          "Break mode",
+          "pill, border, button and bar turn leaf green"
+        ],
+        [
+          "Progress",
+          "max-w 260 · h 6 · pill"
+        ]
+      ]
+    }
+  },
+  "dc24": {
+    "kind": "drill",
+    "level": 2,
+    "order": 24,
+    "minutes": 18,
+    "title": "Dashboard theme switcher",
+    "focus": "src/App.tsx",
+    "summary": "Add Light / Dark / System to an analytics dashboard with CSS variables on a data-theme attribute, remembered in localStorage.",
+    "skills": [
+      "CSS custom properties",
+      "data attributes",
+      "localStorage + try/catch",
+      "lazy initial state",
+      "matchMedia"
+    ],
+    "brief": "<p>Northwind Metrics is a SaaS dashboard: KPI cards, a revenue chart and an invoice table. Every color in <code>styles.css</code> comes from variables on <code>:root</code>.</p><p>Read <code>components/SegmentedControl.tsx</code>: the date-range switch already uses it, and the theme switch should too. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–2 read · 2–4 plan · 4–13 Core · 13–18 Next</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I store the user's <b>choice</b> (light, dark or system) in <code>App</code>, initialised lazily from <code>localStorage</code> inside a try/catch, because storage can throw. The <b>applied</b> theme is derived: the choice, or the OS theme when the choice is system. I put it on the root div as <code>data-theme</code>, and in CSS <code>.app[data-theme=&quot;dark&quot;]</code> redefines the variables, which inherit to everything inside. Saving happens in the click handler. For live OS changes I listen to <code>matchMedia</code> change in an effect with cleanup.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next"
+    ],
+    "requirements": [
+      "A second <code>SegmentedControl</code> labelled \"Theme\" in the top bar with <b>Light</b>, <b>Dark</b>, <b>System</b>. The app root gets <code>data-theme=\"light\"</code> or <code>\"dark\"</code>",
+      "Dark mode is done only in CSS: <code>.app[data-theme=\"dark\"]</code> redefines the color variables (bg #0B1120, surface #131B2E, text #E2E8F0…). No component changes its own colors",
+      "The choice is saved to <code>localStorage</code> key <code>northwind-theme</code> and restored on reload. Every storage read and write is wrapped in <code>try/catch</code>; with no saved value the default is System",
+      "<b>System</b> follows <code>prefers-color-scheme</code>, live: changing the OS setting updates the page without a reload. Next to the switch a muted note reads \"Using dark\" / \"Using light\" while System is chosen"
+    ],
+    "hints": [
+      "Two different things: what the user picked (3 options) and what's applied (2 options). Only the first one is state.",
+      "Search: \"css custom properties override attribute selector\". Variables inherit, so redefining them on <code>.app</code> beats the <code>:root</code> values for everything inside.",
+      "Search: \"mdn localStorage exceptions\". <code>getItem</code> and <code>setItem</code> can throw (private mode, blocked storage). Wrap both.",
+      "Lazy initial state reads storage once: <code>useState&lt;ThemeChoice&gt;(() =&gt; { return readStoredChoice(); })</code>",
+      "Search: \"mdn matchMedia change event\". Shape: <code>const mq = window.matchMedia(\"(prefers-color-scheme: dark)\"); mq.addEventListener(\"change\", handle); return () =&gt; { mq.removeEventListener(\"change\", handle); };</code>"
+    ],
+    "rubric": [
+      "Stored the choice; derived the applied theme",
+      "Dark theme done purely by redefining variables under data-theme",
+      "localStorage wrapped in try/catch, read lazily once",
+      "Reused SegmentedControl",
+      "matchMedia listener added and removed in an effect",
+      "Validated the stored value instead of trusting it"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "Dark --bg",
+          "#0B1120"
+        ],
+        [
+          "Dark --surface",
+          "#131B2E"
+        ],
+        [
+          "Dark --border",
+          "#23304A"
+        ],
+        [
+          "Dark --text",
+          "#E2E8F0"
+        ],
+        [
+          "Dark --muted",
+          "#94A3B8"
+        ],
+        [
+          "Dark --accent",
+          "#60A5FA"
+        ]
+      ],
+      "notes": [
+        [
+          "Theme switch",
+          "same SegmentedControl · after date range · gap 10"
+        ],
+        [
+          "Segment",
+          "h 28 · pad 0 12 · 13/600"
+        ],
+        [
+          "System note",
+          "12 · muted · left of switch · gap 8"
+        ],
+        [
+          "Dark",
+          "color-scheme: dark on the root"
+        ]
+      ]
+    }
+  },
+  "dc25": {
+    "kind": "drill",
+    "level": 3,
+    "order": 25,
+    "minutes": 28,
+    "changeAt": 18,
+    "title": "Chat composer: emoji picker",
+    "focus": "src/App.tsx",
+    "summary": "A team-chat composer gets an emoji popover: categories from an API, insert at the cursor, close on outside click or Escape.",
+    "skills": [
+      "useRef",
+      "selectionStart / selectionEnd",
+      "popover outside click",
+      "Escape listener",
+      "fetch on open"
+    ],
+    "brief": "<p>Huddle is a team chat. <code>App.tsx</code> has <code>Sidebar</code>, the message list (using <code>components/Message.tsx</code>) and a working <code>Composer</code>: type, Send appends a message. The 🙂 button in the composer bar does nothing yet.</p><p>Read <code>api.ts</code>: <code>getEmojiCategories()</code> returns 3 categories (name, tab icon, emojis) after a random 0.4–1.0 s.</p><p>The hard part is inserting <b>where the cursor is</b>, not at the end. The textarea keeps its selection after it loses focus.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~18 min):</b> a recently used row.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–18 Core · 18–24 change · 24–28 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>text</code> lives in <code>Composer</code>, so <code>pickerOpen</code> and <code>handlePick</code> go there too. I make an <code>EmojiPicker</code> that's only mounted while open and loads the categories itself, with a tab per category. For the cursor I need a ref on the textarea: read <code>selectionStart</code>/<code>selectionEnd</code>, splice the emoji into the text, then after the re-render put the caret after the emoji. The button and the popover share a wrapper ref; a <code>mousedown</code> listener on <code>document</code> closes it when the click is outside that wrapper, and a <code>keydown</code> listener handles Escape. Both are added only while open and removed in the cleanup.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next",
+      "Next"
+    ],
+    "requirements": [
+      "Clicking 🙂 toggles a popover above the button. It shows \"Loading emoji…\" until <code>getEmojiCategories()</code> resolves, then one tab per category (its icon) and an 8-column grid of that category's emojis under its name",
+      "Clicking an emoji inserts it <b>at the cursor</b> (replacing any selected text), not at the end: with \"See you\" and the caret after \"See\", picking 😀 gives \"See😀 you\". Then the popover closes",
+      "The popover closes on a click outside it and on <b>Escape</b>. Clicking inside it (e.g. switching tabs) keeps it open",
+      "After inserting, the textarea is focused with the caret right after the emoji, so typing continues there",
+      "Listeners are only attached while open and are removed on close (effect cleanup)"
+    ],
+    "change": {
+      "title": "Recently used row",
+      "html": "<p>\"People use the same five emoji all day. Put them at the top.\"</p><ul><li>When at least one emoji has been picked, the popover shows a <b>Recently used</b> row above the tabs.</li><li>Most recent first, no duplicates (picking one again moves it to the front), at most 8.</li><li>It must survive the popover closing and reopening.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: the picker unmounts on close, so this state can't live in it.</p>"
+    },
+    "hints": [
+      "Where does the text live? The picker only reports which emoji; the composer changes the text.",
+      "Search: \"mdn HTMLTextAreaElement selectionStart\". <code>el.selectionStart</code> and <code>el.selectionEnd</code> are indexes into the value.",
+      "Insert: <code>text.slice(0, start) + emoji + text.slice(end)</code>. Emoji are usually 2 UTF-16 units, so the new caret is <code>start + emoji.length</code>.",
+      "Search: \"mdn setSelectionRange\". The caret must be set <i>after</i> React re-renders: keep it in a ref and apply it in a <code>useEffect</code> on <code>[text]</code>.",
+      "Outside click: put the button and popover in one wrapper with a ref, then <code>if (wrapRef.current &amp;&amp; !wrapRef.current.contains(e.target as Node)) { setPickerOpen(false); }</code> in a <code>mousedown</code> listener.",
+      "Recent: <code>setRecent((prev) =&gt; { return [emoji, ...prev.filter((x) =&gt; { return x !== emoji; })].slice(0, 8); });</code> in <code>Composer</code>."
+    ],
+    "rubric": [
+      "Planned state placement (text, open, recent in Composer)",
+      "Used selectionStart/selectionEnd and restored the caret after render",
+      "Picker loads its own data with a loading state and cancelled guard",
+      "Outside click uses one wrapper ref so the toggle button doesn't reopen it",
+      "Document listeners added only while open and cleaned up",
+      "Recent row is deduped, capped, most-recent-first, and survives close",
+      "Talked through anything unfinished"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--aubergine",
+          "#3F0E40"
+        ],
+        [
+          "Active tab",
+          "#F1E6F1"
+        ],
+        [
+          "--border",
+          "#DDDDDD"
+        ],
+        [
+          "--muted",
+          "#616061"
+        ],
+        [
+          "Popover shadow",
+          "rgba(0,0,0,.18)"
+        ]
+      ],
+      "notes": [
+        [
+          "Popover",
+          "w 296 · pad 10 · radius 12 · bottom 40 above button"
+        ],
+        [
+          "Tabs",
+          "36×32 · radius 6 · active: inset 2px underline"
+        ],
+        [
+          "Grid",
+          "8 columns · gap 2 · cell h 32 · 20px emoji"
+        ],
+        [
+          "Heading",
+          "12/700 · muted"
+        ],
+        [
+          "Recent row",
+          "above tabs · bottom border"
+        ]
+      ]
+    }
+  },
+  "dc26": {
+    "kind": "drill",
+    "level": 3,
+    "order": 26,
+    "minutes": 25,
+    "changeAt": 17,
+    "title": "People search: debounce + races",
+    "focus": "src/App.tsx",
+    "summary": "A company directory search: 300 ms debounce, loading state, and stale responses that must never overwrite newer ones.",
+    "skills": [
+      "debounce with setTimeout",
+      "effect cleanup",
+      "race conditions",
+      "derived highlight"
+    ],
+    "brief": "<p>Roster is an HR directory. <code>App.tsx</code> has the top bar, a <code>SearchBox</code> (controlled) and a <code>PersonRow</code> that uses <code>components/Avatar.tsx</code>. Typing does nothing yet.</p><p>Read <code>api.ts</code> carefully: <code>searchPeople(query)</code> is <b>slower for shorter queries</b> (\"j\" ≈ 1.3 s, \"jan\" ≈ 0.7 s). So if you search \"j\" and then \"jan\", the \"j\" answer arrives <i>last</i>. A naive version shows the wrong results.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~17 min):</b> highlight the match.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–17 Core · 17–22 change · 22–25 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>query</code> is state; <code>results</code> and <code>loading</code> are state because they come from the network. One effect on <code>[query]</code> does everything: if the query is empty it clears results and returns. Otherwise it starts a 300 ms <code>setTimeout</code> that calls the API. The cleanup does two jobs: <code>clearTimeout</code> (that's the debounce, because every keystroke cancels the pending call) and <code>cancelled = true</code> (so a response from an older query is ignored when it arrives late).\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next",
+      "Next"
+    ],
+    "requirements": [
+      "Typing searches with <code>searchPeople</code>, <b>debounced 300 ms</b>: typing \"jan\" quickly makes one request, not three",
+      "While a request is in flight a \"Searching…\" line shows under the search box; results render with <code>&lt;PersonRow /&gt;</code>. No matches: <i>No people match \"xyz\".</i>",
+      "Out-of-order responses never win: type \"j\", wait ~0.4 s, then type \"an\". After everything settles the list shows the 5 \"jan\" people, not the 7 \"j\" people",
+      "Empty input (or clearing it) shows \"Start typing to search 18 people.\" with no request and no Searching… line",
+      "Old results stay visible (dimmed) while a newer search loads, instead of flashing empty"
+    ],
+    "change": {
+      "title": "Highlight the match",
+      "html": "<p>\"People scan the list for why it matched. Highlight it.\"</p><ul><li>In each name, wrap the first case-insensitive match of the query in <code>&lt;mark&gt;</code> (teal-soft background, dark teal text). \"jan\" in \"Ben Janssen\" highlights \"Jan\".</li><li>Highlight with the query the results <b>belong to</b>, not the one being typed right now.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: no <code>dangerouslySetInnerHTML</code>. Split the string into before / match / after.</p>"
+    },
+    "hints": [
+      "Debounce in React is just <code>setTimeout</code> in an effect plus <code>clearTimeout</code> in the cleanup.",
+      "Search: \"react useEffect race condition fetch\". The fix is a <code>let cancelled = false</code> per effect run, set to true in the cleanup.",
+      "The cleanup runs before the next effect run, so when <code>query</code> changes, the previous run is cancelled both ways: its timer and its response.",
+      "Highlight: <code>const i = text.toLowerCase().indexOf(q.toLowerCase());</code> then <code>text.slice(0, i)</code>, <code>text.slice(i, i + q.length)</code>, <code>text.slice(i + q.length)</code>.",
+      "Shape: <code>useEffect(() =&gt; { if (q === \"\") { ...; return; } let cancelled = false; const t = setTimeout(() =&gt; { setLoading(true); searchPeople(q).then((data) =&gt; { if (cancelled) { return; } setResults(data); setLoading(false); }); }, 300); return () =&gt; { cancelled = true; clearTimeout(t); }; }, [query]);</code>"
+    ],
+    "rubric": [
+      "Explained the race before coding it",
+      "Debounce via setTimeout + clearTimeout in cleanup",
+      "Stale responses ignored via cancelled flag",
+      "Empty query short-circuits (no request)",
+      "Loading and empty states are distinct and correct",
+      "Highlight derived by slicing, uses the results' query",
+      "Reused Avatar / PersonRow"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--teal",
+          "#0D9488"
+        ],
+        [
+          "--teal-soft (mark)",
+          "#CCFBF1"
+        ],
+        [
+          "Mark text",
+          "#115E59"
+        ],
+        [
+          "Searching bar",
+          "#F0FDFA"
+        ],
+        [
+          "--muted",
+          "#5E7270"
+        ]
+      ],
+      "notes": [
+        [
+          "Search input",
+          "h 52 · 16px · no border"
+        ],
+        [
+          "Searching…",
+          "13 · teal · pad 8 16 · bottom border"
+        ],
+        [
+          "Row",
+          "pad 10 16 · gap 12 · avatar 36"
+        ],
+        [
+          "Loading list",
+          "opacity .55"
+        ],
+        [
+          "Mark",
+          "radius 3 · pad 0 1"
+        ]
+      ]
+    }
+  },
+  "dc27": {
+    "kind": "drill",
+    "level": 3,
+    "order": 27,
+    "minutes": 28,
+    "changeAt": 19,
+    "title": "Kanban: move cards",
+    "focus": "src/App.tsx",
+    "summary": "Load a roadmap board from an API, move cards between To do / Doing / Done with arrows, count each column, add cards. Then a WIP limit.",
+    "skills": [
+      "fetch on mount",
+      "immutable update by id",
+      "derived grouping",
+      "controlled form",
+      "business rule"
+    ],
+    "brief": "<p>Trellis is a project board. <code>App.tsx</code> has <code>CardView</code>, <code>Column</code> and an empty <code>Board</code>. The columns render, but there are no cards yet.</p><p>Read <code>api.ts</code> (<code>getCards()</code>, random 0.5–1.2 s; each card has a <code>column</code>) and <code>board.ts</code> (<code>COLUMNS</code> in left-to-right order, and label names).</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> WIP limit on Doing.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–19 Core · 19–24 change · 24–28 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One flat <code>cards</code> array in <code>Board</code>, where each card knows its <code>column</code>. The columns are derived with <code>filter</code>, so I never keep three lists in sync. Moving is <code>map</code>: same card with <code>column</code> set to the next or previous entry in <code>COLUMNS</code>. The counts are just <code>.length</code> of the filtered lists. The add form is its own small component with its own input state that calls <code>onAdd(title)</code>.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next"
+    ],
+    "requirements": [
+      "The board shows \"Loading board…\", then the cards from <code>getCards()</code> in their columns. Each column header shows a count pill: To do 3, Doing 2, Done 2",
+      "Each card has <b>←</b> and <b>→</b> buttons that move it to the previous / next column. ← is disabled in To do and → in Done. Counts update",
+      "Under To do, an input + <b>Add</b> button (a form, so Enter works) adds a card with that title to the bottom of To do and clears the input. Blank titles are ignored",
+      "Cards are updated immutably by id (<code>map</code> + spread); the columns are derived from one array, never three separate lists"
+    ],
+    "change": {
+      "title": "WIP limit on Doing",
+      "html": "<p>\"The team keeps starting things and never finishing. Limit Doing to 3.\"</p><ul><li>Doing's count reads <b>2 / 3</b>, and turns red at <b>3 / 3</b>.</li><li>Moving a card <i>into</i> Doing when it has 3 is blocked: the card stays, and a red banner above the board says <i>Doing is at its WIP limit of 3. Finish something first.</i></li><li>Any successful move clears the banner.</li></ul>"
+    },
+    "hints": [
+      "One array or three? If each card stores its column, a move is a one-field change.",
+      "Next column: <code>const from = COLUMNS.findIndex((c) =&gt; { return c.id === card.column; }); const target = COLUMNS[from + step];</code> where step is -1 or 1.",
+      "Move: <code>setCards((prev) =&gt; { return prev.map((c) =&gt; { if (c.id !== id) { return c; } return { ...c, column: target.id }; }); });</code>",
+      "Search: \"react form onSubmit preventDefault\" for the add form, so Enter submits without reloading.",
+      "WIP: check before moving: <code>if (target.id === \"doing\" &amp;&amp; cardsIn(\"doing\").length &gt;= WIP_LIMIT) { setNotice(...); return; }</code>"
+    ],
+    "rubric": [
+      "Single source of truth (flat array) with derived columns",
+      "Fetch on mount with loading state and cancelled guard",
+      "Immutable move by id; edges disabled",
+      "Add form is controlled, uses onSubmit + preventDefault, ignores blanks",
+      "WIP rule checked before the update, with clear feedback",
+      "Column component stays presentational (props + callbacks)"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--primary",
+          "#6D4AFF"
+        ],
+        [
+          "--primary-soft",
+          "#ECE6FF"
+        ],
+        [
+          "Full count",
+          "#FEE2E2 / #B91C1C"
+        ],
+        [
+          "Banner",
+          "#FEF2F2 · border #FECACA · text #991B1B"
+        ],
+        [
+          "--bg",
+          "#F3F0FF"
+        ]
+      ],
+      "notes": [
+        [
+          "Count pill",
+          "h 20 · min-w 22 · pill · 12/700"
+        ],
+        [
+          "Move buttons",
+          "28×24 · radius 6 · right aligned · disabled .35"
+        ],
+        [
+          "Add input",
+          "h 34 · radius 8"
+        ],
+        [
+          "Add button",
+          "h 34 · primary · 13/700"
+        ],
+        [
+          "Banner",
+          "radius 10 · pad 10 14 · margin 16 22 0"
+        ]
+      ]
+    }
+  },
+  "dc28": {
+    "kind": "drill",
+    "level": 3,
+    "order": 28,
+    "minutes": 28,
+    "changeAt": 19,
+    "title": "Comments: inline replies",
+    "focus": "src/App.tsx",
+    "summary": "On a recipe page, Reply opens one inline box under that comment; posting is async with a pending state. Then collapsible replies.",
+    "skills": [
+      "single \"which one\" state",
+      "async submit + pending",
+      "nested immutable update",
+      "collapse state"
+    ],
+    "brief": "<p>Simmer is a recipe site. <code>App.tsx</code> loads the comments (already done) and renders <code>CommentItem</code> with its <code>ReplyItem</code>s. Each comment has a <b>Reply</b> link that does nothing yet.</p><p>Read <code>api.ts</code>: <code>postReply(commentId, text)</code> resolves after a random 0.7–1.2 s with the new <code>Reply</code>. <code>components/Avatar.tsx</code> and <code>utils/time.ts</code> are worth reusing.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> collapsible replies.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–19 Core · 19–25 change · 25–28 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Only one reply box can be open, so <code>CommentSection</code> stores <code>replyingTo: string | null</code>, the id of the comment, not a boolean per comment. A <code>ReplyBox</code> component owns its draft and its pending flag. On submit it calls <code>onSubmit(text)</code>, which returns the promise from <code>postReply</code>. When it resolves, the section adds the reply into that comment's <code>replies</code> with a nested <code>map</code> + spread and sets <code>replyingTo</code> to null, which unmounts the box.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next"
+    ],
+    "requirements": [
+      "Clicking <b>Reply</b> opens an inline reply box (textarea + Cancel + <b>Post reply</b>) under that comment only. Clicking Reply on another comment moves the box there. Cancel closes it",
+      "Post reply calls <code>postReply</code>. While pending the button reads <b>Posting…</b> and the textarea and buttons are disabled. Blank text can't be posted",
+      "When it resolves, the reply appears at the end of that comment's replies (author \"You\", \"just now\") and the box closes. State is updated immutably",
+      "The textarea is focused when the box opens and its placeholder reads \"Reply to Nadia Q.…\""
+    ],
+    "change": {
+      "title": "Collapse / expand replies",
+      "html": "<p>\"Long threads push the next comments off screen.\"</p><ul><li>Replies start <b>collapsed</b>. Under a comment with replies, a muted link reads <b>Show 3 replies</b> (or <b>Show 1 reply</b>). Clicking shows them and the link becomes <b>Hide replies</b>.</li><li>Comments without replies show no link.</li><li>After you post a reply, that thread is expanded so you can see it.</li></ul>"
+    },
+    "hints": [
+      "How many reply boxes can be open at once? One. So store which comment, not a flag per comment.",
+      "Search: \"react async form submit loading state\". Set pending to true before the call; the box unmounts on success, so you don't need to set it back.",
+      "Nested update: <code>prev.map((c) =&gt; { if (c.id !== commentId) { return c; } return { ...c, replies: [...c.replies, reply] }; })</code>",
+      "Return the promise: <code>function handlePostReply(id, text) { return postReply(id, text).then((reply) =&gt; { ... }); }</code>",
+      "Collapse: <code>const [expanded, setExpanded] = useState&lt;Record&lt;string, boolean&gt;&gt;({});</code> and toggle with <code>setExpanded((prev) =&gt; { return { ...prev, [id]: !prev[id] }; });</code>"
+    ],
+    "rubric": [
+      "replyingTo stores one id; only one box possible",
+      "Pending state disables input and changes the label",
+      "Nested immutable update (map + spread twice)",
+      "ReplyBox owns draft; section owns data",
+      "Collapse state keyed by id, label pluralised, expands after posting",
+      "Reused Avatar and timeAgo"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--green",
+          "#2F6B3F"
+        ],
+        [
+          "--border",
+          "#E9E2D2"
+        ],
+        [
+          "--muted",
+          "#7D7867"
+        ],
+        [
+          "Disabled input",
+          "#F4F1E8"
+        ],
+        [
+          "--bg",
+          "#FAF7F0"
+        ]
+      ],
+      "notes": [
+        [
+          "Reply box",
+          "margin-top 10 · gap 8"
+        ],
+        [
+          "Textarea",
+          "min-h 70 · radius 12 · pad 10 12 · focus 2px green"
+        ],
+        [
+          "Buttons",
+          "h 32 · pill · 13/700 · right aligned"
+        ],
+        [
+          "Post reply",
+          "green bg · white"
+        ],
+        [
+          "Show N replies",
+          "13/700 · muted · next to Reply"
+        ]
+      ]
+    }
+  },
+  "dc29": {
+    "kind": "drill",
+    "level": 3,
+    "order": 29,
+    "minutes": 25,
+    "changeAt": 17,
+    "title": "Travel listing: photo carousel",
+    "focus": "src/App.tsx",
+    "summary": "A vacation rental page shows one photo. Make it a carousel: wrapping prev/next, dots, a counter, and autoplay that pauses on hover.",
+    "skills": [
+      "index state + modulo",
+      "setInterval cleanup",
+      "hover pause",
+      "keyboard events",
+      "tabIndex"
+    ],
+    "brief": "<p>Wanderstay is a vacation rental site. <code>App.tsx</code> loads the listing (already done) and renders <code>Gallery</code>, which only shows the first photo, plus details and a <code>BookingCard</code>.</p><p>Read <code>components/PhotoSlide.tsx</code>: it renders any photo. Reuse it for the current slide. There are 7 photos.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~18 min):</b> keyboard arrows.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–18 Core · 18–22 change · 22–25 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>Gallery</code> owns <code>index</code> and <code>paused</code>. Next is <code>(i + 1) % count</code>, prev is <code>(i - 1 + count) % count</code> so it wraps both ways. Autoplay is an effect with <code>setInterval</code> that skips when paused and clears in the cleanup. I'll put <code>index</code> in its deps so a manual click restarts the 4 s countdown. Hover sets <code>paused</code> with <code>onMouseEnter</code>/<code>onMouseLeave</code>. The counter is derived: <code>index + 1</code> of <code>count</code>.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next"
+    ],
+    "requirements": [
+      "Round <b>‹</b> / <b>›</b> buttons on the photo go to the previous / next photo, wrapping (next on 7 goes to 1, prev on 1 goes to 7)",
+      "A row of dots at the bottom (active one white and larger); clicking a dot jumps to that photo. A pill at the bottom right reads <b>3 / 7</b>",
+      "Autoplay advances every 4 s. It pauses while the mouse is over the carousel and resumes on leave. The interval is cleared on unmount and never doubles up",
+      "A manual move restarts the 4 s countdown (no jump right after a click)"
+    ],
+    "change": {
+      "title": "Keyboard arrows",
+      "html": "<p>\"Accessibility review: the carousel can't be used without a mouse.\"</p><ul><li>The carousel is focusable (<code>tabIndex={0}</code>, visible focus ring) with <code>role=\"region\"</code> and <code>aria-label=\"Listing photos\"</code>.</li><li>While it has focus, <b>ArrowLeft</b> / <b>ArrowRight</b> go prev / next (same wrapping).</li><li>Arrow keys elsewhere on the page do nothing to it.</li></ul>"
+    },
+    "hints": [
+      "Wrapping is modulo. Going back: add <code>count</code> before <code>%</code> so it never goes negative.",
+      "Search: \"react setInterval useEffect cleanup\". Return early when paused; the cleanup clears the interval.",
+      "Inside the interval use the updater: <code>setIndex((i) =&gt; { return (i + 1) % count; });</code>",
+      "Search: \"mdn mouseenter vs mouseover\". <code>onMouseEnter</code>/<code>onMouseLeave</code> don't fire again for children.",
+      "Search: \"mdn tabindex\" and \"react onKeyDown\". Put <code>onKeyDown</code> on the focusable carousel div, not on <code>document</code>."
+    ],
+    "rubric": [
+      "Index-only state; counter and active dot derived",
+      "Correct wrap both directions",
+      "Interval in an effect with cleanup; pause state respected",
+      "Reused PhotoSlide",
+      "Keyboard handled on the focusable element, not globally",
+      "ARIA labels on icon buttons and dots"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--coral",
+          "#E8505B"
+        ],
+        [
+          "Nav button",
+          "rgba(255,255,255,.92)"
+        ],
+        [
+          "Counter",
+          "rgba(0,0,0,.55) · white"
+        ],
+        [
+          "Dot",
+          "rgba(255,255,255,.55)"
+        ],
+        [
+          "Active dot",
+          "#FFFFFF · scale 1.25"
+        ]
+      ],
+      "notes": [
+        [
+          "Gallery",
+          "h 340 · radius 16"
+        ],
+        [
+          "Nav buttons",
+          "36 circle · 14 from edge · vertically centered · shadow"
+        ],
+        [
+          "Counter",
+          "pill · 12/700 · right 14 bottom 14"
+        ],
+        [
+          "Dots",
+          "8×8 · gap 6 · centered · bottom 16"
+        ],
+        [
+          "Focus",
+          "3px outline · offset 3"
+        ]
+      ]
+    }
+  },
+  "dc30": {
+    "kind": "drill",
+    "level": 3,
+    "order": 30,
+    "minutes": 30,
+    "changeAt": 21,
+    "title": "Coffee shop: cart drawer",
+    "focus": "src/App.tsx",
+    "summary": "Add a cart to a coffee-gear store: add from the catalog, a drawer with quantities and totals, and a coupon checked by the API.",
+    "skills": [
+      "derived totals",
+      "integer cents",
+      "drawer",
+      "async validation",
+      "reuse helpers"
+    ],
+    "brief": "<p>Ember &amp; Oak sells pour-over gear. <code>App.tsx</code> loads the products (done) and renders <code>ProductCard</code>s with an <b>Add to cart</b> button, and a <b>Cart</b> button with a badge stuck at 0.</p><p>Read <code>utils/money.ts</code> first: all prices are integer <b>cents</b>, and <code>formatMoney</code>, <code>calcTax</code> (8.25%) and <code>percentOf</code> are there to reuse. In <code>api.ts</code>, <code>validateCoupon(code)</code> takes 0.5–1.0 s and only accepts <code>SAVE10</code> (any case).</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~21 min):</b> free-shipping progress bar.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan · 6–21 Core · 21–26 change · 26–30 Next + talk</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The cart is <code>{ productId, qty }[]</code> in <code>App</code>, because the header badge and the drawer both need it. I don't copy names or prices into the cart; the drawer joins with <code>products</code>. Subtotal, discount, tax and total are all derived on every render, in cents, and only formatted at the end. The coupon also lives in <code>App</code> so it survives closing the drawer. The coupon form owns its input, a checking flag and the error message.\"</p></div></details>",
+    "tiers": [
+      "Core",
+      "Core",
+      "Core",
+      "Next",
+      "Next"
+    ],
+    "requirements": [
+      "<b>Add to cart</b> adds one of that product (adding again increases its quantity). The header badge shows the total item count",
+      "Clicking <b>Cart</b> opens a right-side drawer over a dark backdrop: each line shows the product, <b>−</b> qty <b>+</b> (− disabled at 1), <b>Remove</b>, and the line total. Empty cart: \"Your cart is empty.\" ✕ or the backdrop closes it",
+      "Below the lines: Subtotal, Tax (8.25%) and Total, using <code>formatMoney</code> and <code>calcTax</code>. 2 × Ceramic dripper = $56.00, tax $4.62, total $60.62",
+      "A coupon field + <b>Apply</b> calls <code>validateCoupon</code> (button reads \"Checking…\" meanwhile). Invalid: red <i>Code \"BOGUS\" isn't valid.</i> <code>SAVE10</code>: a green \"SAVE10 applied · 10% off\" with Remove, and a Discount row. Tax is on the discounted subtotal",
+      "The coupon and cart survive closing and reopening the drawer"
+    ],
+    "change": {
+      "title": "Free-shipping progress bar",
+      "html": "<p>\"Marketing wants to nudge order size. Free shipping starts at $75.\"</p><ul><li>At the top of the drawer: <i>Add <b>$19.00</b> more for free shipping</i> with a progress bar (amber fill) showing subtotal / $75.</li><li>At $75 or more: <i>You've unlocked free shipping</i>, green background, full green bar.</li><li>Use the subtotal before the discount.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">It's all derived: no new state.</p>"
+    },
+    "hints": [
+      "What does the cart need to remember? Only which product and how many. Price and name come from the product list.",
+      "Add: <code>find</code> the line. If it exists, <code>map</code> it to <code>{ ...line, qty: line.qty + 1 }</code>; otherwise <code>[...prev, { productId, qty: 1 }]</code>.",
+      "Totals in cents: <code>subtotal = lines.reduce((sum, l) =&gt; { return sum + l.product.price * l.qty; }, 0)</code>, then <code>discount = percentOf(subtotal, 10)</code>, <code>tax = calcTax(subtotal - discount)</code>.",
+      "Search: \"javascript floating point money cents\". That's why everything is integer cents until <code>formatMoney</code>.",
+      "Coupon form: <code>setChecking(true); validateCoupon(code).then((result) =&gt; { setChecking(false); if (result.ok) { onApply(...); } else { setError(result.message); } });</code>",
+      "Progress: <code>const percent = Math.min(100, Math.round((subtotal / 7500) * 100));</code> then <code>style={{ width: percent + \"%\" }}</code>."
+    ],
+    "rubric": [
+      "Cart stores ids + qty; joins with products for display",
+      "All money math in cents with the existing helpers",
+      "Totals derived, never stored",
+      "Cart and coupon in App so they survive the drawer closing",
+      "Coupon has pending, error and success states",
+      "Drawer closes via ✕ and backdrop (target === currentTarget)",
+      "Progress bar derived, no new state"
+    ],
+    "spec": {
+      "colors": [
+        [
+          "--espresso",
+          "#2B1D16"
+        ],
+        [
+          "--amber",
+          "#C8742B"
+        ],
+        [
+          "--green",
+          "#3F7D4E"
+        ],
+        [
+          "Backdrop",
+          "rgba(43,29,22,.45)"
+        ],
+        [
+          "Ship bg",
+          "#FBF3E8 → #EAF4EC unlocked"
+        ],
+        [
+          "Error",
+          "#B42318"
+        ]
+      ],
+      "notes": [
+        [
+          "Drawer",
+          "right · max-w 400 · full height · shadow -12 0 32"
+        ],
+        [
+          "Head",
+          "pad 18 20 · title Georgia 20"
+        ],
+        [
+          "Line image",
+          "52×52 · radius 10"
+        ],
+        [
+          "Qty buttons",
+          "26×26 · radius 7"
+        ],
+        [
+          "Ship bar",
+          "h 6 · pill · inside pad 12 14 radius 12 box"
+        ],
+        [
+          "Checkout",
+          "h 46 · amber · radius 10"
+        ]
+      ]
+    }
+  }
+}

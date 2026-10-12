@@ -1,0 +1,395 @@
+<template id="tpl-st-ts">
+  <h1>TypeScript that makes React code safer</h1>
+  <p class="lede">TypeScript is not about adding labels to code that already works. Used well, it makes whole categories of bugs impossible to write. This lesson follows one real bug in a reading app, and shows the handful of TypeScript habits that staff engineers use to stop it, and its cousins, from coming back.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Type props, children, events and refs without reaching for <code>any</code></li>
+    <li>Replace "three booleans" with a discriminated union so impossible states can't be written</li>
+    <li>Explain why types don't check data at runtime, and where validation (like Zod) belongs</li>
+    <li>Pick the right utility type, choose <code>unknown</code> over <code>any</code>, and set sensible strictness</li>
+    <li>Recognise when types have become too clever, and say so in a review</li>
+  </ul></div>
+
+  <h2>1. The running example: a bug in Lexi</h2>
+  <p><b>Lexi</b> is a reading app for schools. Teachers see a dashboard of their class. Students do reading sessions (a timed passage, then a few questions). District admins get reports across many schools. The frontend is React 19 with TypeScript, about 300 components, three small teams.</p>
+  <p>One Monday, a district admin emails a screenshot: the report says <b>"Average accuracy: NaN%"</b> and, underneath it, a spinner that never stops. Two things went wrong at once. The report component kept <code>isLoading</code>, <code>isError</code> and <code>data</code> as separate pieces of state, and a failed retry left <code>isLoading</code> true while the old <code>data</code> was still there. And the API had quietly started sending <code>accuracy</code> as a string (<code>"0.82"</code>) for one school, so the maths produced <code>NaN</code>.</p>
+  <p>TypeScript was "on" the whole time. It didn't help, because the code told it things that weren't true. The rest of this lesson is about writing TypeScript that tells the truth.</p>
+  <div class="callout"><span class="callout-label">Two terms</span>
+    <p><b>Compile time</b>: when TypeScript checks your code, in your editor and in CI, before anything runs. <b>Runtime</b>: when the code actually runs in a browser. TypeScript's types are deleted before runtime; the browser only ever sees plain JavaScript. Keep this split in mind: it explains most of what follows.</p>
+  </div>
+
+  <h2>2. Typing props and children</h2>
+  <p>Start with the simplest thing: a component's props. Describe them with a <code>type</code> (or an <code>interface</code>; for props either is fine, just be consistent). Here is the card a teacher sees for each student.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="StudentCard.tsx">
+import type { ReactNode } from 'react';
+
+type StudentCardProps = {
+  name: string;
+  gradeLevel: number;
+  minutesThisWeek: number;
+  badge?: ReactNode;          // optional: anything React can render
+  onOpen: (studentId: string) => void;
+  studentId: string;
+};
+
+export function StudentCard({ name, gradeLevel, minutesThisWeek, badge, onOpen, studentId }: StudentCardProps) {
+  let badgeSlot: ReactNode = null;
+  if (badge) {
+    badgeSlot = <span className="badge">{badge}</span>;
+  }
+
+  return (
+    <button className="card" onClick={() => onOpen(studentId)}>
+      <strong>{name}</strong>
+      <span>Grade {gradeLevel} · {minutesThisWeek} min this week</span>
+      {badgeSlot}
+    </button>
+  );
+}
+</script>
+  <p>Three habits are hiding in there.</p>
+  <ul>
+    <li><b><code>ReactNode</code> for "anything renderable"</b>: strings, numbers, elements, arrays, <code>null</code>. Use it for <code>children</code> and for slots like <code>badge</code>. If you need exactly one element (rare), use <code>ReactElement</code>.</li>
+    <li><b>Callbacks are typed by what they receive</b>: <code>(studentId: string) =&gt; void</code>. The parent now gets an error if it passes a handler expecting a number.</li>
+    <li><b>Optional with <code>?</code></b>, and the component handles the missing case explicitly above the return.</li>
+  </ul>
+  <p>For a component that wraps a native element, don't retype all 200 HTML attributes. Borrow them with <code>ComponentProps</code>, and add yours on top.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Button.tsx: extend a native element">
+import type { ComponentProps } from 'react';
+
+type ButtonProps = ComponentProps<'button'> & {
+  variant: 'primary' | 'ghost';
+};
+
+export function Button({ variant, className, ...rest }: ButtonProps) {
+  const classes = ['btn', 'btn-' + variant, className].join(' ');
+  return <button className={classes} {...rest} />;
+}
+// <Button variant="primary" type="submit" disabled>Save</Button> all type-checks.
+// <Button variant="big"> is an error: 'big' isn't 'primary' | 'ghost'.
+</script>
+  <p>Notice <code>variant: 'primary' | 'ghost'</code>. That's a <b>union of string literals</b>: the value must be one of exactly those strings. It's the cheapest, highest-value type in React code, and it's the seed of the next idea.</p>
+
+  <h2>3. Make impossible states impossible</h2>
+  <p>Here is how the district report kept its state when the bug happened. It looks reasonable.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="before: three independent pieces of state">
+const [isLoading, setIsLoading] = useState(false);
+const [error, setError] = useState<Error | null>(null);
+const [data, setData] = useState<DistrictReport | null>(null);
+</script>
+  <p>Three independent values give <b>2 × 2 × 2 = 8 combinations</b>. Only three of them mean anything: loading, failed, or loaded. The other five ("loading <em>and</em> errored", "errored <em>and</em> has data") are <b>impossible states</b>: they shouldn't exist, but the type allows them, so one forgotten <code>setIsLoading(false)</code> produces one. That's the stuck spinner on top of stale numbers.</p>
+
+  <svg viewBox="0 0 720 270" width="100%" role="img" aria-label="Three booleans allow eight combinations, five of them impossible; a union allows only three states with clear transitions" style="font-family: var(--font-body); font-size: 13px; color: var(--ink)">
+    <text x="20" y="24" style="fill: currentColor; font-weight: 600">Three booleans: 8 combinations</text>
+    <g>
+      <rect x="20" y="40" width="150" height="34" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="30" y="62" style="fill: currentColor">loading</text>
+      <rect x="180" y="40" width="150" height="34" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="190" y="62" style="fill: currentColor">error</text>
+      <rect x="20" y="82" width="150" height="34" rx="6" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="30" y="104" style="fill: currentColor">data</text>
+      <rect x="180" y="82" width="150" height="34" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="190" y="104" style="fill: currentColor">loading + error</text>
+      <rect x="20" y="124" width="150" height="34" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="30" y="146" style="fill: currentColor">loading + data</text>
+      <rect x="180" y="124" width="150" height="34" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="190" y="146" style="fill: currentColor">error + data</text>
+      <rect x="20" y="166" width="150" height="34" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="30" y="188" style="fill: currentColor">all three</text>
+      <rect x="180" y="166" width="150" height="34" rx="6" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="190" y="188" style="fill: currentColor">none of them</text>
+    </g>
+    <text x="20" y="226" style="fill: var(--muted)">green = meaningful (3)</text>
+    <text x="20" y="246" style="fill: var(--muted)">magenta = impossible, but allowed (5)</text>
+
+    <line x1="365" y1="20" x2="365" y2="255" style="stroke: var(--line)"/>
+    <text x="390" y="24" style="fill: currentColor; font-weight: 600">One union: exactly 3 states</text>
+    <defs><marker id="st7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--muted)"/></marker></defs>
+    <rect x="480" y="50" width="130" height="40" rx="8" style="fill: var(--surface-2); stroke: currentColor"/><text x="500" y="75" style="fill: currentColor">status: loading</text>
+    <rect x="395" y="170" width="130" height="40" rx="8" style="fill: var(--ok-soft); stroke: var(--ok)"/><text x="410" y="195" style="fill: currentColor">status: success</text>
+    <rect x="570" y="170" width="130" height="40" rx="8" style="fill: var(--accent-soft); stroke: var(--accent)"/><text x="592" y="195" style="fill: currentColor">status: error</text>
+    <line x1="525" y1="92" x2="470" y2="166" style="stroke: var(--muted)" marker-end="url(#st7a)"/>
+    <line x1="565" y1="92" x2="625" y2="166" style="stroke: var(--muted)" marker-end="url(#st7a)"/>
+    <path d="M660 168 C 680 120, 650 80, 614 72" style="fill: none; stroke: var(--muted); stroke-dasharray: 4 3" marker-end="url(#st7a)"/>
+    <text x="664" y="118" style="fill: var(--muted)">retry</text>
+    <text x="395" y="236" style="fill: var(--muted)">success carries data; error carries error.</text>
+    <text x="395" y="254" style="fill: var(--muted)">Nothing else can be written.</text>
+  </svg>
+
+  <p>The fix is a <b>discriminated union</b>: a type that is "one of these shapes", where every shape has a shared field (the <b>discriminant</b>, here <code>status</code>) whose literal value tells you which shape you have.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="after: one value, three possible shapes">
+type ReportState =
+  | { status: 'loading' }
+  | { status: 'error'; error: Error }
+  | { status: 'success'; data: DistrictReport };
+
+const [state, setState] = useState<ReportState>({ status: 'loading' });
+
+// Each transition replaces the whole thing. No flag can be left behind.
+setState({ status: 'success', data: report });
+setState({ status: 'error', error: new Error('Report failed to load') });
+</script>
+  <p>Now <code>data</code> only exists on the success shape. If you try to read <code>state.data</code> without checking <code>status</code> first, TypeScript stops you. When you <em>do</em> check, it <b>narrows</b>: inside <code>if (state.status === 'success')</code> it knows <code>state.data</code> is there.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="DistrictReportView.tsx: decisions above the return">
+function DistrictReportView({ state }: { state: ReportState }) {
+  if (state.status === 'loading') {
+    return <Spinner label="Loading district report" />;
+  }
+  if (state.status === 'error') {
+    return <ErrorPanel message={state.error.message} />;
+  }
+  // Here TypeScript knows status is 'success', so state.data exists.
+  return <ReportTable rows={state.data.schools} />;
+}
+</script>
+  <p>Add a fourth shape later (say <code>{ status: 'empty' }</code> for a district with no sessions yet) and you want every place that handles <code>ReportState</code> to be flagged. A <code>switch</code> with an <b>exhaustiveness check</b> does that: the <code>default</code> branch assigns to <code>never</code>, a type that no value can have, so it only compiles if every case was handled.</p>
+  <script type="text/x-code" data-lang="ts" data-title="exhaustiveness check">
+function reportTitle(state: ReportState): string {
+  switch (state.status) {
+    case 'loading': return 'Loading…';
+    case 'error':   return 'Something went wrong';
+    case 'success': return state.data.districtName;
+    default: {
+      const unhandled: never = state; // error here if a new status is added and not handled
+      return unhandled;
+    }
+  }
+}
+</script>
+  <p>You'll see this same shape in libraries. TanStack Query v5's <code>useQuery</code> result has <code>status: 'pending' | 'error' | 'success'</code> and narrows <code>data</code> the same way. Once you see it, you see it everywhere: form steps, a reading session (<code>'not-started' | 'reading' | 'answering' | 'submitted'</code>), modal flows.</p>
+
+  <h2>4. Events and refs</h2>
+  <p>Event handlers written inline (<code>onChange={(e) =&gt; …}</code>) get their types for free: TypeScript infers <code>e</code> from the JSX attribute. You only write the type when the handler is a named function. The pattern is <code>React.<i>Something</i>Event&lt;<i>the element</i>&gt;</code>.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="ClassSearch.tsx: events and a ref">
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+
+export function ClassSearch({ onSearch }: { onSearch: (query: string) => void }) {
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);   // starts null, becomes the <input>
+
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    setQuery(e.target.value);                          // .value is known to exist
+  }
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (query.trim() === '') {
+      inputRef.current?.focus();                       // ?. because it might still be null
+      return;
+    }
+    onSearch(query.trim());
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input ref={inputRef} value={query} onChange={handleChange} placeholder="Find a student" />
+      <button type="submit">Search</button>
+    </form>
+  );
+}
+</script>
+  <p>Two things to know for current React. A DOM ref is typed with the element it will hold, <code>useRef&lt;HTMLInputElement&gt;(null)</code>, and the type includes <code>null</code> because before the first render there is no element. And in React 19, a function component can accept <code>ref</code> as an ordinary prop, so you rarely need <code>forwardRef</code> any more; type it as <code>ref?: Ref&lt;HTMLInputElement&gt;</code> in the props.</p>
+
+  <h2>5. Generic components, gently</h2>
+  <p>Lexi has dropdowns everywhere: pick a class, pick a student, pick a reading level. The first version was three nearly identical components. The second version was one <code>Select</code> whose options were typed <code>any</code>, so <code>onChange</code> handed back <code>any</code> and the type checking stopped right there.</p>
+  <p>A <b>generic</b> is a type parameter: a blank that gets filled in when the component is used. Read <code>Select&lt;T&gt;</code> as "a Select <em>of some type T</em>". When you pass a list of classrooms, T becomes <code>Classroom</code>, and <code>onChange</code> hands back a <code>Classroom</code>. You never write T yourself; TypeScript works it out from the <code>options</code> you pass.</p>
+  <script type="text/x-code" data-lang="tsx" data-title="Select.tsx: one component, any item type">
+import type { ChangeEvent } from 'react';
+
+type SelectProps<T> = {
+  options: T[];
+  value: T | null;
+  getKey: (item: T) => string;     // how to make a stable key/value from an item
+  getLabel: (item: T) => string;   // what to show
+  onChange: (item: T) => void;
+  label: string;
+};
+
+export function Select<T>({ options, value, getKey, getLabel, onChange, label }: SelectProps<T>) {
+  let selectedKey = '';
+  if (value !== null) {
+    selectedKey = getKey(value);
+  }
+
+  function handleChange(e: ChangeEvent<HTMLSelectElement>) {
+    const picked = options.find((o) => getKey(o) === e.target.value);
+    if (picked !== undefined) {
+      onChange(picked);
+    }
+  }
+
+  return (
+    <label>
+      {label}
+      <select value={selectedKey} onChange={handleChange}>
+        <option value="" disabled>Choose…</option>
+        {options.map((o) => (
+          <option key={getKey(o)} value={getKey(o)}>{getLabel(o)}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+</script>
+  <script type="text/x-code" data-lang="tsx" data-title="using it: T is inferred as Classroom">
+<Select
+  label="Class"
+  options={classrooms}                      // Classroom[]
+  value={selectedClass}
+  getKey={(c) => c.id}                       // c is Classroom: autocomplete works
+  getLabel={(c) => c.name + ' (' + c.period + ')'}
+  onChange={(c) => setSelectedClass(c)}      // c is Classroom, not any
+/>
+</script>
+  <p>The same idea gives you a <code>Table&lt;Row&gt;</code> where each column's <code>render(row)</code> knows the row's exact shape. Rule of thumb: reach for a generic when a component <b>passes the caller's data back to the caller</b> (through a callback or a render function). If the component only displays strings, it doesn't need one.</p>
+
+  <h2>6. API responses: types don't validate</h2>
+  <p>Back to <code>"NaN%"</code>. The code looked like this:</p>
+  <script type="text/x-code" data-lang="ts" data-title="before: a type assertion that lies">
+type SchoolRow = { schoolId: string; name: string; accuracy: number; sessions: number };
+
+const res = await fetch('/api/districts/' + districtId + '/report');
+const rows = (await res.json()) as SchoolRow[];   // "trust me"
+</script>
+  <p><code>res.json()</code> returns whatever the server sent. The <code>as SchoolRow[]</code> is a <b>type assertion</b>: it tells TypeScript "believe me", and TypeScript does. But types are deleted at runtime, so nothing ever checked that <code>accuracy</code> was a number. When one school's row arrived as <code>"0.82"</code>, the compiler had already signed off. The bug got past every type check because there was no check.</p>
+  <p>The fix is to <b>validate at the boundary</b>: the one place data enters your app (an API response, <code>localStorage</code>, URL params, a <code>postMessage</code>). A schema library like <b>Zod</b> (Valibot and ArkType are similar) lets you describe the shape once as a runtime object, check real data against it, and derive the TypeScript type from that same description so the two can never drift apart.</p>
+  <script type="text/x-code" data-lang="ts" data-title="after: parse, don't assume">
+import { z } from 'zod';
+
+const SchoolRow = z.object({
+  schoolId: z.string(),
+  name: z.string(),
+  accuracy: z.number().min(0).max(1),
+  sessions: z.number().int(),
+});
+const DistrictReport = z.object({ districtName: z.string(), schools: z.array(SchoolRow) });
+
+export type DistrictReport = z.infer<typeof DistrictReport>;  // the type comes FROM the schema
+
+export async function fetchDistrictReport(districtId: string): Promise<DistrictReport> {
+  const res = await fetch('/api/districts/' + districtId + '/report');
+  if (!res.ok) throw new Error('Report request failed: ' + res.status);
+  const json: unknown = await res.json();
+  const parsed = DistrictReport.safeParse(json);
+  if (!parsed.success) {
+    reportSchemaMismatch('district-report', parsed.error); // log it so you hear about it
+    throw new Error('Report data was not in the expected format');
+  }
+  return parsed.data; // now the type is earned, not asserted
+}
+</script>
+
+  <svg viewBox="0 0 720 200" width="100%" role="img" aria-label="Data from the network is unknown until a schema parses it at the boundary; inside the app, types can be trusted" style="font-family: var(--font-body); font-size: 13px; color: var(--ink)">
+    <defs><marker id="st7b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--muted)"/></marker></defs>
+    <rect x="10" y="60" width="130" height="60" rx="8" style="fill: var(--surface-2); stroke: currentColor"/>
+    <text x="28" y="86" style="fill: currentColor; font-weight: 600">Lexi API</text>
+    <text x="28" y="106" style="fill: var(--muted)">(another team)</text>
+    <line x1="140" y1="90" x2="228" y2="90" style="stroke: var(--muted)" marker-end="url(#st7b)"/>
+    <text x="150" y="80" style="fill: var(--muted)">JSON</text>
+    <text x="150" y="112" style="fill: var(--muted)">unknown</text>
+    <rect x="232" y="30" width="150" height="120" rx="8" style="fill: var(--warn-soft); stroke: var(--warn)"/>
+    <text x="250" y="58" style="fill: currentColor; font-weight: 600">The boundary</text>
+    <text x="250" y="82" style="fill: currentColor">schema.safeParse()</text>
+    <text x="250" y="104" style="fill: var(--muted)">fail → log + error UI</text>
+    <text x="250" y="126" style="fill: var(--muted)">pass → typed data</text>
+    <line x1="382" y1="90" x2="440" y2="90" style="stroke: var(--muted)" marker-end="url(#st7b)"/>
+    <rect x="444" y="20" width="266" height="150" rx="10" style="fill: var(--ok-soft); stroke: var(--ok); stroke-dasharray: 5 4"/>
+    <text x="460" y="44" style="fill: currentColor; font-weight: 600">Inside the app: types are true</text>
+    <rect x="460" y="60" width="110" height="34" rx="6" style="fill: var(--surface); stroke: var(--line)"/><text x="472" y="82" style="fill: currentColor">query cache</text>
+    <rect x="585" y="60" width="110" height="34" rx="6" style="fill: var(--surface); stroke: var(--line)"/><text x="597" y="82" style="fill: currentColor">components</text>
+    <rect x="460" y="108" width="235" height="34" rx="6" style="fill: var(--surface); stroke: var(--line)"/><text x="472" y="130" style="fill: currentColor">no more checks needed here</text>
+    <text x="10" y="192" style="fill: var(--muted)">Check once, at the edge. Everywhere downstream can trust the type without defensive code.</text>
+  </svg>
+
+  <p>Validation has a cost: some bundle size and a little CPU per response. For a 2,000-row report that's negligible; for a 50,000-row export you might validate a sample or validate on the server instead. Staff engineers also ask a better upstream question: can we <b>generate</b> types from the backend's contract (an OpenAPI spec, or a shared schema in a monorepo, or tRPC), so the frontend and backend share one source of truth? Generated types still don't validate at runtime, but they catch contract changes at build time, and runtime validation catches what slips through.</p>
+
+  <h2>7. Utility types you'll actually use</h2>
+  <p>Utility types are built-in "type functions": you give them a type, they give you a new one. Five cover most real React code.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Utility</th><th>What it does</th><th>Lexi example</th></tr>
+    <tr><td><code>Pick&lt;T, K&gt;</code></td><td>Keep only some fields</td><td><code>Pick&lt;Student, 'id' | 'name'&gt;</code> for a lightweight avatar component that shouldn't depend on the whole student</td></tr>
+    <tr><td><code>Omit&lt;T, K&gt;</code></td><td>Everything except some fields</td><td><code>Omit&lt;Student, 'id' | 'createdAt'&gt;</code> for the "new student" form, where the server assigns those</td></tr>
+    <tr><td><code>Partial&lt;T&gt;</code></td><td>Make every field optional</td><td><code>Partial&lt;ReportFilters&gt;</code> for a PATCH, or filters read from the URL that may be missing</td></tr>
+    <tr><td><code>Record&lt;K, V&gt;</code></td><td>An object with keys K and values V</td><td><code>Record&lt;ReadingLevel, string&gt;</code> for level → colour; with a union key, TypeScript errors if you forget a level</td></tr>
+    <tr><td><code>ReturnType&lt;F&gt;</code></td><td>The type a function returns</td><td><code>ReturnType&lt;typeof useSessionTimer&gt;</code> to type a prop that receives a hook's result, without repeating its shape</td></tr>
+  </table></div>
+  <p>Two cousins worth knowing: <code>Awaited&lt;T&gt;</code> unwraps a Promise (<code>Awaited&lt;ReturnType&lt;typeof fetchDistrictReport&gt;&gt;</code>), and <code>NonNullable&lt;T&gt;</code> removes <code>null</code> and <code>undefined</code>.</p>
+
+  <h2>8. <code>unknown</code> vs <code>any</code></h2>
+  <p>Both mean "I don't know what this is". The difference is what TypeScript lets you do next.</p>
+  <div class="ba"><div><span>any: checks switched off</span><pre>const data: any = await res.json();
+data.schools.map(s =&gt; s.accuracy * 100);
+// compiles. Crashes or gives NaN at
+// runtime. And 'any' spreads: s is
+// any, the result is any...</pre></div><i>vs</i><div><span>unknown: must prove it first</span><pre>const data: unknown = await res.json();
+data.schools;  // error: data is unknown
+// You must narrow it first: typeof,
+// 'in', instanceof, or a schema parse.
+// Then it's typed and safe.</pre></div></div>
+  <p><code>any</code> is contagious: anything you read from it is also <code>any</code>, so one <code>any</code> at the boundary silently turns off checking across every component that touches the data. <code>unknown</code> is honest: it forces a check before use. Use <code>unknown</code> for anything from outside (JSON, <code>catch (err)</code>, <code>postMessage</code> events). With <code>strict</code> on, caught errors are already <code>unknown</code>, which is why you'll write <code>if (err instanceof Error)</code> before reading <code>err.message</code>.</p>
+
+  <h2>9. Strictness settings</h2>
+  <p><code>tsconfig.json</code> decides how picky the compiler is. The defaults for a new project in 2026 are good; older codebases often aren't.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Setting</th><th>What it catches</th><th>Advice</th></tr>
+    <tr><td><code>strict: true</code></td><td>A bundle: <code>strictNullChecks</code> (null isn't silently allowed everywhere), <code>noImplicitAny</code>, strict function types, <code>unknown</code> in catch</td><td>Non-negotiable. Without <code>strictNullChecks</code>, half the value of TypeScript is gone.</td></tr>
+    <tr><td><code>noUncheckedIndexedAccess</code></td><td><code>students[0]</code> and <code>levelColors[key]</code> become <code>T | undefined</code></td><td>Turn on for new code. It catches "empty class" bugs; costs some extra checks.</td></tr>
+    <tr><td><code>exactOptionalPropertyTypes</code></td><td>Distinguishes "missing" from "explicitly undefined"</td><td>Useful for libraries; often more noise than value in app code.</td></tr>
+  </table></div>
+  <p>Turning <code>strict</code> on in a big old codebase gives thousands of errors at once. The staff move is incremental: turn it on, record the existing errors as a baseline (some teams use per-file <code>// @ts-expect-error</code> comments with a ticket, or a tool that tracks the error count), fail CI only if the count <em>goes up</em>, and let it shrink as teams touch files.</p>
+
+  <h2>10. When types get too clever</h2>
+  <p>TypeScript's type system can compute almost anything: conditional types, mapped types, template literal types, recursive types. That power is for library authors. In app code, a type that takes ten minutes to read is a cost every teammate pays every time they hover over it, and its error messages are often unreadable.</p>
+  <script type="text/x-code" data-lang="ts" data-title="clever (hard to read, hard to debug)">
+type DeepPathKeys<T> = T extends object
+  ? { [K in keyof T & string]: K | `${K}.${DeepPathKeys<T[K]>}` }[keyof T & string]
+  : never;
+// "Type-safe" string paths like 'student.reading.level'. Errors are walls of text.
+</script>
+  <script type="text/x-code" data-lang="ts" data-title="boring (clear, good enough)">
+type SortKey = 'name' | 'gradeLevel' | 'minutesThisWeek' | 'accuracy';
+// A plain list. Anyone can read it; adding a column means adding one word.
+</script>
+  <p>A useful test: <b>would a mid-level engineer understand this error message?</b> If not, simplify, even at the cost of a little duplication or a runtime check. Other warning signs: a type with more lines than the function it describes; types that need a comment explaining the type system rather than the domain; slow editor autocomplete.</p>
+
+  <h2>11. How a staff engineer approaches this</h2>
+  <p>The questions they ask about types in a codebase like Lexi's:</p>
+  <ul>
+    <li><b>Where does data enter, and is it checked there?</b> List the boundaries. Each one gets a schema or a generated contract.</li>
+    <li><b>Which bugs keep recurring?</b> Stuck spinners and stale data point at state shape (unions). <code>NaN</code> and <code>undefined</code> point at boundaries (validation) and indexing (<code>noUncheckedIndexedAccess</code>).</li>
+    <li><b>Where is <code>any</code> leaking in?</b> A lint rule (<code>no-explicit-any</code>) plus a count in CI turns it into a visible number.</li>
+    <li><b>Who reads these types?</b> Shared component props are read by all three teams, so they deserve the most care and the least cleverness.</li>
+  </ul>
+  <p>The trade-offs, said plainly:</p>
+  <ul>
+    <li>Discriminated unions give you states that can't contradict each other at the cost of slightly more verbose updates (you replace the whole object). Choose them whenever two or more flags describe one lifecycle.</li>
+    <li>Runtime validation gives you loud, early failures and honest types at the cost of bundle size and per-response CPU. Choose it at every boundary you don't control; skip or sample it for very large, trusted, internal payloads.</li>
+    <li>Strict compiler settings give you fewer runtime surprises at the cost of migration effort and some extra checks. Choose them for all new code, and migrate old code with a ratchet, not a big bang.</li>
+    <li>Generics give you reuse with full type safety at the cost of readability for newer engineers. Choose them for shared primitives (Select, Table, data hooks), not for one-off feature components.</li>
+  </ul>
+
+  <h2>12. Common mistakes</h2>
+  <ul>
+    <li><b><code>as</code> on API data.</b> An assertion is a promise you can't keep. Parse instead.</li>
+    <li><b>Booleans for lifecycles.</b> <code>isLoading</code> + <code>isError</code> + <code>isEmpty</code> means 8 combinations; use one <code>status</code> union.</li>
+    <li><b>Optional everything.</b> Making every prop optional "for flexibility" pushes <code>undefined</code> checks into every component. Required by default.</li>
+    <li><b><code>any</code> to silence an error.</b> If you must, use <code>unknown</code> and narrow, or <code>// @ts-expect-error</code> with a reason, which fails loudly once the problem is fixed.</li>
+    <li><b>Copying types by hand from the backend.</b> They drift. Generate them or derive them from a shared schema.</li>
+    <li><b>Writing types for the type system's sake.</b> If the clever version and the boring version catch the same real bugs, ship the boring one.</li>
+  </ul>
+
+  <div class="callout is-key"><span class="callout-label">What to say in a design review / interview</span>
+    <p>"I'd model the report's state as a discriminated union on <code>status</code>, so loading, error and success can't overlap; that removes the stuck-spinner class of bug rather than fixing one instance. TypeScript doesn't check data at runtime, so I'd parse API responses with a schema at the boundary and derive the type from the schema, so the two can't drift. Inside the app I'd treat <code>any</code> as a bug and use <code>unknown</code> for anything external. And I'd keep shared types boring: if a teammate can't read the error message, the type is too clever."</p>
+  </div>
+
+  <h2>13. Recap</h2>
+  <ul>
+    <li>Props: a <code>type</code> per component, <code>ReactNode</code> for slots, <code>ComponentProps&lt;'button'&gt;</code> to extend native elements, literal unions for variants.</li>
+    <li>Discriminated unions turn 8 possible combinations into 3 real states, and narrowing gives you <code>data</code> only when it exists.</li>
+    <li>Events: <code>ChangeEvent&lt;HTMLInputElement&gt;</code> and friends; refs: <code>useRef&lt;HTMLInputElement&gt;(null)</code>; React 19 passes <code>ref</code> as a prop.</li>
+    <li>Generics pass the caller's type back to the caller: <code>Select&lt;T&gt;</code>, <code>Table&lt;Row&gt;</code>.</li>
+    <li>Types vanish at runtime. Validate at the boundary and derive types from the schema.</li>
+    <li><code>unknown</code> over <code>any</code>; <code>strict</code> always; ratchet old code; keep types boring.</li>
+  </ul>
+
+  <details class="callout"><summary><b>Check yourself</b></summary>
+    <ol>
+      <li><p><b>A component has <code>isLoading</code>, <code>error</code> and <code>data</code>. What's the risk, and the fix?</b><br>Eight combinations, five meaningless, and one missed setter shows a spinner over stale data. Use one <code>status</code> union where only the success shape has <code>data</code>.</p></li>
+      <li><p><b>Why didn't <code>as SchoolRow[]</code> catch a string <code>accuracy</code>?</b><br>Assertions aren't checks, and types are deleted before runtime. Only runtime code (a schema parse) can inspect the actual data.</p></li>
+      <li><p><b>When does a component need a generic?</b><br>When it hands the caller's own data back, through <code>onChange</code> or a render function, so the caller keeps its exact type.</p></li>
+      <li><p><b><code>any</code> or <code>unknown</code> for <code>res.json()</code>?</b><br><code>unknown</code>: it forces you to validate before use, while <code>any</code> silently disables checking for everything downstream.</p></li>
+      <li><p><b>Your team inherits a non-strict codebase. How do you turn on <code>strict</code>?</b><br>Turn it on, baseline the existing errors, fail CI only when the count rises, and fix files as they're touched.</p></li>
+    </ol>
+  </details>
+</template>

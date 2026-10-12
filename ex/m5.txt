@@ -1,0 +1,492 @@
+@@@ shared src/App.jsx
+import React from 'react';
+import CustomersPage from './pages/CustomersPage';
+
+export default function App() {
+  return (
+    <div className="layout">
+      <nav className="sidenav">
+        <p className="brand">Northwind</p>
+        <a className="nav-link">Overview</a>
+        <a className="nav-link is-current">Customers</a>
+        <a className="nav-link">Invoices</a>
+        <a className="nav-link">Settings</a>
+      </nav>
+      <main className="main">
+        <CustomersPage />
+      </main>
+    </div>
+  );
+}
+@@@ shared src/data/customers.js
+// Static data. No fetching in this task.
+// Customer: { id, name, company, email, status: 'active' | 'trial' | 'churned',
+//             plan: 'Starter' | 'Growth' | 'Enterprise', seats, revenue (monthly USD), joinedAt }
+export const CUSTOMERS = [
+  { id: 'c1', name: 'Ada Okafor', company: 'Brightline', email: 'ada@brightline.io', status: 'active', plan: 'Enterprise', seats: 120, revenue: 18400, joinedAt: '2023-02-11' },
+  { id: 'c2', name: 'Ben Carter', company: 'Lumen Labs', email: 'ben@lumenlabs.com', status: 'trial', plan: 'Growth', seats: 8, revenue: 0, joinedAt: '2026-09-21' },
+  { id: 'c3', name: 'Chloe Park', company: 'Fieldnote', email: 'chloe@fieldnote.app', status: 'active', plan: 'Growth', seats: 25, revenue: 2250, joinedAt: '2024-06-03' },
+  { id: 'c4', name: 'Diego Alvarez', company: 'Monarch Freight', email: 'diego@monarch.co', status: 'churned', plan: 'Starter', seats: 5, revenue: 0, joinedAt: '2022-11-30' },
+  { id: 'c5', name: 'Elif Demir', company: 'Kettle & Co', email: 'elif@kettle.co', status: 'active', plan: 'Starter', seats: 6, revenue: 290, joinedAt: '2025-01-15' },
+  { id: 'c6', name: 'Farah Malik', company: 'Northstar Health', email: 'farah@northstar.health', status: 'active', plan: 'Enterprise', seats: 300, revenue: 41200, joinedAt: '2022-08-08' },
+  { id: 'c7', name: 'Gus Lindqvist', company: 'Pinecone Studio', email: 'gus@pinecone.studio', status: 'trial', plan: 'Starter', seats: 3, revenue: 0, joinedAt: '2026-09-29' },
+  { id: 'c8', name: 'Hana Sato', company: 'Orbital', email: 'hana@orbital.dev', status: 'active', plan: 'Growth', seats: 40, revenue: 3600, joinedAt: '2024-11-19' },
+  { id: 'c9', name: 'Ivan Petrov', company: 'Bluewater', email: 'ivan@bluewater.net', status: 'churned', plan: 'Growth', seats: 12, revenue: 0, joinedAt: '2023-05-27' },
+  { id: 'c10', name: 'Jade Thompson', company: 'Copperleaf', email: 'jade@copperleaf.com', status: 'active', plan: 'Growth', seats: 18, revenue: 1620, joinedAt: '2025-07-02' },
+  { id: 'c11', name: 'Kofi Mensah', company: 'Savanna Pay', email: 'kofi@savannapay.com', status: 'active', plan: 'Enterprise', seats: 85, revenue: 12750, joinedAt: '2024-03-10' },
+  { id: 'c12', name: 'Lena Fischer', company: 'Brightline', email: 'lena@brightline.io', status: 'trial', plan: 'Growth', seats: 10, revenue: 0, joinedAt: '2026-10-01' },
+];
+@@@ shared src/components/SearchInput.jsx
+import React from 'react';
+
+export default function SearchInput({ value, onChange, placeholder }) {
+  return (
+    <div className="search">
+      <span className="search-icon" aria-hidden="true">⌕</span>
+      <input
+        className="search-input"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => { onChange(e.target.value); }}
+      />
+    </div>
+  );
+}
+@@@ shared src/components/StatusBadge.jsx
+import React from 'react';
+
+const LABELS = { active: 'Active', trial: 'Trial', churned: 'Churned' };
+
+export default function StatusBadge({ status }) {
+  return <span className={'status status-' + status}>{LABELS[status]}</span>;
+}
+@@@ shared src/utils/format.js
+// formatCurrency(18400) -> "$18,400"
+export function formatCurrency(n) {
+  return '$' + n.toLocaleString('en-US');
+}
+
+// formatDate('2023-02-11') -> "Feb 11, 2023"
+export function formatDate(isoDate) {
+  return new Date(isoDate + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+@@@ starter src/pages/CustomersPage.jsx
+import React, { useState } from 'react';
+import { CUSTOMERS } from '../data/customers';
+import SearchInput from '../components/SearchInput';
+import CustomerTable from '../components/CustomerTable';
+
+export default function CustomersPage() {
+  const [query, setQuery] = useState('');
+
+  const q = query.trim().toLowerCase();
+  const visible = CUSTOMERS.filter((c) => {
+    return c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1>Customers</h1>
+        <p className="page-sub">{visible.length} of {CUSTOMERS.length} customers</p>
+      </header>
+
+      <div className="toolbar">
+        <SearchInput value={query} onChange={setQuery} placeholder="Search customers…" />
+      </div>
+
+      <CustomerTable customers={visible} />
+    </div>
+  );
+}
+@@@ starter src/components/CustomerTable.jsx
+import React from 'react';
+import StatusBadge from './StatusBadge';
+import { formatCurrency, formatDate } from '../utils/format';
+
+export default function CustomerTable({ customers }) {
+  return (
+    <div className="table-card">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th className="num">Revenue</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          {customers.map((c) => {
+            return (
+              <tr key={c.id}>
+                <td>
+                  <div className="cell-name">{c.name}</div>
+                  <div className="cell-sub">{c.company}</div>
+                </td>
+                <td><StatusBadge status={c.status} /></td>
+                <td className="num">{formatCurrency(c.revenue)}</td>
+                <td className="muted">{formatDate(c.joinedAt)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #4F46E5;
+  --primary-soft: #EEF0FF;
+  --row-hover: #F9FAFB;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidenav { width: 200px; flex-shrink: 0; padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 16px; font-weight: 700; font-size: 16px; }
+.nav-link { padding: 7px 8px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-link.is-current { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+.page { max-width: 900px; display: flex; flex-direction: column; gap: 16px; }
+.page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.page-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+.toolbar { display: flex; gap: 8px; align-items: center; }
+.search { position: relative; flex: 1; max-width: 320px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
+.search-input { width: 100%; height: 36px; padding: 0 12px 0 32px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); }
+.search-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--muted); background: #FAFBFC; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: var(--row-hover); }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.table .muted { color: var(--muted); }
+.cell-name { font-weight: 500; }
+.cell-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.status { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.status-active { background: #E7F6EC; color: #1C7A43; }
+.status-trial { background: #EEF0FF; color: #4F46E5; }
+.status-churned { background: #F2F4F7; color: #667085; }
+@@@ solution src/pages/CustomersPage.jsx
+import React, { useState } from 'react';
+import { CUSTOMERS } from '../data/customers';
+import SearchInput from '../components/SearchInput';
+import CustomerTable from '../components/CustomerTable';
+import CustomerDrawer from '../components/CustomerDrawer';
+
+const STATUS_OPTIONS = [
+  ['all', 'All statuses'],
+  ['active', 'Active'],
+  ['trial', 'Trial'],
+  ['churned', 'Churned'],
+];
+
+export default function CustomersPage() {
+  // ---- state ----
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [sortKey, setSortKey] = useState(null); // null | 'revenue' | 'name'
+  const [sortDir, setSortDir] = useState('desc');
+  const [selectedId, setSelectedId] = useState(null); // mid-session change
+
+  // ---- handlers ----
+  function handleSort(key) {
+    if (sortKey === key) {
+      // same column: flip direction
+      if (sortDir === 'desc') {
+        setSortDir('asc');
+      } else {
+        setSortDir('desc');
+      }
+      return;
+    }
+    // new column: revenue starts high→low, name starts A→Z
+    setSortKey(key);
+    if (key === 'revenue') {
+      setSortDir('desc');
+    } else {
+      setSortDir('asc');
+    }
+  }
+
+  function handleClear() {
+    setQuery('');
+    setStatus('all');
+  }
+
+  // ---- derived: source → search → status → sort ----
+  const q = query.trim().toLowerCase();
+  const searched = CUSTOMERS.filter((c) => {
+    return c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q);
+  });
+
+  let filtered = searched;
+  if (status !== 'all') {
+    filtered = searched.filter((c) => {
+      return c.status === status;
+    });
+  }
+
+  let visible = filtered;
+  if (sortKey === 'revenue') {
+    visible = [...filtered].sort((a, b) => {
+      return a.revenue - b.revenue;
+    });
+  }
+  if (sortKey === 'name') {
+    visible = [...filtered].sort((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
+  }
+  if (sortKey && sortDir === 'desc') {
+    visible = [...visible].reverse();
+  }
+
+  const selected = CUSTOMERS.find((c) => {
+    return c.id === selectedId;
+  });
+
+  // ---- decisions ----
+  let drawer = null;
+  if (selected) {
+    drawer = <CustomerDrawer customer={selected} onClose={() => { setSelectedId(null); }} />;
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1>Customers</h1>
+        <p className="page-sub">{visible.length} of {CUSTOMERS.length} customers</p>
+      </header>
+
+      <div className="toolbar">
+        <SearchInput value={query} onChange={setQuery} placeholder="Search customers…" />
+        <select
+          className="select"
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); }}
+          aria-label="Filter by status"
+        >
+          {STATUS_OPTIONS.map((opt) => {
+            return <option key={opt[0]} value={opt[0]}>{opt[1]}</option>;
+          })}
+        </select>
+      </div>
+
+      <CustomerTable
+        customers={visible}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+        onClear={handleClear}
+        selectedId={selectedId}
+        onSelect={(id) => { setSelectedId(id); }}
+      />
+
+      {drawer}
+    </div>
+  );
+}
+@@@ solution src/components/CustomerTable.jsx
+import React from 'react';
+import StatusBadge from './StatusBadge';
+import { formatCurrency, formatDate } from '../utils/format';
+
+function SortHeader({ label, column, sortKey, sortDir, onSort, className }) {
+  let arrow = '↕';
+  let arrowClass = 'sort-arrow';
+  if (sortKey === column) {
+    arrowClass = 'sort-arrow is-active';
+    if (sortDir === 'desc') {
+      arrow = '▼';
+    } else {
+      arrow = '▲';
+    }
+  }
+  return (
+    <th className={className}>
+      <button className="sort-btn" onClick={() => { onSort(column); }}>
+        {label}
+        <span className={arrowClass}>{arrow}</span>
+      </button>
+    </th>
+  );
+}
+
+export default function CustomerTable({ customers, sortKey, sortDir, onSort, onClear, selectedId, onSelect }) {
+  let rows;
+  if (customers.length === 0) {
+    rows = (
+      <tr>
+        <td colSpan={4} className="empty">
+          <p>No customers match your filters.</p>
+          <button className="link-btn" onClick={() => { onClear(); }}>Clear filters</button>
+        </td>
+      </tr>
+    );
+  } else {
+    rows = customers.map((c) => {
+      let rowClass = 'row';
+      if (c.id === selectedId) {
+        rowClass = 'row is-selected';
+      }
+      return (
+        <tr key={c.id} className={rowClass} onClick={() => { onSelect(c.id); }}>
+          <td>
+            <div className="cell-name">{c.name}</div>
+            <div className="cell-sub">{c.company}</div>
+          </td>
+          <td><StatusBadge status={c.status} /></td>
+          <td className="num">{formatCurrency(c.revenue)}</td>
+          <td className="muted">{formatDate(c.joinedAt)}</td>
+        </tr>
+      );
+    });
+  }
+
+  return (
+    <div className="table-card">
+      <table className="table">
+        <thead>
+          <tr>
+            <SortHeader label="Name" column="name" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <th>Status</th>
+            <SortHeader label="Revenue" column="revenue" sortKey={sortKey} sortDir={sortDir} onSort={onSort} className="num" />
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+  );
+}
+@@@ solution src/components/CustomerDrawer.jsx
+import React from 'react';
+import StatusBadge from './StatusBadge';
+import { formatCurrency, formatDate } from '../utils/format';
+
+export default function CustomerDrawer({ customer, onClose }) {
+  return (
+    <aside className="drawer" aria-label="Customer details">
+      <div className="drawer-head">
+        <div>
+          <h2>{customer.name}</h2>
+          <p className="cell-sub">{customer.company}</p>
+        </div>
+        <button className="icon-btn" aria-label="Close" onClick={() => { onClose(); }}>✕</button>
+      </div>
+      <dl className="drawer-list">
+        <div><dt>Status</dt><dd><StatusBadge status={customer.status} /></dd></div>
+        <div><dt>Email</dt><dd>{customer.email}</dd></div>
+        <div><dt>Plan</dt><dd>{customer.plan}</dd></div>
+        <div><dt>Seats</dt><dd>{customer.seats}</dd></div>
+        <div><dt>Monthly revenue</dt><dd>{formatCurrency(customer.revenue)}</dd></div>
+        <div><dt>Customer since</dt><dd>{formatDate(customer.joinedAt)}</dd></div>
+      </dl>
+    </aside>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --border: #E4E7EC;
+  --text: #101828;
+  --muted: #667085;
+  --primary: #4F46E5;
+  --primary-soft: #EEF0FF;
+  --row-hover: #F9FAFB;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.layout { display: flex; min-height: 100vh; }
+.sidenav { width: 200px; flex-shrink: 0; padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brand { margin: 0 8px 16px; font-weight: 700; font-size: 16px; }
+.nav-link { padding: 7px 8px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.nav-link.is-current { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
+
+.page { max-width: 900px; display: flex; flex-direction: column; gap: 16px; }
+.page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.page-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+.toolbar { display: flex; gap: 8px; align-items: center; }
+.search { position: relative; flex: 1; max-width: 320px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
+.search-input { width: 100%; height: 36px; padding: 0 12px 0 32px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 14px; background: var(--surface); }
+.search-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--muted); background: #FAFBFC; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: var(--row-hover); }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.table .muted { color: var(--muted); }
+.cell-name { font-weight: 500; }
+.cell-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.status { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.status-active { background: #E7F6EC; color: #1C7A43; }
+.status-trial { background: #EEF0FF; color: #4F46E5; }
+.status-churned { background: #F2F4F7; color: #667085; }
+
+/* ---- Added for the Figma ---- */
+.select { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font: inherit; font-size: 14px; color: var(--text); }
+
+.sort-btn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.sort-btn:hover { color: var(--text); }
+.sort-arrow { font-size: 10px; color: #98A2B3; }
+.sort-arrow.is-active { color: var(--primary); }
+
+.empty { text-align: center; padding: 32px 16px; color: var(--muted); }
+.empty p { margin: 0 0 8px; }
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 500; color: var(--primary); cursor: pointer; }
+
+.row { cursor: pointer; }
+.table tbody tr.is-selected { background: var(--primary-soft); }
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+  overflow-y: auto;
+}
+.drawer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.drawer-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.icon-btn { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+.icon-btn:hover { background: #F2F4F7; color: var(--text); }
+.drawer-list { margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.drawer-list div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
+.drawer-list dt { color: var(--muted); }
+.drawer-list dd { margin: 0; font-weight: 500; }

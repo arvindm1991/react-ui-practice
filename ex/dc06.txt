@@ -1,0 +1,389 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Task = {
+  id: string;
+  title: string;
+  subject: string;
+  done: boolean;
+};
+
+const TASKS: Task[] = [
+  { id: 't1', title: 'Read chapter 4: Cell respiration', subject: 'Biology', done: true },
+  { id: 't2', title: 'Problem set 3, questions 1–12', subject: 'Calculus', done: false },
+  { id: 't3', title: 'Outline the WW1 causes essay', subject: 'History', done: false },
+  { id: 't4', title: 'Flashcards: irregular verbs', subject: 'Spanish', done: false },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /planner/tasks -> Task[]
+export async function getTasks(): Promise<Task[]> {
+  await randomDelay(500, 1200);
+  return TASKS.map((t) => {
+    return { ...t };
+  });
+}
+@@@ shared src/utils/id.ts
+// makeId('t') -> "t_k3j9x2"  (unique enough for client-side ids)
+export function makeId(prefix: string): string {
+  return prefix + '_' + Math.random().toString(36).slice(2, 8);
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTasks } from './api';
+import type { Task } from './api';
+
+function PlannerHeader() {
+  return (
+    <header className="planner-head">
+      <div>
+        <p className="week">Week 6 · Oct 7 – 13</p>
+        <h1>This week</h1>
+      </div>
+      {/* TODO: "3 left" */}
+    </header>
+  );
+}
+
+function TaskRow({ task }: { task: Task }) {
+  return (
+    <li className="task">
+      <input type="checkbox" className="task-check" checked={task.done} readOnly />
+      <span className="task-title">{task.title}</span>
+      <span className="subject">{task.subject}</span>
+      <button type="button" className="delete-btn" aria-label="Delete task">×</button>
+    </li>
+  );
+}
+
+function AddTask() {
+  return (
+    <div className="add-row">
+      <input className="add-input" placeholder="Add a task and press Enter" />
+      <button type="button" className="add-btn">Add</button>
+    </div>
+  );
+}
+
+function Planner() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTasks().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTasks(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let list = <p className="empty">Loading your tasks…</p>;
+  if (!loading) {
+    list = (
+      <ul className="task-list">
+        {tasks.map((task) => {
+          return <TaskRow key={task.id} task={task} />;
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <section className="planner">
+      <PlannerHeader />
+      <AddTask />
+      {list}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <div className="brand">studyhall</div>
+      <Planner />
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFF8E7;
+  --paper: #FFFFFF;
+  --ink: #2D2A32;
+  --muted: #8B8494;
+  --line: #EFE6D2;
+  --primary: #3D5AFE;
+  --highlight: #FFD54A;
+  --danger: #E5484D;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Nunito', 'Trebuchet MS', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+
+.app { max-width: 520px; margin: 0 auto; padding: 28px 16px; }
+.brand { font-weight: 800; font-size: 18px; letter-spacing: -0.3px; margin-bottom: 18px; }
+.brand::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 8px; border-radius: 3px; background: var(--highlight); transform: rotate(12deg); }
+
+.planner { background: var(--paper); border-radius: var(--radius); padding: 22px; box-shadow: 0 2px 0 var(--line), 0 12px 32px rgba(45, 42, 50, 0.06); }
+
+.planner-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; }
+.planner-head h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.week { margin: 0 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.add-input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 2px solid var(--line); border-radius: 12px; font: inherit; font-size: 15px; color: var(--ink); background: #FFFDF7; }
+.add-input:focus { outline: none; border-color: var(--primary); }
+.add-btn { height: 42px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--ink); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px dashed var(--line); }
+.task:last-child { border-bottom: 0; }
+.task-check { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+.task-title { flex: 1; min-width: 0; font-size: 15px; }
+.subject { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #F1EEFF; color: #5B4BDB; }
+.delete-btn { width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.delete-btn:hover { background: #FDECEC; color: var(--danger); }
+
+.empty { margin: 0; padding: 24px 0; text-align: center; color: var(--muted); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getTasks } from './api';
+import type { Task } from './api';
+import { makeId } from './utils/id';
+
+// remaining is null while tasks are still loading.
+function PlannerHeader({ remaining }: { remaining: number | null }) {
+  let badge = null;
+  if (remaining === 0) {
+    badge = <span className="left-badge is-done">All done</span>;
+  } else if (remaining !== null) {
+    badge = <span className="left-badge">{remaining} left</span>;
+  }
+  return (
+    <header className="planner-head">
+      <div>
+        <p className="week">Week 6 · Oct 7 – 13</p>
+        <h1>This week</h1>
+      </div>
+      {badge}
+    </header>
+  );
+}
+
+type TaskRowProps = {
+  task: Task;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+};
+
+function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
+  let cls = 'task';
+  if (task.done) {
+    cls = 'task is-done';
+  }
+  return (
+    <li className={cls}>
+      <input type="checkbox" className="task-check" checked={task.done} onChange={() => { onToggle(task.id); }} />
+      <span className="task-title">{task.title}</span>
+      <span className="subject">{task.subject}</span>
+      <button type="button" className="delete-btn" aria-label="Delete task" onClick={() => { onDelete(task.id); }}>×</button>
+    </li>
+  );
+}
+
+// Owns only the draft text. It reports a finished title up.
+function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
+  const [draft, setDraft] = useState('');
+
+  // A <form> gives us Enter-to-submit for free.
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const title = draft.trim();
+    if (title === '') {
+      return;
+    }
+    onAdd(title);
+    setDraft('');
+  }
+
+  const isEmpty = draft.trim() === '';
+
+  return (
+    <form className="add-row" onSubmit={handleSubmit}>
+      <input className="add-input" placeholder="Add a task and press Enter" value={draft} onChange={(e) => { setDraft(e.target.value); }} />
+      <button type="submit" className="add-btn" disabled={isEmpty}>Add</button>
+    </form>
+  );
+}
+
+function Planner() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTasks().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setTasks(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleAdd(title: string) {
+    const task: Task = { id: makeId('t'), title, subject: 'Inbox', done: false };
+    setTasks((prev) => {
+      return [...prev, task];
+    });
+  }
+
+  function handleToggle(id: string) {
+    setTasks((prev) => {
+      return prev.map((t) => {
+        if (t.id !== id) {
+          return t;
+        }
+        return { ...t, done: !t.done };
+      });
+    });
+  }
+
+  function handleDelete(id: string) {
+    setTasks((prev) => {
+      return prev.filter((t) => {
+        return t.id !== id;
+      });
+    });
+  }
+
+  // Change
+  function handleClearCompleted() {
+    setTasks((prev) => {
+      return prev.filter((t) => {
+        return !t.done;
+      });
+    });
+  }
+
+  // derived: never stored in state
+  const remaining = tasks.filter((t) => {
+    return !t.done;
+  }).length;
+  const doneCount = tasks.length - remaining;
+
+  let list = <p className="empty">Loading your tasks…</p>;
+  if (!loading && tasks.length === 0) {
+    list = <p className="empty">Nothing planned. Add your first task above.</p>;
+  } else if (!loading) {
+    list = (
+      <ul className="task-list">
+        {tasks.map((task) => {
+          return <TaskRow key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} />;
+        })}
+      </ul>
+    );
+  }
+
+  let footer = null;
+  if (doneCount > 0) {
+    footer = (
+      <div className="planner-foot">
+        <button type="button" className="clear-btn" onClick={() => { handleClearCompleted(); }}>Clear completed ({doneCount})</button>
+      </div>
+    );
+  }
+
+  let headerCount: number | null = remaining;
+  if (loading) {
+    headerCount = null;
+  }
+
+  return (
+    <section className="planner">
+      <PlannerHeader remaining={headerCount} />
+      <AddTask onAdd={handleAdd} />
+      {list}
+      {footer}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <div className="brand">studyhall</div>
+      <Planner />
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFF8E7;
+  --paper: #FFFFFF;
+  --ink: #2D2A32;
+  --muted: #8B8494;
+  --line: #EFE6D2;
+  --primary: #3D5AFE;
+  --highlight: #FFD54A;
+  --danger: #E5484D;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Nunito', 'Trebuchet MS', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+
+.app { max-width: 520px; margin: 0 auto; padding: 28px 16px; }
+.brand { font-weight: 800; font-size: 18px; letter-spacing: -0.3px; margin-bottom: 18px; }
+.brand::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 8px; border-radius: 3px; background: var(--highlight); transform: rotate(12deg); }
+
+.planner { background: var(--paper); border-radius: var(--radius); padding: 22px; box-shadow: 0 2px 0 var(--line), 0 12px 32px rgba(45, 42, 50, 0.06); }
+
+.planner-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; }
+.planner-head h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.week { margin: 0 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.add-input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 2px solid var(--line); border-radius: 12px; font: inherit; font-size: 15px; color: var(--ink); background: #FFFDF7; }
+.add-input:focus { outline: none; border-color: var(--primary); }
+.add-btn { height: 42px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--ink); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px dashed var(--line); }
+.task:last-child { border-bottom: 0; }
+.task-check { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+.task-title { flex: 1; min-width: 0; font-size: 15px; }
+.subject { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #F1EEFF; color: #5B4BDB; }
+.delete-btn { width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.delete-btn:hover { background: #FDECEC; color: var(--danger); }
+
+.empty { margin: 0; padding: 24px 0; text-align: center; color: var(--muted); }
+
+/* ---- Added: todo interactions ---- */
+.left-badge { font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--highlight); }
+.left-badge.is-done { background: #DDF7E6; color: #1B7F45; }
+.task.is-done .task-title { text-decoration: line-through; color: var(--muted); }
+.task.is-done .subject { opacity: 0.5; }
+
+/* Change: clear completed */
+.planner-foot { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 4px; border-top: 2px solid var(--line); }
+.clear-btn { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.clear-btn:hover { color: var(--danger); }

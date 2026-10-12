@@ -1,0 +1,574 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Department = 'Engineering' | 'Design' | 'Sales' | 'Marketing' | 'People' | 'Finance';
+
+export type Employee = {
+  id: string;
+  name: string;
+  title: string;
+  department: Department;
+  location: string;
+  startDate: string; // "YYYY-MM-DD"
+};
+
+export const DEPARTMENTS: Department[] = ['Engineering', 'Design', 'Sales', 'Marketing', 'People', 'Finance'];
+
+const EMPLOYEES: Employee[] = [
+  { id: 'e1', name: 'Ava Thompson', title: 'Staff Engineer', department: 'Engineering', location: 'Remote', startDate: '2019-03-04' },
+  { id: 'e2', name: 'Liam Patel', title: 'Product Designer', department: 'Design', location: 'New York', startDate: '2021-06-14' },
+  { id: 'e3', name: 'Sofia Garcia', title: 'Account Executive', department: 'Sales', location: 'Austin', startDate: '2022-01-10' },
+  { id: 'e4', name: 'Noah Kim', title: 'Engineering Manager', department: 'Engineering', location: 'New York', startDate: '2018-09-24' },
+  { id: 'e5', name: 'Mia Chen', title: 'Content Lead', department: 'Marketing', location: 'London', startDate: '2020-11-02' },
+  { id: 'e6', name: 'Ethan Brooks', title: 'Recruiter', department: 'People', location: 'Remote', startDate: '2023-02-20' },
+  { id: 'e7', name: 'Isabella Rossi', title: 'Senior Engineer', department: 'Engineering', location: 'Berlin', startDate: '2021-08-30' },
+  { id: 'e8', name: 'Lucas Martin', title: 'Sales Manager', department: 'Sales', location: 'London', startDate: '2017-05-15' },
+  { id: 'e9', name: 'Amelia Wright', title: 'Brand Designer', department: 'Design', location: 'Remote', startDate: '2022-07-11' },
+  { id: 'e10', name: 'Mason Lee', title: 'Frontend Engineer', department: 'Engineering', location: 'Austin', startDate: '2023-04-03' },
+  { id: 'e11', name: 'Harper Nguyen', title: 'Financial Analyst', department: 'Finance', location: 'New York', startDate: '2020-02-17' },
+  { id: 'e12', name: 'Elijah Johnson', title: 'Account Executive', department: 'Sales', location: 'New York', startDate: '2021-10-25' },
+  { id: 'e13', name: 'Evelyn Davis', title: 'Growth Marketer', department: 'Marketing', location: 'Remote', startDate: '2022-09-05' },
+  { id: 'e14', name: 'James Wilson', title: 'Backend Engineer', department: 'Engineering', location: 'London', startDate: '2020-06-08' },
+  { id: 'e15', name: 'Charlotte Moore', title: 'People Partner', department: 'People', location: 'Austin', startDate: '2019-12-02' },
+  { id: 'e16', name: 'Benjamin Clark', title: 'SDR', department: 'Sales', location: 'Austin', startDate: '2024-01-08' },
+  { id: 'e17', name: 'Abigail Lewis', title: 'UX Researcher', department: 'Design', location: 'Berlin', startDate: '2021-03-22' },
+  { id: 'e18', name: 'Henry Walker', title: 'Platform Engineer', department: 'Engineering', location: 'Remote', startDate: '2022-11-14' },
+  { id: 'e19', name: 'Emily Hall', title: 'Controller', department: 'Finance', location: 'London', startDate: '2018-04-30' },
+  { id: 'e20', name: 'Alexander Young', title: 'Product Marketer', department: 'Marketing', location: 'New York', startDate: '2023-06-19' },
+  { id: 'e21', name: 'Ella Allen', title: 'Data Engineer', department: 'Engineering', location: 'Berlin', startDate: '2024-03-11' },
+  { id: 'e22', name: 'Daniel Scott', title: 'Account Executive', department: 'Sales', location: 'Berlin', startDate: '2019-08-12' },
+  { id: 'e23', name: 'Grace Hill', title: 'Design Manager', department: 'Design', location: 'New York', startDate: '2018-01-22' },
+  { id: 'e24', name: 'Jack Green', title: 'Mobile Engineer', department: 'Engineering', location: 'Austin', startDate: '2022-05-16' },
+  { id: 'e25', name: 'Chloe Adams', title: 'Events Manager', department: 'Marketing', location: 'Austin', startDate: '2021-01-11' },
+  { id: 'e26', name: 'Owen Baker', title: 'Head of People', department: 'People', location: 'New York', startDate: '2017-10-09' },
+  { id: 'e27', name: 'Zoe Nelson', title: 'QA Engineer', department: 'Engineering', location: 'London', startDate: '2023-09-25' },
+  { id: 'e28', name: 'Samuel Carter', title: 'Sales Engineer', department: 'Sales', location: 'Remote', startDate: '2020-08-31' },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /employees -> Employee[] (all of them, unsorted; filtering/sorting/paging is done in the UI)
+export async function getEmployees(): Promise<Employee[]> {
+  await randomDelay(500, 1100);
+  return EMPLOYEES.map((e) => ({ ...e }));
+}
+@@@ shared src/components/DeptBadge.tsx
+import React from 'react';
+import type { Department } from '../api';
+
+export function DeptBadge({ department }: { department: Department }) {
+  return <span className={'dept dept-' + department.toLowerCase()}>{department}</span>;
+}
+@@@ shared src/components/Pagination.tsx
+import React from 'react';
+
+type PaginationProps = {
+  page: number;       // 1-based
+  pageCount: number;
+  onChange: (page: number) => void;
+};
+
+// "‹ Prev  Page 2 of 4  Next ›". Buttons disable at the ends.
+export function Pagination({ page, pageCount, onChange }: PaginationProps) {
+  return (
+    <div className="pagination">
+      <button type="button" className="page-btn" disabled={page <= 1} onClick={() => { onChange(page - 1); }}>‹ Prev</button>
+      <span className="page-info">Page {page} of {pageCount}</span>
+      <button type="button" className="page-btn" disabled={page >= pageCount} onClick={() => { onChange(page + 1); }}>Next ›</button>
+    </div>
+  );
+}
+@@@ shared src/utils/format.ts
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// formatDate("2019-03-04") -> "Mar 4, 2019"
+export function formatDate(iso: string): string {
+  const parts = iso.split('-').map(Number);
+  return MONTHS[parts[1] - 1] + ' ' + parts[2] + ', ' + parts[0];
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getEmployees } from './api';
+import type { Employee } from './api';
+import { DeptBadge } from './components/DeptBadge';
+import { formatDate } from './utils/format';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="logo"><span className="logo-mark">P</span>Peoplebase</div>
+      <nav className="side-nav">
+        <span className="side-link">Home</span>
+        <span className="side-link is-active">Directory</span>
+        <span className="side-link">Time off</span>
+        <span className="side-link">Payroll</span>
+      </nav>
+    </aside>
+  );
+}
+
+function EmployeeRow({ employee }: { employee: Employee }) {
+  return (
+    <tr>
+      <td className="cell-name">{employee.name}</td>
+      <td>{employee.title}</td>
+      <td><DeptBadge department={employee.department} /></td>
+      <td>{employee.location}</td>
+      <td>{formatDate(employee.startDate)}</td>
+    </tr>
+  );
+}
+
+// TODO: search + department filter + sorting + pagination
+function EmployeeTable() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getEmployees().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setEmployees(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <div className="card"><p className="table-msg">Loading employees…</p></div>;
+  }
+
+  return (
+    <div className="card">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Location</th>
+            <th>Start date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map((e) => {
+            return <EmployeeRow key={e.id} employee={e} />;
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Sidebar />
+      <main className="main">
+        <div className="page-head">
+          <h1>Directory</h1>
+          <p className="page-sub">Everyone at Northwind, in one place.</p>
+        </div>
+        <EmployeeTable />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --muted: #64748B;
+  --primary: #0F766E;
+  --primary-soft: #F0FDFA;
+  --head: #F1F5F9;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: 210px 1fr; min-height: 100vh; }
+.sidebar { background: #0F172A; color: #CBD5E1; padding: 18px 12px; }
+.logo { display: flex; align-items: center; gap: 8px; padding: 0 8px 20px; font-weight: 700; color: #fff; }
+.logo-mark { width: 26px; height: 26px; border-radius: 6px; background: #14B8A6; color: #0F172A; display: grid; place-items: center; font-weight: 800; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-link { padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.side-link:hover { background: rgba(255, 255, 255, 0.06); }
+.side-link.is-active { background: rgba(20, 184, 166, 0.16); color: #5EEAD4; font-weight: 600; }
+
+.main { padding: 28px 32px; min-width: 0; }
+.page-head h1 { margin: 0; font-size: 24px; }
+.page-sub { margin: 4px 0 20px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.table-msg { margin: 0; padding: 40px; text-align: center; color: var(--muted); }
+.table { width: 100%; border-collapse: collapse; }
+.table th { height: 40px; padding: 0 14px; background: var(--head); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-align: left; color: var(--muted); white-space: nowrap; }
+.table td { height: 48px; padding: 0 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #FAFCFD; }
+.cell-name { font-weight: 600; }
+
+.dept { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.dept-engineering { background: #E0F2FE; color: #0369A1; }
+.dept-design { background: #FCE7F3; color: #BE185D; }
+.dept-sales { background: #FEF3C7; color: #B45309; }
+.dept-marketing { background: #EDE9FE; color: #6D28D9; }
+.dept-people { background: #DCFCE7; color: #15803D; }
+.dept-finance { background: #F1F5F9; color: #334155; }
+
+.pagination { display: flex; align-items: center; gap: 12px; }
+.page-info { font-size: 13px; color: var(--muted); }
+.page-btn { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
+.page-btn:hover:not(:disabled) { background: var(--head); }
+.page-btn:disabled { opacity: 0.45; cursor: default; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { DEPARTMENTS, getEmployees } from './api';
+import type { Employee } from './api';
+import { DeptBadge } from './components/DeptBadge';
+import { Pagination } from './components/Pagination';
+import { formatDate } from './utils/format';
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="logo"><span className="logo-mark">P</span>Peoplebase</div>
+      <nav className="side-nav">
+        <span className="side-link">Home</span>
+        <span className="side-link is-active">Directory</span>
+        <span className="side-link">Time off</span>
+        <span className="side-link">Payroll</span>
+      </nav>
+    </aside>
+  );
+}
+
+type ColumnKey = 'name' | 'title' | 'department' | 'location' | 'startDate';
+type SortDir = 'asc' | 'desc';
+
+// One config drives the header, the cells and the column toggles.
+const COLUMNS: { key: ColumnKey; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'title', label: 'Title' },
+  { key: 'department', label: 'Department' },
+  { key: 'location', label: 'Location' },
+  { key: 'startDate', label: 'Start date' },
+];
+const PAGE_SIZE = 8;
+
+function renderCell(employee: Employee, key: ColumnKey) {
+  if (key === 'department') {
+    return <DeptBadge department={employee.department} />;
+  }
+  if (key === 'startDate') {
+    return formatDate(employee.startDate);
+  }
+  return employee[key];
+}
+
+type ColumnMenuProps = {
+  visible: Record<ColumnKey, boolean>;
+  onToggle: (key: ColumnKey) => void;
+};
+
+// Change: column visibility. Name is always shown.
+function ColumnMenu({ visible, onToggle }: ColumnMenuProps) {
+  return (
+    <details className="col-menu">
+      <summary className="btn">Columns</summary>
+      <div className="col-pop">
+        {COLUMNS.map((col) => {
+          if (col.key === 'name') {
+            return null;
+          }
+          return (
+            <label key={col.key} className="col-option">
+              <input type="checkbox" checked={visible[col.key]} onChange={() => { onToggle(col.key); }} />
+              {col.label}
+            </label>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+function EmployeeTable() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [dept, setDept] = useState('');
+  const [sortKey, setSortKey] = useState<ColumnKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
+  const [visible, setVisible] = useState<Record<ColumnKey, boolean>>({
+    name: true, title: true, department: true, location: true, startDate: true,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    getEmployees().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setEmployees(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Every filter change sends you back to page 1 (page 3 of the old list may not exist).
+  function handleQuery(value: string) {
+    setQuery(value);
+    setPage(1);
+  }
+
+  function handleDept(value: string) {
+    setDept(value);
+    setPage(1);
+  }
+
+  function handleClear() {
+    setQuery('');
+    setDept('');
+    setPage(1);
+  }
+
+  function handleSort(key: ColumnKey) {
+    if (key === sortKey) {
+      setSortDir((prev) => {
+        if (prev === 'asc') {
+          return 'desc';
+        }
+        return 'asc';
+      });
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+    setPage(1);
+  }
+
+  function handleToggleColumn(key: ColumnKey) {
+    setVisible((prev) => {
+      return { ...prev, [key]: !prev[key] };
+    });
+  }
+
+  if (loading) {
+    return <div className="card"><p className="table-msg">Loading employees…</p></div>;
+  }
+
+  // derived pipeline: search -> department -> sort -> page. Nothing here is stored in state.
+  const q = query.trim().toLowerCase();
+  const filtered = employees.filter((e) => {
+    const matchesQuery = q === '' || e.name.toLowerCase().includes(q) || e.title.toLowerCase().includes(q);
+    const matchesDept = dept === '' || e.department === dept;
+    return matchesQuery && matchesDept;
+  });
+  const sorted = [...filtered].sort((a, b) => {
+    const result = a[sortKey].localeCompare(b[sortKey]);
+    if (sortDir === 'desc') {
+      return -result;
+    }
+    return result;
+  });
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const start = (page - 1) * PAGE_SIZE;
+  const pageRows = sorted.slice(start, start + PAGE_SIZE);
+  const visibleColumns = COLUMNS.filter((col) => {
+    return visible[col.key];
+  });
+
+  let clearBtn = null;
+  if (query !== '' || dept !== '') {
+    clearBtn = <button type="button" className="btn btn-link" onClick={() => { handleClear(); }}>Clear filters</button>;
+  }
+
+  let rows;
+  if (pageRows.length === 0) {
+    rows = (
+      <tr>
+        <td className="table-empty" colSpan={visibleColumns.length}>No employees match your filters.</td>
+      </tr>
+    );
+  } else {
+    rows = pageRows.map((e) => {
+      return (
+        <tr key={e.id}>
+          {visibleColumns.map((col) => {
+            let cls = '';
+            if (col.key === 'name') {
+              cls = 'cell-name';
+            }
+            return <td key={col.key} className={cls}>{renderCell(e, col.key)}</td>;
+          })}
+        </tr>
+      );
+    });
+  }
+
+  let rangeText = '0 of 0';
+  if (sorted.length > 0) {
+    rangeText = (start + 1) + '–' + (start + pageRows.length) + ' of ' + sorted.length;
+  }
+
+  return (
+    <div className="card">
+      <div className="toolbar">
+        <input className="search" placeholder="Search name or title" value={query} onChange={(e) => { handleQuery(e.target.value); }} />
+        <select className="select" value={dept} onChange={(e) => { handleDept(e.target.value); }}>
+          <option value="">All departments</option>
+          {DEPARTMENTS.map((d) => {
+            return <option key={d} value={d}>{d}</option>;
+          })}
+        </select>
+        {clearBtn}
+        <span className="toolbar-spacer" />
+        <ColumnMenu visible={visible} onToggle={handleToggleColumn} />
+      </div>
+      <table className="table">
+        <thead>
+          <tr>
+            {visibleColumns.map((col) => {
+              let arrow = '↕';
+              let cls = 'sort-btn';
+              let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
+              if (col.key === sortKey) {
+                cls = 'sort-btn is-sorted';
+                arrow = '▲';
+                ariaSort = 'ascending';
+                if (sortDir === 'desc') {
+                  arrow = '▼';
+                  ariaSort = 'descending';
+                }
+              }
+              return (
+                <th key={col.key} aria-sort={ariaSort}>
+                  <button type="button" className={cls} onClick={() => { handleSort(col.key); }}>
+                    {col.label}
+                    <span className="sort-arrow">{arrow}</span>
+                  </button>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+      <div className="table-foot">
+        <span className="range">Showing {rangeText}</span>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Sidebar />
+      <main className="main">
+        <div className="page-head">
+          <h1>Directory</h1>
+          <p className="page-sub">Everyone at Northwind, in one place.</p>
+        </div>
+        <EmployeeTable />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --muted: #64748B;
+  --primary: #0F766E;
+  --primary-soft: #F0FDFA;
+  --head: #F1F5F9;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.app { display: grid; grid-template-columns: 210px 1fr; min-height: 100vh; }
+.sidebar { background: #0F172A; color: #CBD5E1; padding: 18px 12px; }
+.logo { display: flex; align-items: center; gap: 8px; padding: 0 8px 20px; font-weight: 700; color: #fff; }
+.logo-mark { width: 26px; height: 26px; border-radius: 6px; background: #14B8A6; color: #0F172A; display: grid; place-items: center; font-weight: 800; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-link { padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.side-link:hover { background: rgba(255, 255, 255, 0.06); }
+.side-link.is-active { background: rgba(20, 184, 166, 0.16); color: #5EEAD4; font-weight: 600; }
+
+.main { padding: 28px 32px; min-width: 0; }
+.page-head h1 { margin: 0; font-size: 24px; }
+.page-sub { margin: 4px 0 20px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.table-msg { margin: 0; padding: 40px; text-align: center; color: var(--muted); }
+.table { width: 100%; border-collapse: collapse; }
+.table th { height: 40px; padding: 0 14px; background: var(--head); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-align: left; color: var(--muted); white-space: nowrap; }
+.table td { height: 48px; padding: 0 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #FAFCFD; }
+.cell-name { font-weight: 600; }
+
+.dept { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.dept-engineering { background: #E0F2FE; color: #0369A1; }
+.dept-design { background: #FCE7F3; color: #BE185D; }
+.dept-sales { background: #FEF3C7; color: #B45309; }
+.dept-marketing { background: #EDE9FE; color: #6D28D9; }
+.dept-people { background: #DCFCE7; color: #15803D; }
+.dept-finance { background: #F1F5F9; color: #334155; }
+
+.pagination { display: flex; align-items: center; gap: 12px; }
+.page-info { font-size: 13px; color: var(--muted); }
+.page-btn { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
+.page-btn:hover:not(:disabled) { background: var(--head); }
+.page-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ---- Added: toolbar, sorting, paging, column menu ---- */
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.toolbar-spacer { flex: 1; }
+.search { width: 240px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text); }
+.select { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text); background: var(--surface); }
+.search:focus, .select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12); }
+.btn { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--head); }
+.btn-link { border-color: transparent; color: var(--primary); }
+
+.table th { padding: 0 6px; }
+.sort-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+.sort-btn:hover { background: #E2E8F0; color: var(--text); }
+.sort-arrow { font-size: 10px; color: #94A3B8; }
+.sort-btn.is-sorted { color: var(--text); }
+.sort-btn.is-sorted .sort-arrow { color: var(--primary); }
+.table-empty { padding: 40px 14px; text-align: center; color: var(--muted); }
+
+.table-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); background: #FCFDFE; }
+.range { font-size: 13px; color: var(--muted); }
+
+.col-menu { position: relative; }
+.col-menu summary { list-style: none; }
+.col-menu summary::-webkit-details-marker { display: none; }
+.col-pop { position: absolute; right: 0; top: 42px; z-index: 5; min-width: 180px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12); }
+.col-option { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; }
+.col-option:hover { background: var(--head); }

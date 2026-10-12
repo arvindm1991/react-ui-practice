@@ -1,0 +1,200 @@
+<template id="tpl-flex">
+  <h1>Flexbox</h1>
+  <p class="lede">Most of any mockup is rows and columns of things: a header, a list item with an avatar, a button group, a stack of cards. Flexbox is the tool for that, and it all makes sense once you understand one idea: the two axes.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Predict what <code>justify-content</code> and <code>align-items</code> will do before you try them</li>
+    <li>Make one item fill the leftover space, and stop another from shrinking</li>
+    <li>Fix text that won't truncate inside a flex row</li>
+    <li>Build the six layouts that show up in nearly every design</li>
+  </ul></div>
+
+  <h2>1. What flexbox does</h2>
+  <p>Put <code>display: flex</code> on a parent and its direct children line up in a single line, a row by default, instead of stacking. Flexbox then gives you control over two things: <b>how the children are spaced along that line</b>, and <b>how they're aligned across it</b>. It's one-dimensional: it arranges things in one direction at a time. (For two dimensions, rows <em>and</em> columns lining up, you use grid.)</p>
+
+  <h2>2. The two axes</h2>
+  <p>Every flex container has a <b>main axis</b>, the direction items are laid out in, and a <b>cross axis</b> at right angles to it.</p>
+  <ul>
+    <li><code>flex-direction: row</code> (the default): main axis runs left → right, cross axis runs top → bottom.</li>
+    <li><code>flex-direction: column</code>: main axis runs top → bottom, cross axis runs left → right.</li>
+  </ul>
+  <p>Then there are two alignment properties, and the whole trick is knowing which axis each one controls:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Property</th><th>Works along</th><th>Answers the question</th></tr>
+    <tr><td><code>justify-content</code></td><td>Main axis</td><td>"Where do the items go along the line, and what happens to the extra space?"</td></tr>
+    <tr><td><code>align-items</code></td><td>Cross axis</td><td>"How are the items positioned or stretched across the line?"</td></tr>
+  </table></div>
+  <p>That's why "center vertically" in a row is <code>align-items: center</code>, but in a column it's <code>justify-content: center</code>. The properties didn't change meaning; the axes rotated.</p>
+  <p>Try every option below and watch the axis labels. Item 3 has more text than the others, so you can see how content size matters.</p>
+  <div data-explorer="flex"></div>
+  <div class="try"><b>Try this</b><ol>
+    <li>Set <code>justify-content: space-between</code>. The first and last items touch the edges and the rest of the space is shared between items. This is the classic header layout.</li>
+    <li>Leave <code>align-items</code> on <code>stretch</code> and notice every item is as tall as the tallest one. Change it to <code>center</code>: items shrink to their own height and center vertically. Most row layouts in designs want <code>center</code>.</li>
+    <li>Switch <code>flex-direction</code> to <code>column</code> and try <code>align-items: flex-start</code>. Items stop stretching to full width.</li>
+    <li>Set "Item 3 gets" to <code>flex: 1</code>, then to <code>margin-left: auto</code>. Compare: one grows, the other just pushes.</li>
+  </ol></div>
+
+  <h3>The values</h3>
+  <ul>
+    <li><code>justify-content</code>: <code>flex-start</code> (default, packed at the start), <code>center</code>, <code>flex-end</code>, <code>space-between</code> (first and last at the edges), <code>space-around</code>, <code>space-evenly</code>.</li>
+    <li><code>align-items</code>: <code>stretch</code> (default: fill the cross axis), <code>flex-start</code>, <code>center</code>, <code>flex-end</code>, <code>baseline</code> (line up the text baselines, handy for a big number next to a small label).</li>
+    <li><code>gap</code>: fixed space between items.</li>
+    <li><code>flex-wrap: wrap</code>: let items flow onto a new line when they run out of room, for tag lists and chips.</li>
+  </ul>
+
+  <h2>3. How items decide their size</h2>
+  <p>This is where most flexbox confusion comes from. Each flex item has three settings, usually written together with the <code>flex</code> shorthand:</p>
+  <ul>
+    <li><b><code>flex-basis</code></b>: the starting size. Default <code>auto</code>, meaning "my content's natural size, or my <code>width</code> if I have one".</li>
+    <li><b><code>flex-grow</code></b>: if there's leftover space in the row, how much of it do I take? Default <code>0</code>: none.</li>
+    <li><b><code>flex-shrink</code></b>: if the row is too small, how much do I give up? Default <code>1</code>: shrink along with the others.</li>
+  </ul>
+  <p>So by default, items sit at their content size, never grow, and shrink when squeezed. Two settings change that, and you'll use both constantly:</p>
+  <ul>
+    <li><b><code>flex: 1</code></b> means "grow to take the leftover space". If two items have <code>flex: 1</code>, they share it equally. In Figma terms this is <b>Fill container</b>.</li>
+    <li><b><code>flex-shrink: 0</code></b> means "never get smaller than my size". Use it on avatars, icons and fixed-width buttons so a long title next to them can't squash them into ovals.</li>
+  </ul>
+
+  <h3>The min-width: 0 problem</h3>
+  <p>Here's the bug everybody hits. You have an avatar, then a title that should truncate with "…", then a button. You set the truncation CSS on the title, but instead of truncating, the long title pushes the button out of the box.</p>
+  <p>Why: a flex item has a hidden default, <code>min-width: auto</code>, which means "never shrink narrower than my content's natural width". For a title that can't wrap (<code>white-space: nowrap</code>), the natural width is the whole sentence. So the item refuses to shrink, and the ellipsis never gets a chance. The fix is to tell it that it may shrink to zero: <b><code>min-width: 0</code></b>. Then <code>overflow: hidden</code> and <code>text-overflow: ellipsis</code> can do their job.</p>
+
+  <script type="text/x-play" data-title="Fix the truncation" data-h="300" data-console="off">
+export default function App() {
+  return (
+    <div className="row">
+      <div className="avatar">MO</div>
+      <div className="text">
+        <div className="title">Quarterly review of the evaluation harness for long-context retrieval tasks</div>
+        <div className="sub">Updated 2h ago</div>
+      </div>
+      <button className="btn">Open</button>
+    </div>
+  );
+}
+/*** css ***/
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 360px;
+  padding: 12px;
+  border: 1px solid #DADEE6;
+  border-radius: 10px;
+}
+.avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: #E8EEFF; color: #3451D1;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 14px;
+}
+.text {
+  flex: 1;
+  /* min-width: 0; */
+}
+.title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sub { font-size: 13px; color: #6B7385; }
+.btn { padding: 6px 12px; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Look at the preview: the title overflows and the button is pushed out of the box.</li>
+    <li>Uncomment <code>min-width: 0;</code> in <code>.text</code>. Now it truncates.</li>
+    <li>Squeezed avatars: change the title to a much longer text, then remove <code>min-width: 0</code> again and watch the avatar get narrower than 40px. Add <code>flex-shrink: 0</code> to <code>.avatar</code> to protect it.</li>
+  </ol></div>
+
+  <h2>4. Auto margins: push one thing away</h2>
+  <p>In a flex row, <code>margin-left: auto</code> on an item means "put all the free space on my left". The effect is that the item, and everything after it, jumps to the right edge. It's the cleanest way to get "logo and nav on the left, sign-in button on the right" without wrapping things in extra divs. <code>margin-top: auto</code> does the same thing in a column, which is how you pin a footer to the bottom of a card.</p>
+
+  <h2>5. The six layouts you'll build again and again</h2>
+  <script type="text/x-play" data-title="Six common layouts" data-h="330" data-console="off">
+export default function App() {
+  return (
+    <div className="demo">
+      {/* 1. Header: left group + right action */}
+      <header className="header">
+        <strong>Console</strong>
+        <nav className="nav"><a>Docs</a><a>Usage</a></nav>
+        <button className="push">Sign in</button>
+      </header>
+
+      {/* 2. Media object: fixed thing + flexible text */}
+      <div className="media">
+        <div className="dot" />
+        <div className="media-text">Fixed icon on the left, text takes the rest</div>
+      </div>
+
+      {/* 3. Vertical stack with even spacing */}
+      <div className="stack"><div>Stack</div><div>with</div><div>gap</div></div>
+
+      {/* 4. Centered in a box */}
+      <div className="center">Centered both ways</div>
+
+      {/* 5. Equal columns */}
+      <div className="cols"><div>1</div><div>2</div><div>3</div></div>
+
+      {/* 6. Wrapping chips */}
+      <div className="chips">
+        {['react', 'css', 'flexbox', 'grid', 'state', 'effects', 'forms'].map((t) => <span key={t}>{t}</span>)}
+      </div>
+    </div>
+  );
+}
+/*** css ***/
+.demo { display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
+.demo > * { border: 1px dashed #C5D0F5; padding: 8px; }
+
+.header { display: flex; align-items: center; gap: 16px; }
+.nav { display: flex; gap: 12px; color: #3451D1; }
+.push { margin-left: auto; }
+
+.media { display: flex; align-items: center; gap: 10px; }
+.dot { width: 24px; height: 24px; border-radius: 50%; background: #3451D1; flex-shrink: 0; }
+.media-text { flex: 1; min-width: 0; }
+
+.stack { display: flex; flex-direction: column; gap: 6px; }
+
+.center { display: flex; justify-content: center; align-items: center; height: 60px; }
+
+.cols { display: flex; gap: 8px; }
+.cols > div { flex: 1; background: #E8EEFF; text-align: center; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { padding: 2px 10px; border-radius: 999px; background: #EEF0F3; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Delete <code>margin-left: auto</code> from <code>.push</code>. The button falls in line with the nav. Put it back.</li>
+    <li>In <code>.cols</code>, give the second column <code>flex: 2</code> (add the rule <code>.cols &gt; div:nth-child(2) { flex: 2; }</code>). It takes twice the share of the others.</li>
+    <li>Add <code>width: 220px</code> to <code>.chips</code> so it's narrow, then remove <code>flex-wrap: wrap</code>. The chips squash and overflow instead of wrapping onto a new line.</li>
+  </ol></div>
+
+  <h2>6. A short checklist when a flex layout looks wrong</h2>
+  <ol>
+    <li>Is <code>display: flex</code> on the <b>direct parent</b> of the things you're arranging? (Not the grandparent.)</li>
+    <li>Which way is the main axis? Then: am I using <code>justify-content</code> for that axis and <code>align-items</code> for the other?</li>
+    <li>Things too tall? <code>align-items</code> defaults to <code>stretch</code>.</li>
+    <li>Something not filling the space? It needs <code>flex: 1</code>.</li>
+    <li>Something squashed? <code>flex-shrink: 0</code>. Text overflowing instead of truncating? <code>min-width: 0</code>.</li>
+  </ol>
+
+  <h2>Figma mapping, now that you know why</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Figma auto layout</th><th>Flexbox</th></tr>
+    <tr><td>Direction: horizontal / vertical</td><td><code>flex-direction: row / column</code></td></tr>
+    <tr><td>Spacing between items</td><td><code>gap</code></td></tr>
+    <tr><td>Spacing: Auto</td><td><code>justify-content: space-between</code></td></tr>
+    <tr><td>Alignment grid</td><td><code>justify-content</code> (main) + <code>align-items</code> (cross)</td></tr>
+    <tr><td>Child: Fill container (along the direction)</td><td><code>flex: 1</code> (+ <code>min-width: 0</code> if it holds text)</td></tr>
+    <tr><td>Child: Fill container (across the direction)</td><td><code>align-self: stretch</code></td></tr>
+    <tr><td>Child: Hug contents</td><td>the default</td></tr>
+    <tr><td>Child: Fixed width</td><td><code>width</code> + <code>flex-shrink: 0</code></td></tr>
+  </table></div>
+
+  <p>Practice: the <b>Profile card</b> drill is pure flexbox.</p>
+  <div data-exs="d1"></div>
+  <div data-quiz="flex"></div>
+</template>

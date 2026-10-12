@@ -1,0 +1,1016 @@
+{
+ "dc41": {
+  "kind": "drill",
+  "level": 4,
+  "order": 41,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Retro board: undo / redo",
+  "focus": "src/App.tsx",
+  "summary": "A sticky-note retro board already adds, edits and deletes notes. Add an undo/redo history with buttons and Ctrl/Cmd+Z.",
+  "skills": [
+   "history stack (past / present / future)",
+   "pure state helpers",
+   "global keydown listener",
+   "useRef snapshot",
+   "disabled states"
+  ],
+  "brief": "<p><b>Pinboard</b> is a team retro board. <code>App.tsx</code> has <code>Header</code>, <code>Toolbar</code>, <code>NoteCard</code> and <code>App</code>. You can already add a note (in the picked color), type in it, and delete it. <code>getBoard()</code> in <code>api.ts</code> loads the notes after a random 0.3–0.9 s.</p><p>Product wants <b>undo and redo</b>. Read <code>components/IconButton.tsx</code> (use it for the new buttons) and <code>utils/id.ts</code> first.</p><p>The interesting decision is the <b>shape of the state</b>: right now it is one <code>notes</code> array. Undo needs the old versions too.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change:</b> cap history at 20 (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–24 Core · 24–31 change + Next · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Every change to the notes becomes a snapshot. I'll replace <code>notes</code> with one state object <code>{ past, present, future }</code> so the three always change together. Add and delete call <code>commit(next)</code>: push <code>present</code> onto <code>past</code>, set the new present, clear <code>future</code>. Undo pops <code>past</code> into <code>present</code> and pushes the old present onto <code>future</code>; redo is the mirror. I'll write those as pure functions <code>(h) =&gt; newH</code> so I can pass them straight to <code>setHistory</code>, and the keydown effect doesn't need any dependencies.</p><p>Typing is the tricky part: one undo per keystroke would be awful. I'll update <code>present</code> without a history entry while typing, remember a snapshot on focus in a <code>useRef</code>, and on blur commit that snapshot to <code>past</code> if the notes changed. Can-undo / can-redo are derived from the array lengths.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "Toolbar gets <b>Undo</b> and <b>Redo</b> buttons (use <code>IconButton</code>). Undo is disabled when there is nothing to undo, Redo when there is nothing to redo. Loading the board is <i>not</i> an undoable step",
+   "Adding and deleting a note can be undone and redone. A deleted note comes back <b>in the same position</b>. Doing a new action after an undo clears the redo stack",
+   "Editing a note's text is <b>one</b> undo step per edit (commit when the note loses focus), not one step per keystroke",
+   "<b>Ctrl/Cmd+Z</b> undoes and <b>Shift+Ctrl/Cmd+Z</b> redoes. While the cursor is in a note's textarea the shortcut is left to the browser (native text undo)",
+   "The keydown listener is added once in an effect and removed in the cleanup; no stale state (undo twice quickly must undo two steps)"
+  ],
+  "change": {
+   "title": "Cap the history at 20",
+   "html": "<p>\"On long retros the history grows forever and we keep every snapshot in memory.\"</p><ul><li>Keep at most <b>20</b> undo steps. The oldest step is dropped when a 21st is added.</li><li>Show a small meter next to the buttons: <b>\"3 / 20\"</b> (undo steps available / max).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one <code>.slice(-20)</code> in the right place. Check that <i>every</i> path that pushes to <code>past</code> uses it.</p>"
+  },
+  "hints": [
+   "State shape: <code>type History = { past: Note[][]; present: Note[]; future: Note[][] }</code>. The notes you render are <code>history.present</code>.",
+   "Write pure helpers outside the component: <code>function undoHistory(h: History): History { ... }</code>. Then <code>setHistory(undoHistory)</code> works from a button <i>and</i> from a keydown listener with <code>[]</code> deps.",
+   "Commit: <code>return { past: [...h.past, h.present], present: next, future: [] };</code>. Undo: take the last item of <code>past</code>, put the old <code>present</code> at the front of <code>future</code>.",
+   "Keyboard: <code>if ((e.metaKey || e.ctrlKey) &amp;&amp; e.key.toLowerCase() === \"z\")</code>. With Shift held, <code>e.key</code> is uppercase <code>\"Z\"</code>, hence <code>toLowerCase()</code>. Search: \"mdn KeyboardEvent metaKey\".",
+   "Skip the shortcut while typing: <code>const t = e.target as HTMLElement; if (t.tagName === \"TEXTAREA\") return;</code>",
+   "Text edits: <code>onFocus</code> stores <code>editStart.current = history.present</code>; typing does <code>setHistory((h) =&gt; ({ ...h, present: next }))</code>; <code>onBlur</code> pushes <code>editStart.current</code> onto <code>past</code> if <code>h.present !== editStart.current</code>."
+  ],
+  "rubric": [
+   "Chose a single history object (past / present / future) and explained why",
+   "Undo / redo / commit are pure and never mutate arrays",
+   "Buttons' disabled states are derived from stack lengths, not stored",
+   "Keydown listener cleaned up; updater form avoids stale closures",
+   "Typing does not create one history entry per keystroke",
+   "Cap applied to every path that grows the past stack",
+   "Talked through edge cases (redo cleared after a new action, load not undoable)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--paper",
+     "#F7F4EC"
+    ],
+    [
+     "--ink",
+     "#1F2933"
+    ],
+    [
+     "--line",
+     "#E5E1D8"
+    ],
+    [
+     "--note-yellow",
+     "#FFE58A"
+    ],
+    [
+     "--note-pink",
+     "#FFC2D1"
+    ],
+    [
+     "Meter bg",
+     "#F3F1EA"
+    ]
+   ],
+   "notes": [
+    [
+     "Undo / Redo",
+     "IconButton · h 32 · radius 8 · disabled opacity .4"
+    ],
+    [
+     "History group",
+     "border-left 1 · pad-left 10 · gap 6"
+    ],
+    [
+     "Meter",
+     "pill · pad 3 8 · 12px · tabular nums"
+    ]
+   ]
+  }
+ },
+ "dc42": {
+  "kind": "drill",
+  "level": 4,
+  "order": 42,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Photo feed: infinite scroll",
+  "focus": "src/App.tsx",
+  "summary": "A dark photo feed only shows the first page. Load the next page automatically when the user nears the bottom, using IntersectionObserver.",
+  "skills": [
+   "IntersectionObserver",
+   "cursor pagination",
+   "refs for in-flight guards",
+   "scroll container",
+   "effect cleanup"
+  ],
+  "brief": "<p><b>Aperture</b> is a photo community. <code>App.tsx</code> has <code>TopBar</code>, <code>Feed</code> and <code>App</code>; cards are rendered by <code>components/PhotoCard.tsx</code>, and <code>components/Spinner.tsx</code> is a loading row you should reuse. The feed scrolls inside its <b>own container</b> (<code>.feed-scroll</code>), not the window.</p><p><code>getPhotos(cursor)</code> returns <code>{ photos, nextCursor }</code> after 0.5–1.1 s. <code>nextCursor</code> is <code>null</code> on the last page (40 photos in total). It logs every request to the console, so you can see duplicate loads.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> \"Back to top\" button (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Feed</code>: <code>photos</code>, <code>nextCursor</code> (start at 0, <code>null</code> means done) and <code>loading</code>. I'll put an empty sentinel <code>div</code> after the last card and observe it with an <code>IntersectionObserver</code> whose <code>root</code> is the scroll container, not the viewport. When it intersects and nothing is in flight, I fetch the next page and append.</p><p>The observer callback is a closure, so for the in-flight guard I'll use a <code>useRef</code>; a state value would be stale inside it. The effect depends on <code>nextCursor</code>: each page recreates the observer, and if the sentinel is still visible it fires again, which fills tall screens. When <code>nextCursor</code> is <code>null</code> the effect just doesn't observe, and I show \"You're all caught up\". Cleanup disconnects.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "The first page loads on mount (no button). When the user scrolls near the bottom of <code>.feed-scroll</code>, the next page is fetched with the previous <code>nextCursor</code> and appended. Use an <code>IntersectionObserver</code> on a sentinel element with the scroll container as <code>root</code> (not a scroll event)",
+   "While a page is loading, a loading row (\"Loading more photos…\", reuse <code>Spinner</code>) shows at the bottom of the list",
+   "No duplicate requests: scrolling up and down while a request is in flight never starts a second one, and no photo appears twice",
+   "At the end (<code>nextCursor === null</code>) the observer stops and the list ends with \"You're all caught up · 40 photos\". The observer is disconnected on unmount"
+  ],
+  "change": {
+   "title": "Back to top",
+   "html": "<p>\"After 40 photos, getting back to the top is painful.\"</p><ul><li>Once the feed is scrolled more than <b>800px</b>, show a floating pill <b>\"↑ Back to top\"</b> centered at the bottom of the feed.</li><li>Clicking it smooth-scrolls the feed container to the top; the button disappears when back near the top.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Search: \"mdn element scrollTo behavior smooth\". The button needs a <code>position: relative</code> parent that does not scroll.</p>"
+  },
+  "hints": [
+   "You need two refs: <code>scrollRef</code> on <code>.feed-scroll</code> (the observer root) and <code>sentinelRef</code> on an empty div after the cards.",
+   "Search: \"mdn IntersectionObserver root rootMargin\". <code>new IntersectionObserver(cb, { root: scrollRef.current, rootMargin: \"0px 0px 300px 0px\" })</code> starts loading 300px before the end.",
+   "Why a ref for the in-flight flag? The callback was created when the effect ran; a <code>loading</code> state value inside it is frozen at that moment. <code>inFlight.current</code> is always current.",
+   "Effect shape: <code>useEffect(() =&gt; { if (nextCursor === null) return; const obs = new IntersectionObserver(...); obs.observe(sentinelRef.current); return () =&gt; { obs.disconnect(); }; }, [nextCursor]);</code>",
+   "Inside the callback: <code>if (!entries[0].isIntersecting || inFlight.current) return; inFlight.current = true; getPhotos(cursor).then((page) =&gt; { setPhotos((prev) =&gt; [...prev, ...page.photos]); setNextCursor(page.nextCursor); inFlight.current = false; });</code>"
+  ],
+  "rubric": [
+   "Observer root is the feed's scroll container, not the window",
+   "In-flight guard explained (ref vs stale state in a closure)",
+   "Appends with the updater form; never duplicates",
+   "Stops cleanly at the end and disconnects on cleanup",
+   "Loading and end states are separate decisions above the return",
+   "Back-to-top derived from scrollTop with a threshold; smooth scroll on the container",
+   "Mentioned the alternative (scroll listener + math) and why the observer is better"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0D0D10"
+    ],
+    [
+     "--surface",
+     "#17171C"
+    ],
+    [
+     "--line",
+     "#2A2A33"
+    ],
+    [
+     "--accent",
+     "#FF5C7A"
+    ],
+    [
+     "--muted",
+     "#8B8B99"
+    ],
+    [
+     "Back to top",
+     "#F2F2F5 on #0D0D10"
+    ]
+   ],
+   "notes": [
+    [
+     "Loading row",
+     "Spinner · pad 18 · 14px muted"
+    ],
+    [
+     "End message",
+     "center · 14px muted"
+    ],
+    [
+     "Back to top",
+     "absolute · bottom 20 · centered · h 36 · pill · 13/700 · shadow 0 6 20"
+    ]
+   ]
+  }
+ },
+ "dc43": {
+  "kind": "drill",
+  "level": 4,
+  "order": 43,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Playlist: drag to reorder",
+  "focus": "src/App.tsx",
+  "summary": "Reorder a playlist with HTML5 drag and drop plus accessible Move up/down buttons, then save the order to the API.",
+  "skills": [
+   "HTML5 drag and drop",
+   "immutable move",
+   "accessible alternative to drag",
+   "pending save state",
+   "derived dirty state"
+  ],
+  "brief": "<p><b>Sunday Slow Mornings</b> is a playlist page. <code>App.tsx</code> has <code>PlaylistHeader</code>, <code>TrackRow</code>, <code>TrackList</code> and <code>App</code>. <code>getPlaylist()</code> takes 0.4–1.0 s; <code>savePlaylistOrder(trackIds)</code> takes 0.6–1.2 s. <code>utils/time.ts</code> has <code>formatDuration</code> and <code>formatTotal</code>; <code>components/Cover.tsx</code> draws album art.</p><p>The tracks currently come straight from <code>playlist.tracks</code>. To reorder them you'll need your own copy in state.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> durations + \"Unsaved changes\" (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I'll keep <code>tracks</code> in state (copied from the API) and one pure helper <code>moveItem(list, from, to)</code> that both drag and drop and the buttons call, so there's one code path. For drag: <code>dragId</code> in state on <code>dragstart</code>; on <code>dragover</code> I <code>preventDefault</code> (or drop never fires) and work out <i>before / after</i> from the mouse Y against the row's midpoint, stored as <code>dropTarget</code> to draw the line. On drop, convert to an index, remembering that removing the dragged row shifts later indexes by one.</p><p>Buttons are the accessible path: \"Move X up / down\", disabled at the ends, plus a polite live region. Save sends the ids and shows \"Saving…\".</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Each row is <code>draggable</code>. Dragging a row over another shows a <b>drop indicator</b> line above or below it (depending on which half the pointer is over); dropping moves the track there. The dragged row is faded while dragging",
+   "Each row has <b>▲ / ▼</b> buttons with <code>aria-label=\"Move {title} up\"</code> / <code>\"… down\"</code>, disabled on the first / last row. A visually hidden <code>aria-live</code> region announces \"{title} moved to position 3 of 8\"",
+   "A <b>Save order</b> button sends the current ids with <code>savePlaylistOrder</code>. While saving it reads \"Saving…\" and is disabled. Track numbers always show the current position",
+   "Reorder logic lives in one pure helper used by both drag and drop and the buttons; state is never mutated"
+  ],
+  "change": {
+   "title": "Running time + unsaved changes",
+   "html": "<p>\"People build the playlist for a timed event. And they leave without saving.\"</p><ul><li>The header shows the total: <b>\"Arvind · 8 songs · 30 min\"</b> (use <code>formatTotal</code>), and each row shows when it starts in the playlist: <b>\"starts 4:11\"</b>. Both recalculate on every reorder.</li><li>Show <b>\"● Unsaved changes\"</b> while the order differs from the last saved order, and <b>\"✓ All changes saved\"</b> otherwise. Save is disabled when nothing changed. A <b>Discard</b> button restores the saved order.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: keep <code>savedIds</code> (what the server has). \"Dirty\" is derived by comparing id lists. Moving a track and moving it back must be clean again.</p>"
+  },
+  "hints": [
+   "Search: \"mdn html drag and drop api\". You need <code>draggable</code>, <code>onDragStart</code>, <code>onDragOver</code> (call <code>e.preventDefault()</code>!), <code>onDrop</code> and <code>onDragEnd</code>.",
+   "In <code>onDragStart</code> call <code>e.dataTransfer.setData(\"text/plain\", id)</code>; Firefox will not start a drag without data.",
+   "Before / after: <code>const rect = e.currentTarget.getBoundingClientRect(); const after = e.clientY &gt; rect.top + rect.height / 2;</code>",
+   "The helper: <code>const next = [...list]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next;</code>",
+   "Drop index: <code>let to = indexOf(target); if (after) to += 1; if (from &lt; to) to -= 1;</code> (removing the dragged row shifts everything after it).",
+   "Start times: build an array above the return with a running total in a <code>forEach</code>, then read <code>starts[i]</code> in the map. Dirty: <code>tracks.map((t) =&gt; t.id).join() !== savedIds.join()</code>."
+  ],
+  "rubric": [
+   "One pure move helper shared by drag and buttons",
+   "dragover preventDefault and the index-shift edge case handled",
+   "Indicator state cleared on drop and on dragend (also when dropped outside)",
+   "Buttons are a real keyboard / screen reader alternative (labels, disabled ends, live region)",
+   "Save shows pending state; savedIds updated only after success",
+   "Totals, start times and dirty flag derived, not stored",
+   "Explained why not to keep index-based keys"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#FBF7F0"
+    ],
+    [
+     "--plum",
+     "#3B1F4A"
+    ],
+    [
+     "--coral",
+     "#E8664F"
+    ],
+    [
+     "--muted",
+     "#85768C"
+    ],
+    [
+     "--line",
+     "#EDE4D8"
+    ],
+    [
+     "Saved",
+     "#4E9B7A"
+    ]
+   ],
+   "notes": [
+    [
+     "Drop indicator",
+     "inset box-shadow 3px coral, top or bottom"
+    ],
+    [
+     "Dragging row",
+     "opacity .4"
+    ],
+    [
+     "Move buttons",
+     "26×26 · radius 6 · border line"
+    ],
+    [
+     "Save",
+     "h 36 · pill · plum"
+    ],
+    [
+     "Start time",
+     "12px · #B3A6B8 · tabular nums"
+    ]
+   ]
+  }
+ },
+ "dc44": {
+  "kind": "drill",
+  "level": 4,
+  "order": 44,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Command palette (⌘K)",
+  "focus": "src/App.tsx",
+  "summary": "A deploy dashboard already has every action as data. Build the Ctrl/Cmd+K palette: fuzzy filter, arrow keys, Enter to run, Escape, focus restore.",
+  "skills": [
+   "global shortcut",
+   "fuzzy matching",
+   "active index + keyboard",
+   "aria-activedescendant",
+   "focus restoration"
+  ],
+  "brief": "<p><b>Orbit</b> is a deploy dashboard. <code>App.tsx</code> has <code>Sidebar</code>, <code>TopBar</code> (with a \"Search or run a command… ⌘K\" button that does nothing yet), <code>DeploymentList</code> and <code>App</code>. Read <code>commands.ts</code> first: <code>buildCommands(actions)</code> already returns every action as <code>{ id, label, section, run }</code>, and <code>App</code> already builds the list. <code>components/Kbd.tsx</code> renders key caps.</p><p>Your job is the palette itself. Each command's <code>run()</code> changes something visible (page, theme, sidebar, a queued deployment, a toast).</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> section headers (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>paletteOpen</code>, because both the shortcut and the top-bar button open it, plus a <code>returnFocus</code> ref with the element that had focus. The palette is its own component, only rendered while open, so its <code>query</code> and <code>active</code> index reset on every open. The filtered list is derived. Focus stays in the input the whole time; Arrow keys change <code>active</code> (wrapping), Enter runs <code>results[active]</code>, Escape closes, and I wire <code>aria-activedescendant</code> so screen readers follow. When it closes, an effect puts focus back on the saved element.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "<b>Ctrl/Cmd+K</b> anywhere (and clicking the top-bar search button) opens a centered palette over a dimmed backdrop with the input focused. Pressing it again, <b>Escape</b>, or clicking the backdrop closes it. The browser's own Ctrl+K is prevented",
+   "Typing filters commands <b>fuzzy-ish</b>: every typed letter must appear in order, case-insensitive, spaces ignored (\"rdp\" matches \"<b>R</b>e<b>d</b>eploy <b>p</b>roduction\"). Show \"No commands match\" when empty",
+   "↑ / ↓ move a highlighted item (wrapping at the ends, hover also highlights), <b>Enter</b> runs it and closes; clicking an item runs it too. The input has <code>role=\"combobox\"</code> + <code>aria-activedescendant</code>; items are <code>role=\"option\"</code> with <code>aria-selected</code>",
+   "When the palette closes, focus returns to the element that was focused before it opened (e.g. the sidebar link or the search button)"
+  ],
+  "change": {
+   "title": "Group by section",
+   "html": "<p>\"With more commands coming, the flat list is hard to scan.\"</p><ul><li>Show results grouped under section headers in this order: <b>Navigation</b>, <b>Deployments</b>, <b>Appearance</b> (<code>SECTIONS</code> in <code>commands.ts</code>). Hide a header when none of its commands match.</li><li>Arrow keys must follow the <b>visual</b> order across groups.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: build one flat <code>results</code> array in section order and use it for both rendering and the active index.</p>"
+  },
+  "hints": [
+   "Global shortcut: <code>document.addEventListener(\"keydown\", ...)</code> in an effect, with cleanup. <code>if ((e.metaKey || e.ctrlKey) &amp;&amp; e.key.toLowerCase() === \"k\") { e.preventDefault(); ... }</code>",
+   "Fuzzy match: walk the query letters, each time <code>pos = text.indexOf(ch, pos)</code>; if it is <code>-1</code> return false, else <code>pos += 1</code>.",
+   "Reset <code>active</code> to 0 in the input's onChange, so a shorter list never leaves the highlight out of range.",
+   "Arrows: <code>e.preventDefault()</code> (otherwise the cursor jumps), then <code>setActive((i) =&gt; (i + 1) % results.length)</code>. Search: \"aria-activedescendant combobox mdn\".",
+   "Focus restore: store <code>e.target</code> from the keydown (or the button from the click) in a ref when opening; <code>useEffect(() =&gt; { if (!open &amp;&amp; ref.current) { ref.current.focus(); } }, [open]);</code>",
+   "Grouping: <code>SECTIONS.forEach((s) =&gt; { commands.forEach((c) =&gt; { if (c.section === s &amp;&amp; fuzzyMatch(c.label, query)) results.push(c); }); });</code>"
+  ],
+  "rubric": [
+   "Open state in App; palette state local and reset by unmounting",
+   "Results derived; active index reset on query change",
+   "Keyboard handling with preventDefault where needed, wrapping",
+   "ARIA: combobox input, listbox / option, aria-activedescendant",
+   "Listener cleanup; no stale closure bugs on the toggle",
+   "Focus returns to the previous element",
+   "Grouping keeps keyboard order equal to visual order"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0B0D12"
+    ],
+    [
+     "--panel",
+     "#12151C"
+    ],
+    [
+     "--panel-2",
+     "#1A1E27"
+    ],
+    [
+     "--line",
+     "#242936"
+    ],
+    [
+     "--accent",
+     "#7C8CFF"
+    ],
+    [
+     "Backdrop",
+     "rgba(5,7,12,.55) + blur 2"
+    ]
+   ],
+   "notes": [
+    [
+     "Palette",
+     "max-w 560 · top 12vh · radius 14 · shadow 0 24 60"
+    ],
+    [
+     "Input row",
+     "h 52 · 16px · border-bottom"
+    ],
+    [
+     "Section header",
+     "11px/600 · uppercase · .06em · muted · pad 10 10 4"
+    ],
+    [
+     "Item",
+     "h 38 · radius 8 · active: panel-2 + 2px accent bar"
+    ],
+    [
+     "Footer",
+     "12px muted · Kbd caps"
+    ]
+   ]
+  }
+ },
+ "dc45": {
+  "kind": "drill",
+  "level": 4,
+  "order": 45,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Budget grid: editable cells",
+  "focus": "src/App.tsx",
+  "summary": "Turn a read-only budget table into a small spreadsheet: click to edit, Enter/Tab to move, derived row and column totals, invalid input highlighted.",
+  "skills": [
+   "editing state (row, col)",
+   "keyboard navigation",
+   "derived totals",
+   "storing raw input",
+   "tables"
+  ],
+  "brief": "<p><b>Ledgerly</b> shows a quarterly budget. <code>App.tsx</code> has <code>AppHeader</code>, <code>BudgetTable</code> and <code>App</code>; <code>getBudget()</code> takes 0.4–1.0 s. Read <code>utils/money.ts</code>: <code>formatMoney</code> and <code>parseAmount</code> (returns <code>null</code> for text that is not a number) are there for you. <code>utils/id.ts</code> has <code>uid</code>.</p><p>Right now the cells are plain text. Make it behave like a tiny spreadsheet.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> add / delete rows (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I'll store each cell as the <b>text the user typed</b> (<code>cells: string[]</code>), not a number. That way an invalid entry like \"abc\" stays visible and highlighted instead of being lost. Totals are derived with <code>parseAmount</code>, skipping invalid cells. Editing state is <code>{ row, col } | null</code> plus a <code>draft</code> string; only one cell is an input at a time. Enter commits and moves down, Tab commits and moves right (wrapping to the next row), Shift+Tab goes back, Escape cancels, blur commits.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking a cell turns it into a focused input with its current value. <b>Enter</b> saves and moves to the cell below (or stops editing on the last row). <b>Escape</b> cancels. Clicking elsewhere (blur) saves",
+   "<b>Tab</b> saves and moves right, wrapping to the first month of the next row; <b>Shift+Tab</b> moves left. Focus never leaves the grid while tabbing between cells",
+   "A <b>Total</b> column (per row) and a footer row of <b>column totals</b> plus a grand total, all derived and formatted with <code>formatMoney</code>",
+   "Input that is not a number (e.g. \"abc\") is kept and shown in a <b>red-highlighted</b> cell (title \"Not a number\"), left out of totals, and a message says \"1 cell needs a number. They are left out of the totals.\" \"1,000\" and \"$50\" are valid"
+  ],
+  "change": {
+   "title": "Add and delete rows",
+   "html": "<p>\"Finance wants to add a category for insurance, and drop advertising.\"</p><ul><li>Under the table: a \"New category\" input and a <b>+ Add row</b> button (disabled when empty). The new row has empty cells (counted as $0).</li><li>Each row gets a <b>×</b> button (<code>aria-label=\"Delete {category}\"</code>) at the end. All totals update.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Watch out: if you store the editing position by index, deleting a row shifts indexes. Stop editing when a row is deleted.</p>"
+  },
+  "hints": [
+   "Convert once on load: <code>cells: r.values.map((v) =&gt; String(v))</code>. Now \"abc\" can be stored.",
+   "Render: <code>if (isEditing) return &lt;td&gt;&lt;input autoFocus ... /&gt;&lt;/td&gt;;</code> otherwise a <code>&lt;button&gt;</code> inside the <code>td</code> (keyboard-focusable for free).",
+   "One commit function: <code>function commit(next: CellPos | null) { onCellChange(editing.row, editing.col, draft); if (next) startEdit(next.row, next.col); else setEditing(null); }</code>",
+   "Tab: <code>e.preventDefault()</code> first, or the browser moves focus to the next button. Search: \"mdn keydown Tab preventDefault\".",
+   "Totals: <code>cells.reduce((sum, t) =&gt; { const n = parseAmount(t); return n === null ? sum : sum + n; }, 0)</code> (written with an <code>if</code>, of course)."
+  ],
+  "rubric": [
+   "Stored raw strings and explained why (invalid input stays visible)",
+   "Single editing position; draft separate from committed value",
+   "Enter / Tab / Shift+Tab / Escape / blur all behave as specified",
+   "Totals derived, invalid cells excluded",
+   "Immutable nested update of a single cell",
+   "Row add / delete with stable ids, editing cleared on delete",
+   "Accessible: real buttons and labelled inputs"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--brand",
+     "#0F9D6B"
+    ],
+    [
+     "--brand-soft",
+     "#E5F5EE"
+    ],
+    [
+     "--danger",
+     "#D93D3D"
+    ],
+    [
+     "--danger-soft",
+     "#FDECEC"
+    ],
+    [
+     "--line",
+     "#E3E8E6"
+    ],
+    [
+     "Totals bg",
+     "#F8FAF9"
+    ]
+   ],
+   "notes": [
+    [
+     "Cell",
+     "h 40 · pad 0 14 · mono 13 · right aligned"
+    ],
+    [
+     "Editing cell",
+     "inset 2px brand ring"
+    ],
+    [
+     "Invalid cell",
+     "danger-soft bg · 1px danger ring · danger text"
+    ],
+    [
+     "Footer",
+     "border-top 2px · 700"
+    ],
+    [
+     "Grand total",
+     "brand-soft bg · brand text"
+    ],
+    [
+     "Add row",
+     "input h 34 w 200 · button h 34 brand"
+    ]
+   ]
+  }
+ },
+ "dc46": {
+  "kind": "drill",
+  "level": 4,
+  "order": 46,
+  "minutes": 38,
+  "changeAt": 26,
+  "title": "Theater seat picker",
+  "focus": "src/App.tsx",
+  "summary": "Select up to 4 seats on a theater map, see a priced summary, book through the API, and recover when a seat gets taken mid-checkout.",
+  "skills": [
+   "selection with a limit",
+   "derived totals",
+   "pending + error states",
+   "refetch after failure",
+   "roving tabindex"
+  ],
+  "brief": "<p><b>Lumen Playhouse</b> sells seats for Hamlet. <code>App.tsx</code> has <code>ShowHeader</code>, <code>Legend</code>, <code>SeatGrid</code>, <code>Summary</code> and <code>App</code>. <code>getSeatMap()</code> (0.4–1.0 s) returns every seat with its tier, price and <code>taken</code> flag. <code>formatPrice</code> is in <code>utils/money.ts</code>.</p><p>Read <code>bookSeats</code> in <code>api.ts</code> carefully: it takes 0.8–1.4 s and <b>always rejects a booking that includes seat C5</b> (someone else grabbed it), which also marks C5 as taken on the server. That is how you test the failure path.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> keyboard-selectable seats (~26 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–8 plan · 8–26 Core · 26–34 change · 34–38 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>selected: string[]</code> (seat ids, in pick order), <code>booking</code>, and a message. The selected seat objects and the total are derived from the map. Toggle refuses taken seats and a 5th seat (with a notice). Book calls <code>bookSeats(selected)</code>: on success show a confirmation and clear the selection; on failure show the error. Either way, refetch the map. I'll do that with a <code>reloadKey</code> state the load effect depends on, so there is one loading code path, and after each load I drop selected seats that are now taken.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "Clicking an available seat selects it (gold, <code>aria-pressed=\"true\"</code>); clicking again deselects. Taken seats can't be selected. A 5th seat is refused with the notice \"You can select up to 4 seats.\"",
+   "The summary lists each selected seat (\"C4 · Standard · $65\" with a × remove button), the total by tier price, and the button reads <b>\"Book 2 seats · $160\"</b> (disabled with nothing selected)",
+   "Booking shows <b>\"Booking…\"</b> (disabled). Success: a banner \"Booked! Confirmation LMN-… · seats A5, A6\", selection cleared, and the refreshed map shows those seats taken",
+   "Failure (any booking with C5): an error banner with the API message, the map is refetched (C5 now taken) and C5 is removed from the selection while the other seats stay selected"
+  ],
+  "change": {
+   "title": "Keyboard seat selection",
+   "html": "<p>\"Accessibility audit: the seat map is a wall of 60 tab stops.\"</p><ul><li>Only <b>one</b> seat is in the Tab order (roving <code>tabIndex</code>). <b>Arrow keys</b> move focus between seats (also across taken seats, stopping at the edges). <b>Enter / Space</b> toggle the focused seat.</li><li>Each seat has <code>aria-label=\"Row C, seat 5, Standard $65\"</code> (plus \", taken\") and taken seats use <code>aria-disabled</code> so they stay reachable.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Search: \"roving tabindex\", \"aria-disabled vs disabled\".</p>"
+  },
+  "hints": [
+   "Derived: <code>const selectedSeats = selected.map(id =&gt; map.seats.find(...))</code> and <code>total = selectedSeats.reduce(...)</code>. Don't store the total.",
+   "Refetch pattern: <code>const [reloadKey, setReloadKey] = useState(0);</code> and the load effect has <code>[reloadKey]</code> deps. Bump it in <code>.finally()</code>.",
+   "After the map loads: <code>setSelected((prev) =&gt; prev.filter((id) =&gt; seat is not taken))</code>.",
+   "Promise chain: <code>bookSeats(ids).then(...).catch((err: Error) =&gt; { setError(err.message); }).finally(() =&gt; { setBooking(false); ... });</code>",
+   "Roving tabindex: <code>focusId</code> state; <code>tabIndex={s.id === focusId ? 0 : -1}</code> (as an if above). Keep refs in <code>useRef&lt;Record&lt;string, HTMLButtonElement | null&gt;&gt;({})</code> and call <code>.focus()</code> on arrow keys.",
+   "A <code>&lt;button&gt;</code> already fires <code>onClick</code> on Enter and Space, so you only handle arrows."
+  ],
+  "rubric": [
+   "Selection limit enforced with clear feedback",
+   "Totals and labels derived from selected ids",
+   "Pending state prevents double booking",
+   "Failure path: error shown, map refetched, stale selection pruned",
+   "Single load path reused for refresh",
+   "Roving tabindex + arrow keys + aria labels",
+   "Talked about the real-world race (server is the source of truth)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#170B10"
+    ],
+    [
+     "--panel",
+     "#22121A"
+    ],
+    [
+     "--gold",
+     "#E6B85C"
+    ],
+    [
+     "--premium",
+     "#C9455E"
+    ],
+    [
+     "--standard",
+     "#8E5BD0"
+    ],
+    [
+     "--balcony",
+     "#3C8FB5"
+    ],
+    [
+     "--taken",
+     "#4A3540"
+    ]
+   ],
+   "notes": [
+    [
+     "Seat",
+     "30×28 · radius 8 8 4 4 · 11/600"
+    ],
+    [
+     "Selected",
+     "gold bg · dark text · 2px gold glow"
+    ],
+    [
+     "Focus",
+     "2px white outline · offset 2"
+    ],
+    [
+     "Summary row",
+     "pad 8 0 · dashed divider"
+    ],
+    [
+     "Banner",
+     "pad 12 16 · radius 10 · error / success / notice"
+    ],
+    [
+     "Book button",
+     "h 44 · radius 10 · gold"
+    ]
+   ]
+  }
+ },
+ "dc47": {
+  "kind": "drill",
+  "level": 4,
+  "order": 47,
+  "minutes": 35,
+  "changeAt": 24,
+  "title": "Comment tree",
+  "focus": "src/App.tsx",
+  "summary": "Render a forum thread's nested replies at any depth with a recursive component, collapse subtrees, and upvote optimistically with rollback.",
+  "skills": [
+   "recursive components",
+   "tree recursion helpers",
+   "local vs lifted state",
+   "optimistic update + rollback",
+   "sorting a copy"
+  ],
+  "brief": "<p><b>Threadline</b> is a discussion forum. <code>App.tsx</code> has <code>PostHeader</code>, <code>CommentItem</code> and <code>App</code>. <code>getThread()</code> (0.4–1.0 s) returns comments where each one has <code>replies: Comment[]</code>, nested to any depth. Only the top level renders today.</p><p><code>upvoteComment(id, shouldFail)</code> takes 0.4–0.9 s; the existing <b>\"Simulate offline\"</b> checkbox should be passed as <code>shouldFail</code>. Reuse <code>utils/time.ts</code> (<code>timeAgo</code>) and <code>components/Avatar.tsx</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> sort by Top / New (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>CommentNode</code> renders one comment and then maps its <code>replies</code> to more <code>CommentNode</code>s: recursion handles any depth. Collapse is local state in each node, because it only affects that subtree. The hidden count is a recursive helper, <code>countDescendants</code>.</p><p>Votes I'll lift to <code>App</code> as a map <code>{ [id]: true }</code> instead of editing the nested tree: the shown score is <code>score + 1</code> if voted. Optimistic: set it immediately, call the API, and on failure delete the key and show an error. The map is passed down through the recursion.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "All replies render at <b>any depth</b> with a recursive component; each level is indented with a thread line on the left",
+   "Each comment header has a <b>[–]</b> toggle (<code>aria-expanded</code>). Collapsing hides its text, actions and whole subtree, changes the toggle to <b>[+]</b>, and shows \"<b>4 replies hidden</b>\" (all descendants, any depth; \"1 reply hidden\" for one)",
+   "Upvote (▲) increases the score <b>immediately</b> and disables the button (one vote per comment). The API is called in the background",
+   "With \"Simulate offline\" checked, the vote is <b>rolled back</b> when the request fails, the button is enabled again, and a message says the vote could not be saved"
+  ],
+  "change": {
+   "title": "Sort by Top / New",
+   "html": "<p>\"Long threads bury new replies.\"</p><ul><li>Add a <b>Sort by</b> select (Top / New) above the comments. <b>Top</b> = highest score first (including your vote); <b>New</b> = most recent first.</li><li>The sort applies to the top level <b>and to the replies at every level</b>. Collapsed state should survive re-sorting.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: sort a copy (<code>[...list].sort()</code>), never the array from state. Stable keys keep each node's collapsed state.</p>"
+  },
+  "hints": [
+   "A component can render itself: inside <code>CommentNode</code>, <code>comment.replies.map((r) =&gt; { return &lt;CommentNode key={r.id} comment={r} ... /&gt;; })</code>. The recursion stops when <code>replies</code> is empty.",
+   "Hidden count: <code>function countDescendants(c) { return c.replies.reduce((sum, r) =&gt; sum + 1 + countDescendants(r), 0); }</code>",
+   "Votes as a lookup instead of rewriting the tree: <code>const [votes, setVotes] = useState&lt;Record&lt;string, boolean&gt;&gt;({});</code>",
+   "Rollback: <code>upvoteComment(id, offline).catch(() =&gt; { setVotes((prev) =&gt; { const next = { ...prev }; delete next[id]; return next; }); });</code>. Search: \"optimistic ui rollback react\".",
+   "Sorting: <code>[...list].sort((a, b) =&gt; displayScore(b) - displayScore(a))</code> for Top, <code>a.minutesAgo - b.minutesAgo</code> for New."
+  ],
+  "rubric": [
+   "Recursive component with stable keys",
+   "Collapse kept local and explained why",
+   "Descendant count via recursion, derived",
+   "Votes lifted to App without mutating the nested tree",
+   "Optimistic update uses the updater form and rolls back on failure",
+   "Sorting copies arrays; applied at every depth",
+   "Mentioned deep trees / performance trade-offs (memo, flattening)"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#F3F2EF"
+    ],
+    [
+     "--accent",
+     "#FF5722"
+    ],
+    [
+     "--accent-soft",
+     "#FFEDE6"
+    ],
+    [
+     "--line",
+     "#E4E1DA"
+    ],
+    [
+     "--muted",
+     "#7A766D"
+    ],
+    [
+     "Error",
+     "#B42318 on #FDECEC"
+    ]
+   ],
+   "notes": [
+    [
+     "Replies",
+     "margin-left 10 · pad-left 18 · 2px left border"
+    ],
+    [
+     "Toggle",
+     "12px mono · muted · [–] / [+]"
+    ],
+    [
+     "Hidden count",
+     "pill · 12px · bg page"
+    ],
+    [
+     "Voted",
+     "accent-soft bg · accent arrow"
+    ],
+    [
+     "Sort select",
+     "h 30 · radius 8"
+    ]
+   ]
+  }
+ },
+ "dc48": {
+  "kind": "drill",
+  "level": 4,
+  "order": 48,
+  "minutes": 40,
+  "changeAt": 28,
+  "title": "Mini form builder",
+  "focus": "src/App.tsx",
+  "summary": "Build a no-code form editor: add, edit, reorder and delete fields, with a live preview that renders a working form and validates required fields.",
+  "skills": [
+   "list of editable objects",
+   "partial updates",
+   "rendering by type",
+   "form validation",
+   "derived JSON"
+  ],
+  "brief": "<p><b>Formcraft</b> is a form builder. <code>App.tsx</code> has <code>AddFieldPanel</code>, <code>FieldCard</code>, <code>PreviewPanel</code> and <code>App</code>; <code>getForm()</code> loads two fields after 0.3–0.8 s. The type buttons do nothing yet, the cards are read-only, and the preview is a placeholder.</p><p>Read <code>api.ts</code> for the <code>Field</code> type, <code>utils/fieldTypes.ts</code> (<code>FIELD_TYPES</code>, <code>typeInfo</code>, <code>isEmail</code>), <code>utils/id.ts</code> and <code>components/Toggle.tsx</code> (use it for \"Required\").</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> JSON export panel (~28 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–8 plan · 8–28 Core · 28–35 Next + change · 35–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The field definitions live in <code>App</code> as <code>Field[]</code>; the builder and the preview both read them. I'll have one <code>handleChange(id, patch)</code> that merges a <code>Partial&lt;Field&gt;</code>, so label, required and options all share it. Add creates a field with a <code>uid</code>; move and delete are small immutable helpers.</p><p>The preview is a separate component with its own <code>values</code> and <code>errors</code> keyed by field id; it switches on <code>field.type</code> to render an input, select or checkbox. Submit validates every field and shows errors under each one, or a success message.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "The 4 type buttons add a field at the end (\"Untitled short text\", \"Untitled dropdown\", …; dropdowns start with \"Option 1\" and \"Option 2\"). Each builder card has a label input, a <b>Required</b> toggle (reuse <code>Toggle</code>), and a ✕ delete button",
+   "The live preview renders a real form from the fields: text and email inputs, a select (\"Choose…\" plus options), a checkbox. Labels are linked to inputs; required fields show a red *. Changes in the builder show up immediately",
+   "Submit validates: empty required fields show \"This field is required\" (unchecked required checkbox: \"Please check this box\"), invalid email \"Enter a valid email\". Errors clear as the user fixes the field; a valid submit shows \"✓ Submitted…\"",
+   "Fields can be reordered with ↑ / ↓ buttons (disabled at the ends); dropdown cards have an \"Options (one per line)\" textarea; blank lines are ignored in the preview"
+  ],
+  "change": {
+   "title": "Export as JSON",
+   "html": "<p>\"Engineering wants to paste the form definition into the backend config.\"</p><ul><li>Below the preview add a read-only panel <b>\"Form definition (JSON)\"</b> showing <code>{ name, fields }</code> pretty-printed with 2-space indentation.</li><li>It updates live as the form is edited.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">One line of logic: <code>JSON.stringify(value, null, 2)</code> in a <code>&lt;pre&gt;</code>. It is derived, so no state.</p>"
+  },
+  "hints": [
+   "One update function: <code>function handleChange(id: string, patch: Partial&lt;Field&gt;) { setFields((prev) =&gt; prev.map((f) =&gt; f.id === id ? { ...f, ...patch } : f)); }</code> (write the ternary as an if).",
+   "Options textarea: <code>value={field.options.join(\"\\n\")}</code> and <code>onChange={(e) =&gt; { onChange(field.id, { options: e.target.value.split(\"\\n\") }); }}</code>.",
+   "Preview values: <code>useState&lt;Record&lt;string, string | boolean&gt;&gt;({})</code>; a checkbox stores a boolean, everything else a string.",
+   "Validate in submit: loop the fields, build an <code>errors</code> object, <code>setErrors(errors)</code>. Use <code>noValidate</code> on the form so the browser doesn't show its own bubbles. Search: \"mdn form novalidate\".",
+   "Accessibility: <code>&lt;label htmlFor={id}&gt;</code>, <code>aria-invalid</code> and <code>aria-describedby</code> pointing at the error text."
+  ],
+  "rubric": [
+   "Single source of truth for field definitions shared by builder and preview",
+   "Partial-update helper instead of one handler per property",
+   "Preview renders by type with linked labels",
+   "Validation computed on submit, errors keyed by id, cleared on edit",
+   "Reorder / delete immutable, stable ids as keys",
+   "JSON panel derived from state",
+   "Reused Toggle, FIELD_TYPES and isEmail from the codebase"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#6D4AFF"
+    ],
+    [
+     "--primary-soft",
+     "#EFEAFF"
+    ],
+    [
+     "--bg",
+     "#F5F3FF"
+    ],
+    [
+     "--line",
+     "#E6E1F7"
+    ],
+    [
+     "--danger",
+     "#E5484D"
+    ],
+    [
+     "JSON panel",
+     "#1E1B2E / #D9D2FF"
+    ]
+   ],
+   "notes": [
+    [
+     "Field card",
+     "pad 12 · radius 10 · column gap 10"
+    ],
+    [
+     "Label input",
+     "h 34 · 600"
+    ],
+    [
+     "Card buttons",
+     "28×28 · radius 6"
+    ],
+    [
+     "Preview input",
+     "h 38 · radius 8 · error: danger border + #FFF7F7"
+    ],
+    [
+     "Submit",
+     "h 40 · radius 8 · primary"
+    ],
+    [
+     "JSON",
+     "mono 12/1.5 · max-h 240 · radius 8"
+    ]
+   ]
+  }
+ },
+ "dc49": {
+  "kind": "drill",
+  "level": 5,
+  "order": 49,
+  "minutes": 45,
+  "changeAt": 30,
+  "title": "Accessible country combobox",
+  "focus": "src/App.tsx",
+  "summary": "Replace a native select with a fully accessible ARIA combobox: typing filters, full keyboard support, aria-activedescendant, clear button, then multi-select chips.",
+  "skills": [
+   "WAI-ARIA combobox pattern",
+   "aria-activedescendant",
+   "keyboard handling",
+   "focus management",
+   "chips / multi-select"
+  ],
+  "brief": "<p><b>Passage</b> is a visa application. Step 2 asks \"Countries visited\". <code>App.tsx</code> has <code>Steps</code> and <code>App</code>, and uses <code>components/FormField.tsx</code> for labels and hints (read it: the label points at the control via <code>htmlFor</code>). <code>getCountries()</code> returns 40 countries after 0.4–1.0 s. Today it's a native <code>&lt;select&gt;</code> that is painful with 40 options.</p><p>Build a <code>CountryCombobox</code> component (new file in <code>components/</code>) following the WAI-ARIA combobox pattern. This is a staff-level accessibility exercise: the details are the point.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change:</b> multi-select with removable chips (~30 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–9 plan · 9–30 Core · 30–40 change · 40–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Focus never leaves the input. The component owns <code>query</code>, <code>open</code> and the <code>active</code> index; the filtered options are derived. The input gets <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code> pointing at the listbox id, and <code>aria-activedescendant</code> pointing at the active option's id; that's how a screen reader follows the highlight without moving focus. Options get <code>role=\"option\"</code> and <code>aria-selected</code>.</p><p>Keyboard in one <code>onKeyDown</code>: ↓/↑ open or move (clamped), Home/End jump, Enter selects, Escape closes (then clears), Tab closes and lets focus move. Options use <code>onMouseDown preventDefault</code> so clicking doesn't blur the input. The selected value is lifted to <code>App</code> via <code>onChange</code>, so the form can submit it. I'll scroll the active option into view in an effect.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next",
+   "Next"
+  ],
+  "requirements": [
+   "A text input with <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code> (the listbox id), <code>aria-autocomplete=\"list\"</code>, linked to the \"Countries visited\" label and hint. The popup is a <code>role=\"listbox\"</code> with <code>role=\"option\"</code> children (flag + name) and unique ids. Disabled with \"Loading countries…\" until loaded",
+   "Typing filters options (case-insensitive \"contains\") and opens the list with the first option active; \"No countries match\" when empty. Clicking an option selects it (focus stays in the input)",
+   "Keyboard: <b>↓/↑</b> open the list or move the active option (clamped at the ends, scrolled into view), <b>Home/End</b> jump to first/last while open, <b>Enter</b> selects the active option (without submitting the form), <b>Escape</b> closes (a second Escape clears the text), <b>Tab</b> closes without selecting",
+   "<code>aria-activedescendant</code> always points at the highlighted option while open and is removed when closed; selected options have <code>aria-selected=\"true\"</code> and a ✓",
+   "A <b>✕ clear</b> button (<code>aria-label</code>) empties the value and returns focus to the input. Blur closes the list"
+  ],
+  "change": {
+   "title": "Multi-select with chips",
+   "html": "<p>\"Applicants usually visited several countries.\"</p><ul><li>Selecting adds the country as a <b>chip</b> inside the field (flag + name + × button with <code>aria-label=\"Remove France\"</code>); the text clears and the list stays open for the next pick. Selecting an already-selected country removes it.</li><li><b>Backspace</b> in the empty input removes the last chip. Removing a chip returns focus to the input. The listbox gets <code>aria-multiselectable=\"true\"</code> and a polite live region announces \"3 countries selected\".</li><li>Save shows all selected names: \"Countries: Japan, France\".</li></ul>"
+  },
+  "hints": [
+   "Read the pattern first. Search: \"aria apg combobox list autocomplete\" (w3.org/WAI/ARIA/apg). Copy its attribute list, not its code.",
+   "Option ids must be unique on the page: <code>id={inputId + \"-opt-\" + c.code}</code>. Then <code>aria-activedescendant={activeId}</code> where <code>activeId</code> is <code>undefined</code> when closed.",
+   "Keep the active index valid when the list shrinks: <code>const activeIndex = Math.min(active, options.length - 1);</code> and reset to 0 on every keystroke.",
+   "Clicking an option blurs the input before the click fires. Fix: <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on each option.",
+   "Scroll into view: <code>useEffect(() =&gt; { listRef.current.children[activeIndex].scrollIntoView({ block: \"nearest\" }); }, [activeIndex, open]);</code> Search: \"mdn scrollIntoView block nearest\".",
+   "Enter: only <code>preventDefault()</code> when you actually select something; otherwise let Enter submit the form like any input."
+  ],
+  "rubric": [
+   "All ARIA attributes correct and wired by id (combobox, listbox, option, activedescendant, expanded)",
+   "Focus stays in the input; mousedown preventDefault on options",
+   "Complete keyboard map including Home/End, Escape twice, Tab",
+   "Active option kept valid and scrolled into view",
+   "Value lifted to App; component reusable (props, no global ids)",
+   "Chips: remove buttons labelled, Backspace removal, focus returned, live region",
+   "Talked about screen reader testing (VoiceOver / NVDA) and the APG"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--primary",
+     "#0B7A8C"
+    ],
+    [
+     "--primary-dark",
+     "#075E6C"
+    ],
+    [
+     "--primary-soft",
+     "#E2F3F5"
+    ],
+    [
+     "--focus",
+     "#F2A900"
+    ],
+    [
+     "--line",
+     "#D6E3E8"
+    ],
+    [
+     "--text",
+     "#0F2A36"
+    ]
+   ],
+   "notes": [
+    [
+     "Control",
+     "min-h 44 · 2px border · radius 10 · focus 3px #F2A900 outline"
+    ],
+    [
+     "Chip",
+     "h 28 · pill · primary-soft · 13/600"
+    ],
+    [
+     "Listbox",
+     "top +6 · max-h 240 · radius 10 · shadow 0 12 30"
+    ],
+    [
+     "Option",
+     "h 38 · radius 8 · active: primary-soft + 3px left bar"
+    ],
+    [
+     "Clear",
+     "24×24 circle · right 34"
+    ]
+   ]
+  }
+ },
+ "dc50": {
+  "kind": "drill",
+  "level": 5,
+  "order": 50,
+  "minutes": 45,
+  "changeAt": 30,
+  "title": "Virtualized log viewer",
+  "focus": "src/App.tsx",
+  "summary": "Render 10,000 log lines smoothly by drawing only the visible rows (plus overscan) from scrollTop math, with a sticky header, filters, and jump-to-line.",
+  "skills": [
+   "list virtualization",
+   "scrollTop math",
+   "ResizeObserver",
+   "useMemo",
+   "imperative scrolling"
+  ],
+  "brief": "<p><b>Tracewell</b> is a log explorer. <code>getLogs()</code> returns <b>10,000</b> lines after 0.8–1.5 s. Rendering them all freezes the tab, so the starter only shows the first 200. <code>components/LogRow.tsx</code> renders one row and the header, and exports <code>ROW_HEIGHT</code> (26px: every row is exactly that tall). <code>formatNumber</code> is in <code>utils/format.ts</code>.</p><p>Build virtualization by hand (no libraries): keep the scroll container's full height, but only render the rows that are on screen.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> jump to line (~30 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–9 plan · 9–30 Core · 30–40 change · 40–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The scroller keeps its real height through a spacer <code>div</code> of <code>count × ROW_HEIGHT</code>, so the scrollbar is right. I track <code>scrollTop</code> from <code>onScroll</code> and the viewport height from a <code>ResizeObserver</code>. Then <code>start = floor(scrollTop / H) - overscan</code>, <code>end = ceil((scrollTop + viewport) / H) + overscan</code>, clamped, and I render only <code>slice(start, end)</code>, each absolutely positioned at <code>top: index × H</code>.</p><p>The header is <code>position: sticky</code> inside the scroller. Filtering is a <code>useMemo</code> over level + text, and virtualization runs on the filtered list, so it stays fast. When the filter changes I reset the scroll to the top.\"</p></div></details>",
+  "tiers": [
+   "Core",
+   "Core",
+   "Core",
+   "Next"
+  ],
+  "requirements": [
+   "All 10,000 lines are scrollable but only the visible rows plus an overscan of ~8 above and below are in the DOM (fewer than ~90 rows at any time). The scrollbar reflects the full list (spacer height = rows × 26px)",
+   "Rows are positioned from <code>scrollTop</code> math (not by rendering everything); scrolling fast never shows blank gaps. Viewport height is measured (and re-measured on resize)",
+   "The column header stays visible (<code>position: sticky</code>) while scrolling",
+   "A text filter (message or service) and level buttons (ALL / DEBUG / INFO / WARN / ERROR) filter the list, virtualization keeps working on the filtered rows, the scroll resets to the top, and \"1,234 / 10,000\" shows the match count"
+  ],
+  "change": {
+   "title": "Jump to line",
+   "html": "<p>\"Support pastes a line number from an alert and needs to see it.\"</p><ul><li>Add a <b>\"Line #\"</b> input and a <b>Go</b> button. Go scrolls so that line is in the middle of the viewport and highlights it (accent background + left bar).</li><li>Errors: \"Enter a line between 1 and 10,000\" for invalid input, and \"Line 42 is hidden by the current filter\" when the line is filtered out.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">The row may not be rendered yet, so you can't <code>scrollIntoView</code> it. Compute the scroll position from its index instead.</p>"
+  },
+  "hints": [
+   "Structure: <code>&lt;div className=\"log-scroll\" ref onScroll&gt; &lt;LogHeader /&gt; &lt;div style={{ position: \"relative\", height: total }}&gt;{visible rows}&lt;/div&gt; &lt;/div&gt;</code>",
+   "Measure: <code>const ro = new ResizeObserver(() =&gt; setViewportHeight(el.clientHeight)); ro.observe(el);</code> and <code>ro.disconnect()</code> in cleanup. Search: \"mdn ResizeObserver\".",
+   "Window: <code>const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN); const end = Math.min(rows.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN);</code>",
+   "Each visible row: <code>style={{ top: (start + i) * ROW_HEIGHT }}</code> with <code>position: absolute; left: 0; right: 0</code> in CSS. Key by <code>line</code>, not by <code>i</code>.",
+   "Wrap the filter in <code>useMemo(() =&gt; ..., [logs, query, level])</code>: <code>onScroll</code> re-renders often, and re-filtering 10,000 rows each time is wasteful.",
+   "Jump: <code>const index = filtered.findIndex((l) =&gt; l.line === n); scrollRef.current.scrollTop = index * ROW_HEIGHT - (viewport - header) / 2;</code>"
+  ],
+  "rubric": [
+   "Correct window math with overscan and clamping",
+   "Spacer keeps the true scroll height; rows absolutely positioned",
+   "Viewport measured with ResizeObserver, cleaned up",
+   "Filtering memoized; virtualization runs on the filtered list",
+   "Scroll reset on filter change explained",
+   "Jump computes position from index; validation messages",
+   "Discussed variable row heights and why libraries (react-window) exist"
+  ],
+  "spec": {
+   "colors": [
+    [
+     "--bg",
+     "#0A0E14"
+    ],
+    [
+     "--panel-2",
+     "#151C26"
+    ],
+    [
+     "--accent",
+     "#39BAE6"
+    ],
+    [
+     "--info",
+     "#7FD962"
+    ],
+    [
+     "--warn",
+     "#FFB454"
+    ],
+    [
+     "--error",
+     "#F07178"
+    ],
+    [
+     "Highlight",
+     "rgba(57,186,230,.18)"
+    ]
+   ],
+   "notes": [
+    [
+     "Row",
+     "h 26 · mono 12 · grid 64 104 62 110 1fr · gap 12"
+    ],
+    [
+     "Header",
+     "h 30 · sticky · 11/600 uppercase"
+    ],
+    [
+     "Level tabs",
+     "h 24 · mono 11/600 · active panel-2"
+    ],
+    [
+     "Jump",
+     "input w 80 h 30 · Go button accent"
+    ],
+    [
+     "Highlight",
+     "accent 18% bg · 3px left bar · 1.2s flash"
+    ]
+   ]
+  }
+ }
+}

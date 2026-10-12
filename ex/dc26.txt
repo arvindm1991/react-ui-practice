@@ -1,0 +1,353 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Person = {
+  id: string;
+  name: string;
+  title: string;
+  team: string;
+  location: string;
+};
+
+const PEOPLE: Person[] = [
+  { id: 'p1', name: 'Jana Novak', title: 'Staff Engineer', team: 'Platform', location: 'Prague' },
+  { id: 'p2', name: 'Jamal Wright', title: 'Product Designer', team: 'Growth', location: 'Austin' },
+  { id: 'p3', name: 'Janet Okoye', title: 'Engineering Manager', team: 'Payments', location: 'Lagos' },
+  { id: 'p4', name: 'Ben Janssen', title: 'Data Scientist', team: 'Insights', location: 'Utrecht' },
+  { id: 'p5', name: 'Priya Raman', title: 'Recruiter', team: 'People', location: 'Bengaluru' },
+  { id: 'p6', name: 'Marco Bellini', title: 'iOS Engineer', team: 'Mobile', location: 'Milan' },
+  { id: 'p7', name: 'Sofia Alvarez', title: 'Head of Design', team: 'Design', location: 'Madrid' },
+  { id: 'p8', name: 'Tom Jansen', title: 'Support Lead', team: 'Customer', location: 'Dublin' },
+  { id: 'p9', name: 'Aiko Tanaka', title: 'Frontend Engineer', team: 'Platform', location: 'Tokyo' },
+  { id: 'p10', name: 'Grace Kim', title: 'Product Manager', team: 'Growth', location: 'Seoul' },
+  { id: 'p11', name: 'Omar Haddad', title: 'Security Engineer', team: 'Platform', location: 'Amman' },
+  { id: 'p12', name: 'Lena Fischer', title: 'Finance Partner', team: 'Finance', location: 'Berlin' },
+  { id: 'p13', name: 'Diego Santos', title: 'Backend Engineer', team: 'Payments', location: 'São Paulo' },
+  { id: 'p14', name: 'Hannah Lee', title: 'UX Researcher', team: 'Design', location: 'Toronto' },
+  { id: 'p15', name: 'Ravi Menon', title: 'SRE', team: 'Platform', location: 'Pune' },
+  { id: 'p16', name: 'Emma Johansson', title: 'Account Executive', team: 'Sales', location: 'Stockholm' },
+  { id: 'p17', name: 'Noah Brooks', title: 'QA Engineer', team: 'Mobile', location: 'Denver' },
+  { id: 'p18', name: 'Maria Janeiro', title: 'Content Designer', team: 'Design', location: 'Lisbon' },
+];
+
+export const TOTAL_PEOPLE = PEOPLE.length;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /people?q=jan -> Person[] whose name contains q (case-insensitive)
+// Shorter queries match more rows and are SLOWER: "j" takes ~1.3s, "jan" ~0.7s.
+// So an older, shorter request can finish AFTER a newer, longer one.
+export async function searchPeople(query: string): Promise<Person[]> {
+  const q = query.trim().toLowerCase();
+  await wait(Math.max(250, 1600 - q.length * 300));
+  return PEOPLE.filter((p) => p.name.toLowerCase().includes(q)).map((p) => ({ ...p }));
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#0D9488', '#7C3AED', '#EA580C', '#2563EB', '#DB2777', '#65A30D'];
+
+// Initials in a colored circle. Color is stable per name.
+export default function Avatar({ name }: { name: string }) {
+  const parts = name.split(' ');
+  let initials = parts[0][0];
+  if (parts.length > 1) {
+    initials = parts[0][0] + parts[parts.length - 1][0];
+  }
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i);
+  }
+  return (
+    <span className="avatar" style={{ background: COLORS[sum % COLORS.length] }}>{initials}</span>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import Avatar from './components/Avatar';
+import type { Person } from './api';
+import { TOTAL_PEOPLE } from './api';
+
+function PersonRow({ person }: { person: Person }) {
+  return (
+    <li className="person">
+      <Avatar name={person.name} />
+      <div className="person-main">
+        <span className="person-name">{person.name}</span>
+        <span className="person-title">{person.title} · {person.team}</span>
+      </div>
+      <span className="person-loc">{person.location}</span>
+    </li>
+  );
+}
+
+function SearchBox({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="search">
+      <span className="search-icon">⌕</span>
+      <input
+        className="search-input"
+        placeholder="Search people by name"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); }}
+      />
+    </div>
+  );
+}
+
+// TODO: search the directory with searchPeople(query), debounced by 300 ms,
+// with a loading state, and render each result with <PersonRow />.
+function Directory() {
+  const [query, setQuery] = useState('');
+
+  return (
+    <section className="directory">
+      <SearchBox value={query} onChange={setQuery} />
+      <p className="dir-message">Start typing to search {TOTAL_PEOPLE} people.</p>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">Roster</span>
+        <nav className="tabs">
+          <a className="tab is-active" href="#">People</a>
+          <a className="tab" href="#">Teams</a>
+          <a className="tab" href="#">Org chart</a>
+        </nav>
+      </header>
+      <main className="page">
+        <h1>People</h1>
+        <Directory />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F7FAFA;
+  --surface: #FFFFFF;
+  --border: #DDE7E6;
+  --text: #13201F;
+  --muted: #5E7270;
+  --teal: #0D9488;
+  --teal-soft: #CCFBF1;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 28px; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; color: var(--teal); letter-spacing: -0.02em; font-size: 18px; }
+.tabs { display: flex; gap: 4px; height: 100%; }
+.tab { display: flex; align-items: center; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; border-bottom: 2px solid transparent; }
+.tab.is-active { color: var(--text); border-bottom-color: var(--teal); }
+
+.page { max-width: 640px; margin: 0 auto; padding: 28px 20px; }
+.page h1 { margin: 0 0 16px; font-size: 24px; letter-spacing: -0.01em; }
+
+.directory { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.search { display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.search-icon { font-size: 18px; color: var(--muted); }
+.search-input { flex: 1; height: 52px; border: 0; outline: none; font: inherit; font-size: 16px; background: none; color: var(--text); }
+.dir-message { margin: 0; padding: 32px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+
+.people { list-style: none; margin: 0; padding: 4px 0; }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.person:hover { background: #F2F8F7; }
+.avatar { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.person-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.person-name { font-weight: 600; font-size: 15px; }
+.person-title { font-size: 13px; color: var(--muted); }
+.person-loc { font-size: 13px; color: var(--muted); }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import Avatar from './components/Avatar';
+import type { Person } from './api';
+import { searchPeople, TOTAL_PEOPLE } from './api';
+
+const DEBOUNCE_MS = 300;
+
+// Wraps the first case-insensitive match of `query` in <mark>.
+function Highlight({ text, query }: { text: string; query: string }) {
+  const index = text.toLowerCase().indexOf(query.toLowerCase());
+  if (query === '' || index === -1) {
+    return <span>{text}</span>;
+  }
+  const before = text.slice(0, index);
+  const match = text.slice(index, index + query.length);
+  const after = text.slice(index + query.length);
+  return (
+    <span>
+      {before}
+      <mark className="match">{match}</mark>
+      {after}
+    </span>
+  );
+}
+
+function PersonRow({ person, query }: { person: Person; query: string }) {
+  return (
+    <li className="person">
+      <Avatar name={person.name} />
+      <div className="person-main">
+        <span className="person-name"><Highlight text={person.name} query={query} /></span>
+        <span className="person-title">{person.title} · {person.team}</span>
+      </div>
+      <span className="person-loc">{person.location}</span>
+    </li>
+  );
+}
+
+function SearchBox({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="search">
+      <span className="search-icon">⌕</span>
+      <input
+        className="search-input"
+        placeholder="Search people by name"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); }}
+      />
+    </div>
+  );
+}
+
+function Directory() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Person[]>([]);
+  const [loading, setLoading] = useState(false);
+  // The query the current results belong to (used for highlighting).
+  const [resultsFor, setResultsFor] = useState('');
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q === '') {
+      setResults([]);
+      setResultsFor('');
+      setLoading(false);
+      return;
+    }
+    // One flag per effect run. When the query changes, the cleanup marks
+    // this run as stale, so its late response is ignored.
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLoading(true);
+      searchPeople(q).then((data) => {
+        if (cancelled) {
+          return;
+        }
+        setResults(data);
+        setResultsFor(q);
+        setLoading(false);
+      });
+    }, DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer); // debounce: a new keystroke cancels the pending call
+    };
+  }, [query]);
+
+  // decisions
+  let status = null;
+  if (loading) {
+    status = <p className="dir-status" aria-live="polite">Searching…</p>;
+  }
+
+  let body;
+  if (query.trim() === '') {
+    body = <p className="dir-message">Start typing to search {TOTAL_PEOPLE} people.</p>;
+  } else if (resultsFor === '') {
+    body = null; // first search still in flight: the status line says so
+  } else if (results.length === 0) {
+    body = <p className="dir-message">No people match "{resultsFor}".</p>;
+  } else {
+    body = (
+      <ul className="people">
+        {results.map((p) => {
+          return <PersonRow key={p.id} person={p} query={resultsFor} />;
+        })}
+      </ul>
+    );
+  }
+
+  let cls = 'directory';
+  if (loading) {
+    cls = 'directory is-loading';
+  }
+
+  return (
+    <section className={cls}>
+      <SearchBox value={query} onChange={setQuery} />
+      {status}
+      {body}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <header className="topbar">
+        <span className="logo">Roster</span>
+        <nav className="tabs">
+          <a className="tab is-active" href="#">People</a>
+          <a className="tab" href="#">Teams</a>
+          <a className="tab" href="#">Org chart</a>
+        </nav>
+      </header>
+      <main className="page">
+        <h1>People</h1>
+        <Directory />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F7FAFA;
+  --surface: #FFFFFF;
+  --border: #DDE7E6;
+  --text: #13201F;
+  --muted: #5E7270;
+  --teal: #0D9488;
+  --teal-soft: #CCFBF1;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.topbar { display: flex; align-items: center; gap: 28px; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.logo { font-weight: 800; color: var(--teal); letter-spacing: -0.02em; font-size: 18px; }
+.tabs { display: flex; gap: 4px; height: 100%; }
+.tab { display: flex; align-items: center; padding: 0 12px; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; border-bottom: 2px solid transparent; }
+.tab.is-active { color: var(--text); border-bottom-color: var(--teal); }
+
+.page { max-width: 640px; margin: 0 auto; padding: 28px 20px; }
+.page h1 { margin: 0 0 16px; font-size: 24px; letter-spacing: -0.01em; }
+
+.directory { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.search { display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.search-icon { font-size: 18px; color: var(--muted); }
+.search-input { flex: 1; height: 52px; border: 0; outline: none; font: inherit; font-size: 16px; background: none; color: var(--text); }
+.dir-message { margin: 0; padding: 32px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+
+.people { list-style: none; margin: 0; padding: 4px 0; }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.person:hover { background: #F2F8F7; }
+.avatar { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.person-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.person-name { font-weight: 600; font-size: 15px; }
+.person-title { font-size: 13px; color: var(--muted); }
+.person-loc { font-size: 13px; color: var(--muted); }
+
+/* ---- Added: search states + highlight ---- */
+.dir-status { margin: 0; padding: 8px 16px; font-size: 13px; color: var(--teal); background: #F0FDFA; border-bottom: 1px solid var(--border); }
+.directory.is-loading .people { opacity: 0.55; }
+.match { background: var(--teal-soft); color: #115E59; border-radius: 3px; padding: 0 1px; }

@@ -1,0 +1,500 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Level = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
+export type LogLine = {
+  line: number;     // 1-based, unique
+  time: string;     // "14:02:07.481"
+  level: Level;
+  service: string;
+  message: string;
+};
+
+const SERVICES = ['api-gateway', 'auth', 'billing', 'search', 'worker', 'notifier'];
+const MESSAGES: Record<Level, string[]> = {
+  DEBUG: ['cache lookup key=user:{n}', 'span closed in {n}µs', 'retry budget remaining={n}', 'pool stats active={n}'],
+  INFO: ['GET /v1/orders/{n} 200', 'job {n} completed', 'user {n} signed in', 'webhook delivered id={n}', 'POST /v1/carts 201'],
+  WARN: ['slow query took {n}ms', 'rate limit at 80% for tenant {n}', 'deprecated header used by client {n}'],
+  ERROR: ['payment {n} declined: card_expired', 'upstream timeout after {n}ms', 'failed to parse payload id={n}'],
+};
+
+// Deterministic pseudo-random numbers, so the same 10,000 lines every time.
+let seed = 42;
+function rand(): number {
+  seed = (seed * 1664525 + 1013904223) % 4294967296;
+  return seed / 4294967296;
+}
+
+function pickLevel(): Level {
+  const r = rand();
+  if (r < 0.25) {
+    return 'DEBUG';
+  }
+  if (r < 0.8) {
+    return 'INFO';
+  }
+  if (r < 0.94) {
+    return 'WARN';
+  }
+  return 'ERROR';
+}
+
+const TOTAL = 10000;
+const LOGS: LogLine[] = [];
+let ms = (14 * 3600 + 2 * 60) * 1000;
+for (let i = 1; i <= TOTAL; i++) {
+  ms += Math.floor(rand() * 900);
+  const level = pickLevel();
+  const templates = MESSAGES[level];
+  const template = templates[Math.floor(rand() * templates.length)];
+  const d = new Date(ms);
+  const time = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') + ':' +
+    String(d.getUTCSeconds()).padStart(2, '0') + '.' + String(d.getUTCMilliseconds()).padStart(3, '0');
+  LOGS.push({
+    line: i,
+    time: time,
+    level: level,
+    service: SERVICES[Math.floor(rand() * SERVICES.length)],
+    message: template.replace('{n}', String(Math.floor(rand() * 9000) + 100)),
+  });
+}
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /logs?since=1h -> LogLine[] (10,000 lines, oldest first)
+export async function getLogs(): Promise<LogLine[]> {
+  await randomDelay(800, 1500);
+  return LOGS.map((l) => ({ ...l }));
+}
+@@@ shared src/components/LogRow.tsx
+import React from 'react';
+import type { LogLine } from '../api';
+
+// Every row is exactly this tall (CSS uses the same number). Virtualization relies on it.
+export const ROW_HEIGHT = 26;
+
+type LogRowProps = {
+  log: LogLine;
+  style?: React.CSSProperties;   // e.g. { top: 520 } when absolutely positioned
+  highlighted?: boolean;
+};
+
+export default function LogRow({ log, style, highlighted }: LogRowProps) {
+  let cls = 'log-row level-' + log.level.toLowerCase();
+  if (highlighted) {
+    cls = cls + ' is-highlighted';
+  }
+  return (
+    <div className={cls} style={style} data-line={log.line}>
+      <span className="c-line">{log.line}</span>
+      <span className="c-time">{log.time}</span>
+      <span className="c-level">{log.level}</span>
+      <span className="c-service">{log.service}</span>
+      <span className="c-msg">{log.message}</span>
+    </div>
+  );
+}
+
+// The column header row. Same grid as LogRow.
+export function LogHeader() {
+  return (
+    <div className="log-header" role="row">
+      <span className="c-line">#</span>
+      <span className="c-time">Time</span>
+      <span className="c-level">Level</span>
+      <span className="c-service">Service</span>
+      <span className="c-msg">Message</span>
+    </div>
+  );
+}
+@@@ shared src/utils/format.ts
+// formatNumber(10000) -> "10,000"
+export function formatNumber(n: number): string {
+  return n.toLocaleString('en-US');
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getLogs } from './api';
+import type { LogLine } from './api';
+import LogRow, { LogHeader } from './components/LogRow';
+import { formatNumber } from './utils/format';
+
+const PREVIEW_LIMIT = 200;
+
+function TopBar({ total }: { total: number }) {
+  return (
+    <header className="topbar">
+      <span className="logo">▍tracewell</span>
+      <span className="crumb">production / <b>all services</b> / last 1h</span>
+      <span className="live-dot">● live</span>
+      <span className="total">{formatNumber(total)} lines</span>
+    </header>
+  );
+}
+
+export default function App() {
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLogs().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setLogs(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // TODO: rendering all 10,000 rows freezes the tab, so for now only the first 200 render.
+  const shown = logs.slice(0, PREVIEW_LIMIT);
+
+  let body;
+  if (loading) {
+    body = <p className="log-message">Fetching logs…</p>;
+  } else {
+    body = (
+      <div className="log-scroll">
+        <LogHeader />
+        {shown.map((l) => {
+          return <LogRow key={l.line} log={l} />;
+        })}
+        <p className="log-message">Showing the first {PREVIEW_LIMIT} of {formatNumber(logs.length)} lines.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <TopBar total={logs.length} />
+      <div className="toolbar">
+        <span className="toolbar-hint">Filters and jump-to-line coming soon</span>
+      </div>
+      <main className="log-panel">{body}</main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0A0E14;
+  --panel: #0F141C;
+  --panel-2: #151C26;
+  --line: #1F2833;
+  --text: #C9D4E0;
+  --muted: #6B7A8C;
+  --accent: #39BAE6;
+  --debug: #6B7A8C;
+  --info: #7FD962;
+  --warn: #FFB454;
+  --error: #F07178;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --row-h: 26px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { height: 100vh; display: flex; flex-direction: column; }
+.topbar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.logo { font-weight: 800; color: #fff; letter-spacing: 0.02em; }
+.crumb { color: var(--muted); }
+.crumb b { color: var(--text); font-weight: 600; }
+.live-dot { color: var(--info); font-size: 12px; }
+.total { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+.toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.toolbar-hint { color: var(--muted); font-size: 12px; }
+
+.log-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.log-scroll { flex: 1; min-height: 0; overflow: auto; font-family: var(--mono); font-size: 12px; }
+.log-message { padding: 16px; color: var(--muted); font-size: 13px; }
+
+.log-header, .log-row { display: grid; grid-template-columns: 64px 104px 62px 110px minmax(0, 1fr); align-items: center; gap: 12px; height: var(--row-h); padding: 0 16px; white-space: nowrap; }
+.log-header { position: sticky; top: 0; z-index: 2; height: 30px; background: var(--panel-2); border-bottom: 1px solid var(--line); color: var(--muted); font-family: system-ui, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.log-row { border-bottom: 1px solid rgba(31, 40, 51, 0.5); }
+.log-row:hover { background: var(--panel-2); }
+.c-line { color: var(--muted); text-align: right; }
+.c-time { color: #8A9AAD; }
+.c-msg, .c-service { overflow: hidden; text-overflow: ellipsis; }
+.c-service { color: var(--accent); }
+.log-header .c-line, .log-header .c-time, .log-header .c-service { color: var(--muted); }
+.level-debug .c-level { color: var(--debug); }
+.level-info .c-level { color: var(--info); }
+.level-warn .c-level { color: var(--warn); }
+.level-error .c-level { color: var(--error); }
+.level-error { background: rgba(240, 113, 120, 0.06); }
+@@@ solution src/App.tsx
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getLogs } from './api';
+import type { Level, LogLine } from './api';
+import LogRow, { LogHeader, ROW_HEIGHT } from './components/LogRow';
+import { formatNumber } from './utils/format';
+
+const OVERSCAN = 8;      // extra rows above and below the viewport, so fast scrolling doesn't flash blank
+const HEADER_HEIGHT = 30;
+const LEVELS: (Level | 'ALL')[] = ['ALL', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
+
+function TopBar({ total }: { total: number }) {
+  return (
+    <header className="topbar">
+      <span className="logo">▍tracewell</span>
+      <span className="crumb">production / <b>all services</b> / last 1h</span>
+      <span className="live-dot">● live</span>
+      <span className="total">{formatNumber(total)} lines</span>
+    </header>
+  );
+}
+
+type ViewerProps = {
+  logs: LogLine[];
+};
+
+function LogViewer({ logs }: ViewerProps) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [query, setQuery] = useState('');
+  const [level, setLevel] = useState<Level | 'ALL'>('ALL');
+  const [jumpValue, setJumpValue] = useState('');
+  const [jumpError, setJumpError] = useState('');
+  const [highlightLine, setHighlightLine] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Measure the scroll container (and re-measure when it resizes).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    function measure() {
+      if (el) {
+        setViewportHeight(el.clientHeight);
+      }
+    }
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
+  // derived + memoized: filtering 10,000 rows on every scroll event would be wasteful
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return logs.filter((l) => {
+      if (level !== 'ALL' && l.level !== level) {
+        return false;
+      }
+      if (q === '') {
+        return true;
+      }
+      return l.message.toLowerCase().includes(q) || l.service.includes(q);
+    });
+  }, [logs, query, level]);
+
+  function scrollToTop() {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+    setScrollTop(0);
+  }
+
+  function handleQuery(value: string) {
+    setQuery(value);
+    scrollToTop(); // old scroll position means nothing in a new list
+  }
+
+  function handleLevel(value: Level | 'ALL') {
+    setLevel(value);
+    scrollToTop();
+  }
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    setScrollTop(e.currentTarget.scrollTop);
+  }
+
+  function handleJump(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const n = Number(jumpValue);
+    if (!Number.isInteger(n) || n < 1 || n > logs.length) {
+      setJumpError('Enter a line between 1 and ' + formatNumber(logs.length));
+      return;
+    }
+    const index = filtered.findIndex((l) => {
+      return l.line === n;
+    });
+    if (index === -1) {
+      setJumpError('Line ' + n + ' is hidden by the current filter');
+      return;
+    }
+    setJumpError('');
+    setHighlightLine(n);
+    // Put the row in the middle of the viewport. Pure math: no need to render it first.
+    const rowsArea = viewportHeight - HEADER_HEIGHT;
+    const top = Math.max(0, index * ROW_HEIGHT - rowsArea / 2 + ROW_HEIGHT / 2);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = top;
+    }
+    setScrollTop(top);
+  }
+
+  // derived: the window of rows to render
+  const totalHeight = filtered.length * ROW_HEIGHT;
+  const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const end = Math.min(filtered.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN);
+  const visible = filtered.slice(start, end);
+
+  let empty = null;
+  if (filtered.length === 0) {
+    empty = <p className="log-message">No lines match the filter.</p>;
+  }
+
+  let jumpErrorEl = null;
+  if (jumpError) {
+    jumpErrorEl = <span className="jump-error" role="alert">{jumpError}</span>;
+  }
+
+  return (
+    <div className="viewer">
+      <div className="toolbar">
+        <input className="tb-input filter-input" placeholder="Filter messages…" aria-label="Filter messages" value={query} onChange={(e) => { handleQuery(e.target.value); }} />
+        <div className="level-tabs" role="group" aria-label="Level">
+          {LEVELS.map((lv) => {
+            let cls = 'level-tab';
+            if (lv === level) {
+              cls = 'level-tab is-active';
+            }
+            return <button key={lv} type="button" className={cls} aria-pressed={lv === level} onClick={() => { handleLevel(lv); }}>{lv}</button>;
+          })}
+        </div>
+        <form className="jump" onSubmit={handleJump}>
+          <input className="tb-input jump-input" inputMode="numeric" placeholder="Line #" aria-label="Jump to line" value={jumpValue} onChange={(e) => { setJumpValue(e.target.value); }} />
+          <button type="submit" className="jump-btn">Go</button>
+        </form>
+        {jumpErrorEl}
+        <span className="match-count">{formatNumber(filtered.length)} / {formatNumber(logs.length)}</span>
+      </div>
+      <div className="log-scroll" ref={scrollRef} onScroll={handleScroll}>
+        <LogHeader />
+        <div className="log-spacer" style={{ height: totalHeight }}>
+          {visible.map((l, i) => {
+            const index = start + i;
+            return <LogRow key={l.line} log={l} style={{ top: index * ROW_HEIGHT }} highlighted={l.line === highlightLine} />;
+          })}
+        </div>
+        {empty}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLogs().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setLogs(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (loading) {
+    body = <p className="log-message">Fetching logs…</p>;
+  } else {
+    body = <LogViewer logs={logs} />;
+  }
+
+  return (
+    <div className="app">
+      <TopBar total={logs.length} />
+      <main className="log-panel">{body}</main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0A0E14;
+  --panel: #0F141C;
+  --panel-2: #151C26;
+  --line: #1F2833;
+  --text: #C9D4E0;
+  --muted: #6B7A8C;
+  --accent: #39BAE6;
+  --debug: #6B7A8C;
+  --info: #7FD962;
+  --warn: #FFB454;
+  --error: #F07178;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --row-h: 26px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+.app { height: 100vh; display: flex; flex-direction: column; }
+.topbar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.logo { font-weight: 800; color: #fff; letter-spacing: 0.02em; }
+.crumb { color: var(--muted); }
+.crumb b { color: var(--text); font-weight: 600; }
+.live-dot { color: var(--info); font-size: 12px; }
+.total { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+.toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.toolbar-hint { color: var(--muted); font-size: 12px; }
+
+.log-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.log-scroll { flex: 1; min-height: 0; overflow: auto; font-family: var(--mono); font-size: 12px; }
+.log-message { padding: 16px; color: var(--muted); font-size: 13px; }
+
+.log-header, .log-row { display: grid; grid-template-columns: 64px 104px 62px 110px minmax(0, 1fr); align-items: center; gap: 12px; height: var(--row-h); padding: 0 16px; white-space: nowrap; }
+.log-header { position: sticky; top: 0; z-index: 2; height: 30px; background: var(--panel-2); border-bottom: 1px solid var(--line); color: var(--muted); font-family: system-ui, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.log-row { border-bottom: 1px solid rgba(31, 40, 51, 0.5); }
+.log-row:hover { background: var(--panel-2); }
+.c-line { color: var(--muted); text-align: right; }
+.c-time { color: #8A9AAD; }
+.c-msg, .c-service { overflow: hidden; text-overflow: ellipsis; }
+.c-service { color: var(--accent); }
+.log-header .c-line, .log-header .c-time, .log-header .c-service { color: var(--muted); }
+.level-debug .c-level { color: var(--debug); }
+.level-info .c-level { color: var(--info); }
+.level-warn .c-level { color: var(--warn); }
+.level-error .c-level { color: var(--error); }
+.level-error { background: rgba(240, 113, 120, 0.06); }
+
+/* ---- Added: virtualization, filter, jump to line ---- */
+.viewer { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.toolbar { flex-wrap: wrap; }
+.log-spacer { position: relative; }
+.log-spacer .log-row { position: absolute; left: 0; right: 0; }
+.log-row.is-highlighted { background: rgba(57, 186, 230, 0.18); box-shadow: inset 3px 0 0 var(--accent); animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: rgba(57, 186, 230, 0.5); } }
+.tb-input { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: 12px var(--mono); }
+.tb-input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.filter-input { width: 220px; }
+.level-tabs { display: flex; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.level-tab { height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: none; color: var(--muted); font: 600 11px var(--mono); cursor: pointer; }
+.level-tab.is-active { background: var(--panel-2); color: var(--text); }
+.jump { display: flex; gap: 4px; margin-left: 8px; }
+.jump-input { width: 80px; }
+.jump-btn { height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--accent); color: #04121A; font: 700 12px system-ui, sans-serif; cursor: pointer; }
+.jump-error { color: var(--error); font-size: 12px; }
+.match-count { margin-left: auto; color: var(--muted); font: 12px var(--mono); }

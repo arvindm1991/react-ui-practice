@@ -1,0 +1,307 @@
+<template id="tpl-events">
+  <h1>Events, forms and lists</h1>
+  <p class="lede">This is where the UI starts responding to people: clicks, typing, submitting, and lists that change. Each has one core pattern, and one classic mistake.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Wire up event handlers correctly, including passing an id</li>
+    <li>Build controlled inputs, checkboxes and selects, and a form with validation</li>
+    <li>Explain what <code>key</code> does, and show the bug a bad key causes</li>
+    <li>Let a child component tell its parent that something happened</li>
+  </ul></div>
+
+  <h2>1. Event handlers: pass a function, don't call it</h2>
+  <p>You attach behavior with props like <code>onClick</code>, <code>onChange</code>, <code>onSubmit</code>, <code>onKeyDown</code>. The value must be a <b>function that React will call later</b>, when the event happens.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="right and wrong">
+<button onClick={handleSave}>Save</button>             // ✓ pass the function
+<button onClick={() => setOpen(true)}>Open</button>    // ✓ pass a new arrow function
+<button onClick={() => remove(item.id)}>×</button>     // ✓ arrow function to pass an argument
+
+<button onClick={setOpen(true)}>Open</button>          // ✗ calls it NOW, during render
+<button onClick={remove(item.id)}>×</button>           // ✗ removes every item while rendering
+</script>
+  <p>The wrong versions have parentheses directly after the name, so JavaScript calls the function immediately while building the JSX, and passes its <em>result</em> to <code>onClick</code>. With a setter, that means setting state during render, which causes "Too many re-renders". The rule of thumb: if you need to pass arguments, wrap it in <code>() =&gt;</code>.</p>
+
+  <h3>The event object</h3>
+  <p>React calls your handler with an event object, usually named <code>e</code>. The parts you'll use:</p>
+  <ul>
+    <li><code>e.target</code>: the element the event happened on. <code>e.target.value</code> is an input's text; <code>e.target.checked</code> is a checkbox's state.</li>
+    <li><code>e.key</code>: which key, for keyboard events (<code>'Enter'</code>, <code>'Escape'</code>, <code>'ArrowDown'</code>). <code>e.metaKey</code>/<code>e.ctrlKey</code>/<code>e.shiftKey</code> for modifiers.</li>
+    <li><code>e.preventDefault()</code>: stop the browser's built-in behavior, like a form submitting and reloading the page.</li>
+    <li><code>e.stopPropagation()</code>: stop the event from reaching parent elements.</li>
+  </ul>
+
+  <h3>Bubbling</h3>
+  <p>Events <b>bubble</b>: a click on a button also counts as a click on every element containing it, all the way up. Usually that's harmless. It matters when a clickable row contains its own buttons: clicking the row's delete button would also trigger the row's "open" handler. Call <code>e.stopPropagation()</code> in the inner handler, or, better, structure the row so the two buttons are siblings rather than nested.</p>
+  <script type="text/x-play" data-title="Handlers, arguments, bubbling" data-h="330">
+import { useState } from 'react';
+
+export default function App() {
+  const [log, setLog] = useState('Click something');
+
+  function openRow(name) {
+    setLog('Opened ' + name);
+  }
+
+  function remove(e, name) {
+    // e.stopPropagation();
+    setLog('Removed ' + name);
+  }
+
+  return (
+    <div>
+      {['Alpha', 'Beta'].map((name) => (
+        <div key={name} className="row" onClick={() => openRow(name)}>
+          {name}
+          <button onClick={(e) => remove(e, name)}>Remove</button>
+        </div>
+      ))}
+      <p className="log">{log}</p>
+    </div>
+  );
+}
+/*** css ***/
+.row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #DADEE6; border-radius: 8px; cursor: pointer; }
+.row:hover { background: #F2F4F8; }
+.log { color: #586074; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Click "Remove" on Alpha. The message says "Opened Alpha": the remove ran, then the click bubbled to the row and replaced the message.</li>
+    <li>Uncomment <code>e.stopPropagation()</code> and try again.</li>
+  </ol></div>
+
+  <h2>2. Controlled inputs</h2>
+  <p>A <b>controlled</b> input is one whose value comes from React state. The input shows whatever the state says, and every keystroke updates the state. It's a loop:</p>
+  <div class="flow"><span>user types "a"</span><i>→</i><span><code>onChange</code> fires</span><i>→</i><span><code>setName(e.target.value)</code></span><i>→</i><span>re-render</span><i>→</i><span>input shows <code>value={name}</code></span></div>
+  <p>Why bother, when the browser can manage an input's text on its own? Because then the value lives in your state, where you can validate it, format it, use it to filter a list, reset it after submit, or show it somewhere else, all with plain JavaScript.</p>
+  <p>The classic bug: <code>value</code> without <code>onChange</code>. React forces the input to show the state on every render, the state never changes, so the input is frozen and you can't type. React also warns about it in the console.</p>
+  <script type="text/x-play" data-title="Inputs, checkboxes, selects" data-h="380">
+import { useState } from 'react';
+
+export default function App() {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('member');
+  const [notify, setNotify] = useState(true);
+
+  return (
+    <div className="form">
+      <label>
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+
+      <label>
+        Role
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="admin">Admin</option>
+          <option value="member">Member</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </label>
+
+      <label className="inline">
+        <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+        Email notifications
+      </label>
+
+      <p className="out">
+        {name || 'Someone'} is a {role}, notifications {notify ? 'on' : 'off'}.
+      </p>
+      <button onClick={() => { setName(''); setRole('member'); setNotify(true); }}>Reset</button>
+    </div>
+  );
+}
+/*** css ***/
+.form { display: flex; flex-direction: column; gap: 10px; width: 280px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #586074; }
+.form label.inline { flex-direction: row; align-items: center; gap: 8px; color: #1A1F2B; }
+.out { margin: 4px 0; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Type a name, pick a role, toggle the box. The sentence updates live, because all three are state.</li>
+    <li>Delete <code>onChange={…}</code> from the name input. You can no longer type, and the console explains why.</li>
+    <li>Notice the checkbox uses <code>checked</code> and <code>e.target.checked</code>, not <code>value</code>.</li>
+  </ol></div>
+
+  <h2>3. Forms</h2>
+  <p>Wrap inputs in a <code>&lt;form&gt;</code> and handle <code>onSubmit</code> on the form, not <code>onClick</code> on the button. You get Enter-to-submit for free, and it's the accessible way. Two details:</p>
+  <ul>
+    <li><b>Call <code>e.preventDefault()</code></b> first thing in the submit handler. A form's built-in behavior is to send the data to a URL and reload the page, which would wipe your app.</li>
+    <li><b>Buttons inside a form are <code>type="submit"</code> by default.</b> Any other button in the form, like "Cancel" or "Add field", needs <code>type="button"</code>, or clicking it submits the form. This one bites people.</li>
+    <li><b><code>noValidate</code> on the form</b> turns off the browser's built-in validation popups (the ones triggered by <code>type="email"</code> or <code>required</code>). Without it, an invalid email shows the browser's own grey bubble and your <code>onSubmit</code> never runs, so your styled error message never appears. Add it when you write your own validation.</li>
+  </ul>
+  <h3>Validation pattern</h3>
+  <p>Keep an <code>error</code> string in state. On submit, check the inputs; if something's wrong, set the error and return early. Show the error under the field, and clear it as soon as the user starts fixing it. While an async submit is running, disable the button so it can't be clicked twice.</p>
+  <script type="text/x-play" data-title="A form with validation" data-h="520">
+import { useState } from 'react';
+
+function fakeInvite(email) {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => (email.startsWith('taken') ? reject(new Error('Already on the team.')) : resolve()), 700)
+  );
+}
+
+export default function App() {
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [invited, setInvited] = useState([]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();                       // 1. no page reload
+    const value = email.trim();
+    if (!value.includes('@')) {               // 2. validate, bail out early
+      setError('Enter a valid email address.');
+      return;
+    }
+    setSubmitting(true);                      // 3. lock the button
+    try {
+      await fakeInvite(value);
+      setInvited((prev) => [...prev, value]);
+      setEmail('');                           // 4. reset on success
+    } catch (err) {
+      setError(err.message);                  // 5. show server errors too
+    } finally {
+      setSubmitting(false);                   // 6. always unlock
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      <div className="row">
+        <input
+          className={error ? 'has-error' : ''}
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError('');                     // clear the error as they fix it
+          }}
+        />
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Inviting…' : 'Invite'}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <ul>{invited.map((x) => <li key={x}>{x}</li>)}</ul>
+    </form>
+  );
+}
+/*** css ***/
+.row { display: flex; gap: 8px; }
+input { flex: 1; height: 32px; padding: 0 10px; border: 1px solid #C9CED8; border-radius: 6px; }
+input.has-error { border-color: #D92D20; }
+.error { margin: 6px 0 0; color: #B42318; font-size: 13px; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Submit empty, then type: the error appears, then clears.</li>
+    <li>Invite <code>taken@acme.dev</code> to see the server error path, and <code>you@acme.dev</code> for success. Press Enter instead of clicking: the form submits either way.</li>
+    <li>Remove <code>e.preventDefault()</code> and submit. In a real browser the whole page would reload and every piece of state would be lost; here the console warns you instead. Put it back.</li>
+  </ol></div>
+
+  <h2>4. Rendering lists</h2>
+  <p>To render a list, turn an array of data into an array of elements with <code>.map()</code>. React renders arrays of elements directly.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="the list pattern">
+<ul>
+  {items.map((item) => (
+    <li key={item.id}>{item.title}</li>
+  ))}
+</ul>
+</script>
+  <h3>What key is for</h3>
+  <p>When the list changes, React compares the old list of elements with the new one and has to decide which old element corresponds to which new one, so it can keep each item's DOM node and state attached to the right data. The <code>key</code> is the name tag it uses to match them.</p>
+  <p>With a stable id as the key, React knows "the item with key 7 moved from position 3 to position 1". With the array <b>index</b> as the key, it only knows positions: after you delete the first item, every item shifts up one position, and React thinks item 0 still exists but has new text. Any state inside the rows (typed text, an open menu, a checkbox) stays attached to the <em>position</em>, so it ends up on the wrong item. Watch it happen:</p>
+  <script type="text/x-play" data-title="The index-as-key bug" data-h="430">
+import { useState } from 'react';
+
+function Row({ label, onRemove }) {
+  const [note, setNote] = useState('');   // each row keeps its own state
+  return (
+    <li className="row">
+      <span className="label">{label}</span>
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="note…" />
+      <button onClick={onRemove}>×</button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [items, setItems] = useState([
+    { id: 'a', label: 'Apple' },
+    { id: 'b', label: 'Banana' },
+    { id: 'c', label: 'Cherry' },
+  ]);
+
+  return (
+    <ul className="list">
+      {items.map((item, index) => (
+        <Row
+          key={index}
+          label={item.label}
+          onRemove={() => setItems((prev) => prev.filter((x) => x.id !== item.id))}
+        />
+      ))}
+    </ul>
+  );
+}
+/*** css ***/
+.list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; width: 320px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.label { width: 64px; }
+.row input { flex: 1; min-width: 0; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Type a note next to each fruit: "red" for Apple, "yellow" for Banana, "dark" for Cherry.</li>
+    <li>Remove Apple. Banana now says "red". The notes stayed at their positions while the labels moved.</li>
+    <li>Change <code>key={index}</code> to <code>key={item.id}</code>, press Reset, and repeat. Now the notes travel with their fruit.</li>
+  </ol></div>
+  <p>The rules: use a stable, unique id from the data. Keys only need to be unique among siblings. The key goes on the outermost element returned from <code>map</code>. Index keys are acceptable only for lists that never reorder, filter or delete.</p>
+
+  <h2>5. Conditional rendering</h2>
+  <p>Since JSX can't contain <code>if</code>, there are four idioms, each with its place:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="four ways">
+// 1. Ternary: one thing or another
+{isLoading ? <Spinner /> : <List items={items} />}
+
+// 2. &&: something or nothing
+{error && <p className="error">{error}</p>}
+
+// 3. Early return: whole component has a different state
+if (!user) return <p>Select a user.</p>;
+
+// 4. A variable built with plain if/else, then used in JSX
+let content;
+if (status === 'loading') content = <Skeleton />;
+else if (status === 'error') content = <ErrorBox />;
+else content = <Table rows={rows} />;
+return <div className="card">{content}</div>;
+</script>
+  <p>The <code>&amp;&amp;</code> trap: <code>{count &amp;&amp; &lt;Badge /&gt;}</code> renders a literal <b>0</b> on the page when <code>count</code> is 0, because <code>0 &amp;&amp; anything</code> evaluates to 0, and React renders numbers. Use <code>{count &gt; 0 &amp;&amp; …}</code>. (<code>null</code>, <code>undefined</code>, <code>false</code> and <code>true</code> render nothing.)</p>
+
+  <h2>6. Children talking to parents</h2>
+  <p>Props only flow down. So how does a list row tell the page "I was selected"? The parent passes down a <b>function</b> as a prop, and the child calls it. The state stays in the parent; the child just reports events.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="callback props">
+function Page() {
+  const [selectedId, setSelectedId] = useState(null);
+  return <Row item={item} isActive={item.id === selectedId} onSelect={setSelectedId} />;
+}
+
+function Row({ item, isActive, onSelect }) {
+  return (
+    <button className={isActive ? 'row is-active' : 'row'} onClick={() => onSelect(item.id)}>
+      {item.title}
+    </button>
+  );
+}
+</script>
+  <p>Name these props <code>on</code> + what happened: <code>onSelect</code>, <code>onDelete</code>, <code>onChange</code>. The child doesn't know or care what the parent does in response. You'll use this on every interview task; the next lessons build on it.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Can't type in an input</b><p><code>value</code> without <code>onChange</code>.</p></div>
+  <div class="mistake"><b>Page reloads on submit</b><p>Missing <code>e.preventDefault()</code>.</p></div>
+  <div class="mistake"><b>A "Cancel" button submits the form</b><p>Add <code>type="button"</code>.</p></div>
+  <div class="mistake"><b>Row state jumps to another row after deleting</b><p>Index used as key.</p></div>
+  <div class="mistake"><b>A stray 0 on the page</b><p><code>count &amp;&amp; …</code>. Compare explicitly.</p></div>
+
+  <p>Practice: <b>Directory search</b> and <b>Feedback list</b>.</p>
+  <div data-exs="d3,d6"></div>
+  <div data-quiz="r3"></div>
+</template>

@@ -1,0 +1,205 @@
+<template id="tpl-react">
+  <h1>Components, JSX and props</h1>
+  <p class="lede">React has one big idea, and once it clicks, the rest is detail: you don't change the page yourself. You write functions that describe what the page should look like for some data, and React makes the page match.</p>
+  <div class="goals"><b>After this lesson you can</b><ul>
+    <li>Explain what a component is and what React does with it</li>
+    <li>Read and write JSX without tripping on its rules</li>
+    <li>Pass data into components with props, and split a design into components</li>
+    <li>Fix the import/export error that shows up in every new file</li>
+  </ul></div>
+
+  <h2>1. The mental model: UI is a function of data</h2>
+  <p>In plain JavaScript you'd build a page step by step: create an element, set its text, append it, and later find it again and change it when something happens. You'd be responsible for keeping the page in sync with your data at every step.</p>
+  <p>React flips this. You write a <b>component</b>: a JavaScript function that takes some data and <em>returns a description</em> of what the UI should look like. React calls your function, looks at the description, and updates the real page to match. When the data changes, React calls your function again, gets a new description, compares it with the previous one, and changes only the parts that differ.</p>
+  <div class="flow"><span>data</span><i>→</i><span>your component function</span><i>→</i><span>description (JSX)</span><i>→</i><span>React updates the page</span></div>
+  <p>So your job is only ever: "given this data, what should the screen look like?" You never write "find the third list item and make it bold". You write "the item whose id matches <code>selectedId</code> gets the bold class", and React figures out what to change.</p>
+
+  <h2>2. A component is just a function</h2>
+  <p>A component is a function whose name starts with a capital letter and which returns JSX. The capital letter matters: it's how React tells your components (<code>&lt;Card /&gt;</code>) apart from HTML tags (<code>&lt;div&gt;</code>).</p>
+  <script type="text/x-play" data-title="Your first components" data-h="250" data-console="off">
+function Greeting() {
+  return <h2 className="greeting">Hello there</h2>;
+}
+
+function Tip() {
+  return <p className="tip">Components are functions that return JSX.</p>;
+}
+
+export default function App() {
+  return (
+    <div>
+      <Greeting />
+      <Tip />
+      <Tip />
+    </div>
+  );
+}
+/*** css ***/
+.greeting { margin: 0 0 8px; }
+.tip { margin: 4px 0; color: #586074; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Add a third <code>&lt;Tip /&gt;</code>. Each use is an independent copy, called an <em>instance</em>.</li>
+    <li>Rename <code>Greeting</code> to <code>greeting</code> in both places. React treats lowercase names as HTML tags, so it renders nothing useful and warns in the console. Change it back.</li>
+  </ol></div>
+
+  <h2>3. JSX is JavaScript in disguise</h2>
+  <p>JSX looks like HTML, but before the browser runs it, a compiler turns every tag into a function call. This:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="what you write">
+<h1 className="title">Hi {name}</h1>
+</script>
+  <p>becomes this:</p>
+  <script type="text/x-code" data-lang="js" data-title="what actually runs">
+React.createElement('h1', { className: 'title' }, 'Hi ', name)
+</script>
+  <p>Knowing that explains every JSX rule:</p>
+  <ul>
+    <li><b><code>className</code>, not <code>class</code>.</b> Attributes become properties of a JavaScript object, and <code>class</code> is a reserved word in JavaScript. Same for <code>htmlFor</code> instead of <code>for</code> on labels.</li>
+    <li><b>Attributes are camelCase</b>: <code>onClick</code>, <code>tabIndex</code>, <code>aria-label</code> is the exception (aria-* and data-* keep their dashes).</li>
+    <li><b>Curly braces hold any JavaScript <em>expression</em></b>: a variable, <code>a + b</code>, a function call, a ternary <code>x ? a : b</code>. But not <em>statements</em> like <code>if</code> or <code>for</code>, because a function argument can't be a statement. That's why JSX uses ternaries, <code>&amp;&amp;</code> and <code>.map()</code> instead.</li>
+    <li><b><code>style</code> takes an object</b>, not a string, with camelCase property names: <code>style={{ marginTop: 8, backgroundColor: 'red' }}</code>. The double braces are just "an expression" containing "an object". Numbers mean px.</li>
+    <li><b>Return one root element.</b> A function returns one value. To return siblings without an extra div, wrap them in a fragment: <code>&lt;&gt;…&lt;/&gt;</code>.</li>
+    <li><b>Every tag must close</b>: <code>&lt;img /&gt;</code>, <code>&lt;input /&gt;</code>, <code>&lt;br /&gt;</code>.</li>
+    <li><b>Comments</b> inside JSX are <code>{/* like this */}</code>.</li>
+  </ul>
+  <script type="text/x-play" data-title="Expressions in JSX" data-h="300" data-console="off">
+export default function App() {
+  const user = { name: 'Maya Okafor', projects: 24, isAdmin: true };
+  const initials = user.name.split(' ').map((part) => part[0]).join('');
+
+  return (
+    <div className="card">
+      <div className="avatar" style={{ backgroundColor: user.isAdmin ? '#E8EEFF' : '#EEE' }}>
+        {initials}
+      </div>
+      <div>
+        <strong>{user.name}</strong>
+        <p className="meta">
+          {user.projects} {user.projects === 1 ? 'project' : 'projects'}
+          {user.isAdmin && ' · Admin'}
+        </p>
+      </div>
+    </div>
+  );
+}
+/*** css ***/
+.card { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; color: #3451D1; }
+.meta { margin: 2px 0 0; color: #586074; font-size: 14px; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Change <code>projects</code> to <code>1</code>, and <code>isAdmin</code> to <code>false</code>. Each expression re-evaluates.</li>
+    <li>Change <code>className="card"</code> to <code>class="card"</code>. It still works in the preview, but look at the console: React warns. In the interview this is a classic small slip; just fix it.</li>
+    <li>Try writing <code>{if (user.isAdmin) 'Admin'}</code> inside the paragraph. You'll get a syntax error, because <code>if</code> is a statement.</li>
+  </ol></div>
+
+  <h2>4. Props: passing data into a component</h2>
+  <p>A component that always shows "Maya Okafor" isn't very useful. <b>Props</b> are how a parent passes data into a child, exactly like arguments to a function. You write them as attributes, and the component receives them all bundled into one object.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="passing and reading props">
+// the parent passes props as attributes
+<UserCard name="Maya Okafor" projects={24} isAdmin />
+
+// the child receives one object: { name, projects, isAdmin }
+function UserCard(props) {
+  return <strong>{props.name}</strong>;
+}
+
+// usually written with destructuring, which pulls the fields out by name
+function UserCard({ name, projects, isAdmin = false }) {
+  return <strong>{name}</strong>;
+}
+</script>
+  <p>A few details: strings can be passed in quotes; everything else (numbers, booleans, objects, arrays, functions) goes in braces. A prop with no value, like <code>isAdmin</code> above, means <code>true</code>. <code>= false</code> in the destructuring sets a default if the parent doesn't pass it.</p>
+  <p><b>Props are read-only.</b> A component must never change its own props. Data flows one way: down from parent to child. If a child needs to change something, the parent passes it a function to call, which is the subject of the next two lessons.</p>
+
+  <h3>The children prop</h3>
+  <p>Whatever you put <em>between</em> a component's opening and closing tags arrives as a special prop called <code>children</code>. It's how you build wrappers like cards, modals and layouts that don't care what's inside them.</p>
+  <p>You never write <code>children=…</code> yourself. React collects the nested JSX and attaches it for you, so these two lines mean the same thing: <code>&lt;Card title="Team"&gt;&lt;p&gt;Hi&lt;/p&gt;&lt;/Card&gt;</code> and <code>&lt;Card title="Team" children={&lt;p&gt;Hi&lt;/p&gt;} /&gt;</code>.</p>
+  <p><b>Why pass JSX instead of data?</b> It depends on who should decide what goes inside.</p>
+  <ul>
+    <li><b>Pass data</b> (<code>&lt;TeamList team={team} /&gt;</code>) when the component exists to show that one kind of thing. It knows the shape of a person and owns how a person looks. This is the usual case.</li>
+    <li><b>Pass children</b> when the component is a frame: border, padding, title, close button. <code>Card</code> doesn't need to know what a "team" is. The same <code>Card</code> can wrap a team list today, a chart tomorrow and a form after that, without adding a new prop for each. That's why modals and layouts are almost always built this way.</li>
+  </ul>
+  <p>Often you use both together: a <code>Card</code> (frame, via children) wrapping a <code>TeamList</code> (content, via data).</p>
+
+  <script type="text/x-play" data-title="Props and children" data-h="360" data-console="off">
+function Avatar({ name, size = 40 }) {
+  const initials = name.split(' ').map((p) => p[0]).join('');
+  return (
+    <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.38 }}>
+      {initials}
+    </div>
+  );
+}
+
+function Card({ title, children }) {
+  return (
+    <section className="card">
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+const team = [
+  { id: 1, name: 'Ada Lovelace', role: 'Research' },
+  { id: 2, name: 'Grace Hopper', role: 'Platform' },
+];
+
+export default function App() {
+  return (
+    <Card title="Team">
+      {team.map((person) => (
+        <div className="person" key={person.id}>
+          <Avatar name={person.name} />
+          <span>{person.name} · {person.role}</span>
+        </div>
+      ))}
+    </Card>
+  );
+}
+/*** css ***/
+.card { padding: 14px; border: 1px solid #DADEE6; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.card h3 { margin: 0; }
+.person { display: flex; align-items: center; gap: 10px; }
+.avatar { border-radius: 50%; background: #E8EEFF; color: #3451D1; display: grid; place-items: center; font-weight: 600; }
+</script>
+  <div class="try"><b>Try this</b><ol>
+    <li>Pass <code>size={28}</code> to <code>Avatar</code>. The default of 40 is overridden.</li>
+    <li>Add a third person to <code>team</code>. The UI follows the data; you didn't touch the JSX.</li>
+    <li>Add a <code>&lt;p&gt;3 people&lt;/p&gt;</code> inside <code>&lt;Card&gt;</code> above the map. It shows up wherever <code>{children}</code> is placed.</li>
+  </ol></div>
+
+  <h2>5. Splitting a design into components</h2>
+  <p>Given a mockup, draw boxes around its pieces and ask of each box:</p>
+  <ul>
+    <li><b>Does it repeat?</b> A row, a card, a chip, a message: make it a component and <code>.map()</code> over data.</li>
+    <li><b>Does it have its own job or state?</b> A form, a menu, a search box: a component.</li>
+    <li><b>Is the parent getting hard to read?</b> Pull a section out and give it a clear name.</li>
+  </ul>
+  <p>And don't overdo it. Three well-named components for a feature is typical in an interview. Name props for what they <em>mean</em> to the component (<code>conversation</code>, <code>isActive</code>, <code>onSelect</code>), not where they came from.</p>
+  <p>A good rhythm in the interview is: build the whole thing in one component until it works, then pull out the repeated piece. Splitting too early means passing props around while the design is still changing.</p>
+
+  <h2>6. Imports and exports</h2>
+  <p>Each file is a module. A file shares things with <code>export</code> and other files take them with <code>import</code>. There are two kinds, and mixing them up causes one of the most common errors you'll see:</p>
+  <script type="text/x-code" data-lang="jsx" data-title="default vs named">
+// Avatar.jsx: a DEFAULT export (one per file)
+export default function Avatar() { … }
+// import it WITHOUT braces, and you choose the name
+import Avatar from './Avatar';
+
+// format.js: NAMED exports (as many as you like)
+export function formatDate() { … }
+export const GROUP_ORDER = ['Today', 'Older'];
+// import them WITH braces, using their exact names
+import { formatDate, GROUP_ORDER } from './utils/format';
+</script>
+  <p>If you write <code>import { Avatar } from './Avatar'</code> for a default export, <code>Avatar</code> is <code>undefined</code>, and React shows <em>"Element type is invalid… got: undefined"</em>. Open the file, look at how it exports, and match it. Paths: <code>./</code> means "same folder", <code>../</code> means "up one folder", and you can leave off <code>.js</code>/<code>.jsx</code>.</p>
+
+  <h2>Common mistakes</h2>
+  <div class="mistake"><b>Nothing renders and no error</b><p>The component forgot to <code>return</code>. With braces after an arrow, <code>() =&gt; { &lt;div/&gt; }</code> returns nothing. Use parentheses <code>() =&gt; (&lt;div/&gt;)</code> or add <code>return</code>.</p></div>
+  <div class="mistake"><b>"Adjacent JSX elements must be wrapped in an enclosing tag"</b><p>Two siblings returned without a parent. Wrap them in <code>&lt;&gt;…&lt;/&gt;</code>.</p></div>
+  <div class="mistake"><b>"Objects are not valid as a React child"</b><p>You put an object in braces, like <code>{user}</code>. Render a field: <code>{user.name}</code>.</p></div>
+
+  <div data-quiz="r1"></div>
+</template>

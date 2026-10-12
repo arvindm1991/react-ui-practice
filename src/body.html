@@ -1,0 +1,739 @@
+<div id="guide">
+  <header class="g-top">
+    <button class="toc-toggle" id="tocToggle" aria-controls="toc" aria-expanded="true" title="Show or hide the topic list">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+      <span id="tocToggleLabel">Hide topics</span>
+    </button>
+    <div class="brand"><span class="brand-name">Mock-Up Round Prep</span><span class="brand-sub">UI Mock-Up Implementation · React · CodeSignal</span></div>
+    <div class="progress"><span id="progressText">0 done</span><div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div></div>
+  </header>
+  <div class="g-layout">
+    <nav class="toc" id="toc" aria-label="Lessons"></nav>
+    <main class="content">
+      <label class="toc-select-label" for="tocSelect" style="position:absolute;left:-9999px">Lesson</label>
+      <select class="toc-select" id="tocSelect"></select>
+      <div id="content"></div>
+    </main>
+  </div>
+</div>
+
+<div class="ide" id="ide" hidden>
+  <header class="ide-top">
+    <button class="ide-btn" id="ideBack">‹ <span class="hide-sm">Guide</span></button>
+    <button class="icon-btn hide-sm" id="toggleTask" title="Show or hide the task panel" aria-label="Toggle task panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+    <div class="ide-title"><span class="ide-kind" id="ideKind">Drill</span><strong id="ideTitle"></strong></div>
+    <div class="ide-spacer"></div>
+    <div class="timer" id="timer">
+      <button class="timer-btn hide-sm" id="timerLen" title="Change duration">15 min</button>
+      <span class="timer-val" id="timerVal">15:00</span>
+      <button class="timer-btn" id="timerToggle">Start</button>
+      <button class="timer-btn hide-sm" id="timerReset">Reset</button>
+    </div>
+    <button class="ide-btn" id="resetTopBtn" title="Throw away your changes and restore the starter files">Reset code</button>
+    <button class="ide-btn is-primary" id="runBtn" title="Run (Ctrl/⌘ + S)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>Run
+    </button>
+  </header>
+  <div class="ide-narrow-note">Phone width. Practice on a laptop for the real thing; switch panes here.</div>
+  <nav class="mobile-tabs" aria-label="Panes">
+    <button data-view-btn="task">Task</button>
+    <button data-view-btn="code" class="is-on">Code</button>
+    <button data-view-btn="preview">Preview</button>
+  </nav>
+  <div class="ide-body" id="ideBody" data-view="code">
+    <section class="pane pane-task" id="paneTask">
+      <div class="tabs" role="tablist">
+        <button class="tab is-active" data-ptab="task">Task <span class="dot" hidden></span></button>
+        <button class="tab" data-ptab="design">Design</button>
+        <button class="tab" data-ptab="solution">Solution</button>
+      </div>
+      <div class="task-scroll" data-pview="task" id="taskView"></div>
+      <div class="design-wrap" data-pview="design" hidden></div>
+      <div class="task-scroll" data-pview="solution" id="solView" hidden></div>
+    </section>
+    <div class="splitter" data-split="task" aria-hidden="true"></div>
+    <section class="pane pane-files">
+      <div class="files-head"><span>Explorer</span>
+        <span style="display:flex;gap:2px">
+          <button class="icon-btn" id="newFileBtn" title="New file" aria-label="New file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="icon-btn" id="resetBtn" title="Reset to starter files" aria-label="Reset to starter files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+        </span>
+      </div>
+      <div class="new-file" id="newFile" hidden><input id="newFileInput" aria-label="New file path" spellcheck="false"><button class="icon-btn" id="newFileOk" aria-label="Create">✓</button></div>
+      <div class="new-file-err" id="newFileErr" hidden></div>
+      <div class="tree" id="tree"></div>
+    </section>
+    <section class="pane pane-editor">
+      <div class="tabs">
+        <div id="fileTabs" style="display:flex"></div>
+        <div class="tabs-tools">
+          <select class="file-switch" id="fileSwitch" aria-label="Open file" style="display:none;height:26px;max-width:180px;background:var(--ide-bg);color:var(--ide-text);border:1px solid var(--ide-line);border-radius:5px;font:12px var(--font-mono)"></select>
+        </div>
+      </div>
+      <div class="editor-area" id="editorArea"></div>
+      <div class="empty-editor" id="editorEmpty" hidden>Open a file from the Explorer.</div>
+      <div class="statusbar">
+        <span id="sbBuild"></span>
+        <span id="sbSave">All changes saved</span>
+        <span class="sb-right">
+          <label title="Rebuild the preview shortly after you stop typing"><input type="checkbox" id="autoRun"> Auto-run</label>
+          <span id="sbPos">Ln 1, Col 1</span>
+          <span id="sbLang" class="hide-sm">JavaScript React</span>
+          <span class="hide-sm">Spaces: 2</span>
+        </span>
+      </div>
+    </section>
+    <div class="splitter" data-split="right" aria-hidden="true"></div>
+    <section class="pane pane-right">
+      <div class="browser-bar">
+        <button class="icon-btn" id="reloadBtn" title="Reload preview" aria-label="Reload preview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+        <div class="url"><span>http://</span><b>localhost:3000</b></div>
+      </div>
+      <div class="preview-frame">
+        <div class="preview-host" id="previewHost"></div>
+        <div class="preview-loading" id="previewLoading" hidden>Loading…</div>
+        <div class="err-overlay" id="errOverlay" hidden></div>
+      </div>
+      <div class="hsplit" data-split="bottom" aria-hidden="true"></div>
+      <div class="bottom">
+        <div class="tabs">
+          <button class="tab is-active" data-btab="terminal">Terminal</button>
+          <button class="tab" data-btab="console">Console <span class="l-count" id="consoleBadge" hidden>0</span></button>
+          <div class="tabs-tools"><button class="icon-btn" id="clearBottom" title="Clear" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5 17.5 6.5"/></svg></button></div>
+        </div>
+        <div class="term" id="termView"></div>
+        <div class="term" id="consoleView" hidden></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<!-- ======================= LESSONS ======================= -->
+
+<template id="tpl-start">
+  <h1>Prep for the UI mock-up round</h1>
+  <p class="lede">Everything you need for Wednesday is in here: lessons, quizzes, a workspace modeled on CodeSignal, short drills, from-memory speed runs, a lookup trainer for anything you weren't taught, and three timed mock interviews.</p>
+
+  <h2>What the round is</h2>
+  <p>From your recruiter packet:</p>
+  <ul>
+    <li>You work in <strong>React inside CodeSignal</strong> and implement a feature from a <strong>Figma mockup</strong>.</li>
+    <li>You get an <strong>existing codebase</strong> to understand and extend. You are not starting from a blank file.</li>
+    <li>You share your screen in <strong>Google Meet</strong>. <strong>No AI tools.</strong></li>
+  </ul>
+  <p>So this is not an algorithms round and not React trivia. It is the job, compressed: read some code, read a design, build the feature, keep it working, and talk while you do it.</p>
+
+  <div class="callout is-key"><span class="callout-label">The most useful thing to know</span>
+    <p>A half-finished UI with a clear plan, a running build and narrated decisions beats a fully styled page hacked together. Interviewers watch <em>how</em> you work at least as much as what is on screen at minute 60.</p></div>
+
+  <h2>How this kit works</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Part</th><th>What you do</th><th>Time</th></tr>
+    <tr><td>CSS, React and JavaScript lessons</td><td>Learn the mental model, then change live examples right in the lesson and watch what happens. A quiz at the end of each</td><td>20–30 min each</td></tr>
+    <tr><td>Name it, search it</td><td>Break down an unfamiliar requirement, name the pieces, write the queries. For everything you weren't taught</td><td>~1 min per scenario</td></tr>
+    <tr><td>Curveballs</td><td>Exercises built on things the kit never taught, solved with Google and MDN</td><td>30 min</td></tr>
+    <tr><td>Drills</td><td>One skill at a time, with a target design and a starter</td><td>15–20 min</td></tr>
+    <tr><td>Speed runs</td><td>The same patterns from blank files, from memory</td><td>20–25 min</td></tr>
+    <tr><td>Mock interviews</td><td>A realistic codebase, a Figma-like target, a timer and a surprise requirement</td><td>55 min + debrief</td></tr>
+  </table></div>
+  <p>The workspace runs real React 18 in your browser: file tree, editor, live preview, terminal and console. It has <strong>no autocomplete on purpose</strong>, because you won't have AI help in the interview. The Design tab has an <strong>Inspect</strong> mode that works like Figma's: hover any element to read its size, padding, colors and type.</p>
+  <p>Your progress, code and quiz answers are saved in this browser.</p>
+
+  <h2>Do these today (from the packet)</h2>
+  <ul data-checklist="packet">
+    <li data-id="figma">Create a Figma account and finish the onboarding flow<small>Then open any file from the Figma Community and click around: select layers, read the right-hand panel.</small></li>
+    <li data-id="meet">Test screen sharing in Google Meet in the browser you'll use<small>On a Mac: System Settings → Privacy &amp; Security → Screen Recording must allow your browser. That setting needs a browser restart.</small></li>
+    <li data-id="recruiter">Ask the recruiter four quick questions<small>How long is the coding part? JavaScript or TypeScript? How is the codebase styled (plain CSS, CSS modules, Tailwind)? Can I look things up on MDN or Google?</small></li>
+  </ul>
+</template>
+
+<template id="tpl-plan">
+  <h1>Your 3-day plan</h1>
+  <p class="lede">About 10 to 11 focused hours from Monday to Wednesday morning. If time runs short, cut from the bottom of each day, never from the mocks.</p>
+
+  <h2>Monday: learn the foundations (~5 h)</h2>
+  <p>Read each lesson with the examples open: do every "Try this" step, then take the quiz at the bottom. Don't just read the code. Change it.</p>
+  <ul data-checklist="mon2">
+    <li data-id="1">Orientation: what gets scored, the in-round playbook <small>25 min</small></li>
+    <li data-id="2">CSS: Boxes, flow and the cascade · Flexbox · Grid, positioning, overflow, states <small>60 min</small></li>
+    <li data-id="3">Drill: <b>Profile card</b> <small>15 min</small></li>
+    <li data-id="4">React: Components, JSX and props · State and rendering · Events, forms and lists <small>75 min</small></li>
+    <li data-id="5">Drill: <b>Directory search</b> <small>15 min</small></li>
+    <li data-id="6">React: Effects and loading data · Structuring a feature <small>50 min</small></li>
+    <li data-id="7">Drill: <b>Inbox</b> <small>20 min</small></li>
+    <li data-id="8">JavaScript for UI work <small>25 min</small></li>
+  </ul>
+
+  <h2>Tuesday: practice under realistic conditions (~5 h)</h2>
+  <ul data-checklist="tue2">
+    <li data-id="0">Data pipelines lesson, then the Data drills <small>60 min</small></li>
+    <li data-id="1">Reading a codebase fast · Figma to CSS <small>30 min</small></li>
+    <li data-id="2">Speed runs: <b>Feedback list</b>, <b>Directory search</b>, <b>Orders</b>, <b>Confirm modal</b>. Note which ones stall <small>30 min</small></li>
+    <li data-id="3">Thinking in lookups, then skim the vocabulary <small>25 min</small></li>
+    <li data-id="4">Mock 1, <b>Chat sidebar</b>: timer on, talking out loud, no solution peeking. Then the debrief <small>65 min</small></li>
+    <li data-id="5">Patch the leak: reread the lesson and redo the drill for your biggest time sink <small>30 min</small></li>
+    <li data-id="6">First pass of <b>Name it, search it</b>, about 12 scenarios <small>20 min</small></li>
+    <li data-id="7">Curveball: <b>Comment thread</b>, with Google open in another tab <small>30 min</small></li>
+    <li data-id="8">Interview lessons: talking, explain-out-loud questions (answer them <i>out loud</i>), debugging <small>30 min</small></li>
+  </ul>
+  <p>If you have extra time Tuesday: Mock 2, <b>Team members</b>, then the remaining lookup scenarios with the 90s timer.</p>
+
+  <h2>Wednesday: warm up, don't cram (~1 h)</h2>
+  <ul data-checklist="wed">
+    <li data-id="1">Optional, only if you have a full hour well before the interview: Mock 3, <b>Usage dashboard</b></li>
+    <li data-id="5">10 scenarios from <b>Name it, search it</b> with the timer, as a warm-up for the lookup reflex <small>10 min</small></li>
+    <li data-id="2">Two speed runs from memory as a warm-up <small>10 min</small></li>
+    <li data-id="3">Read the cheat sheet once <small>10 min</small></li>
+    <li data-id="4">Interview-day checklist (last lesson) <small>10 min</small></li>
+  </ul>
+
+  <div class="callout"><span class="callout-label">Rules for every session</span>
+    <p>No AI help while practicing. Talk out loud even when alone. It feels silly and it is the single most transferable habit. Keep the build working at all times.</p></div>
+</template>
+
+<template id="tpl-scoring">
+  <h1>What gets scored</h1>
+  <p class="lede">Nobody publishes the rubric. This ranking comes from an experienced frontend engineer who prepped people for this format, and it matches how UI rounds like this are usually judged.</p>
+
+  <div class="table-wrap"><table>
+    <tr><th>#</th><th>Signal</th><th>What it looks like on the call</th></tr>
+    <tr><td>1</td><td><strong>Codebase comprehension</strong></td><td>You find and reuse what exists: helpers, components, CSS variables, patterns. You say "this repo does X, so I'll follow it."</td></tr>
+    <tr><td>2</td><td><strong>Requirements triage</strong></td><td>You scope out loud: "I'll do A and B fully, the happy path of C, and stub D." Then you deliver exactly that.</td></tr>
+    <tr><td>3</td><td><strong>Clean decomposition</strong></td><td>Small components with clear prop names. State in the right place. No 200-line JSX blob.</td></tr>
+    <tr><td>4</td><td><strong>Edge-case awareness</strong></td><td>Loading, empty and error states. Long text. Keyboard, focus styles, labels.</td></tr>
+    <tr><td>5</td><td><strong>Calm debugging</strong></td><td>You read the error, form a guess, check it. No panic, no random changes.</td></tr>
+    <tr><td>6</td><td><strong>Visual fidelity</strong></td><td>Layout, spacing and type match the mockup closely. Pixel perfection comes last.</td></tr>
+  </table></div>
+
+  <h2>What this means for how you spend time</h2>
+  <ul>
+    <li><strong>Spend the first 5 minutes reading, not typing.</strong> It feels slow. It is what scores highest.</li>
+    <li><strong>Say your scope before you code.</strong> Then any unfinished part is a decision you made, not a failure.</li>
+    <li><strong>Never leave the build broken.</strong> Work in increments that each run.</li>
+    <li><strong>Polish last.</strong> A correct layout with slightly-off padding beats perfect padding on a broken feature.</li>
+  </ul>
+  <p>Mantra: <strong>comprehension → decomposition → working increments → polish.</strong></p>
+</template>
+
+<template id="tpl-playbook">
+  <h1>The in-round playbook</h1>
+  <p class="lede">The same seven phases every time, so you never have to decide what to do next. Times assume 60 minutes of coding; scale them if your round is longer.</p>
+
+  <ol class="phases">
+    <li class="phase"><span class="phase-time">0–5</span><div><h3>Read</h3><p>Read the whole task once. Open the design. Skim the codebase (see Reading a codebase fast). Ask one to three clarifying questions.</p><div class="phase-bar" style="width:8%"></div></div></li>
+    <li class="phase"><span class="phase-time">5–8</span><div><h3>Plan and scope out loud</h3><p>Write a short comment: components, state, data. Say what you'll do fully, what gets the happy path only, and what you'll skip unless there's time.</p><div class="phase-bar" style="width:5%"></div></div></li>
+    <li class="phase"><span class="phase-time">8–20</span><div><h3>Structure</h3><p>Render the real data with plain JSX and no styling. Split components now. Get it on screen.</p><div class="phase-bar" style="width:20%"></div></div></li>
+    <li class="phase"><span class="phase-time">20–35</span><div><h3>Behavior</h3><p>Add state and handlers one interaction at a time. Check the preview after each.</p><div class="phase-bar" style="width:25%"></div></div></li>
+    <li class="phase"><span class="phase-time">35–42</span><div><h3>States</h3><p>Loading, empty, error, long text, disabled buttons.</p><div class="phase-bar" style="width:12%"></div></div></li>
+    <li class="phase"><span class="phase-time">42–55</span><div><h3>Polish</h3><p>CSS against the design, biggest differences first: layout → spacing → type → color → hover and focus.</p><div class="phase-bar" style="width:22%"></div></div></li>
+    <li class="phase"><span class="phase-time">55–60</span><div><h3>Walk through</h3><p>Demo it, name what you'd improve next, mention tradeoffs.</p><div class="phase-bar" style="width:8%"></div></div></li>
+  </ol>
+
+  <h2>A planning comment is worth writing</h2>
+  <p>Typing your plan at the top of the file takes 90 seconds. The interviewer sees your thinking, and you get a checklist.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="Sidebar.jsx (top of file)">
+/*
+  Plan
+  - Sidebar: fetch conversations (exists), hold query + list state
+  - derived: filter by query -> sort by date -> group with getDateGroup()
+  - ConversationItem: title + star button (sibling buttons, not nested)
+  Scope: all requirements; skip keyboard navigation unless there's time
+*/
+</script>
+
+  <h2>Rules that save you</h2>
+  <ul>
+    <li><strong>Hardcode first, generalize second.</strong> Get one card right, then <code>.map()</code> it.</li>
+    <li><strong>Run constantly.</strong> Every 2–3 minutes. Small breakages are easy; big ones eat 10 minutes.</li>
+    <li><strong>Need something you don't know?</strong> Name it, search it, give it 2 minutes (see Thinking in lookups). Say the name out loud before you search.</li>
+    <li><strong>Stuck for 3 minutes?</strong> Say so, state your guess and simplify. "I'll use a plain list here and come back to the animation."</li>
+    <li><strong>Don't refactor early.</strong> Ugly but working at minute 30 is fine. Clean it up at the end if there's time.</li>
+    <li><strong>Requirement changes are expected.</strong> Stop, re-read, say where it fits, make the smallest change.</li>
+  </ul>
+</template>
+
+<template id="tpl-codebase">
+  <h1>Reading a codebase fast</h1>
+  <p class="lede">The packet says you'll "understand and extend" an existing codebase. That is a scored skill, not a warm-up. Five minutes, in this order.</p>
+
+  <h2>The five-minute read</h2>
+  <ol>
+    <li><strong>The file tree.</strong> Names tell you the architecture: <code>components/</code>, <code>pages/</code>, <code>utils/</code>, <code>hooks/</code>, <code>api.js</code>. Is there a <code>package.json</code>? Check dependencies: a styling library, TypeScript, a router.</li>
+    <li><strong>Top of the render tree.</strong> <code>index.jsx</code> → <code>App.jsx</code> → the file the task names. Now you know where your feature mounts and what props it gets.</li>
+    <li><strong>Where data comes from.</strong> Open the API or data file. What shape is it? Is it async? Which functions exist? You should not write a fetch that already exists.</li>
+    <li><strong>How styling works.</strong> One global CSS file? CSS modules? <strong>CSS variables at the top</strong> (<code>--color-muted</code>)? Use them instead of hex codes.</li>
+    <li><strong>What you can reuse.</strong> Shared <code>Button</code>, <code>Avatar</code>, <code>Icon</code>, <code>formatDate</code>. Reuse them and say so.</li>
+  </ol>
+
+  <h2>Then match the conventions</h2>
+  <ul>
+    <li>Default or named exports? Do the same.</li>
+    <li>How are class names written: <code>is-active</code>, BEM, camelCase? Match it.</li>
+    <li>Where does state live in similar components? Follow it.</li>
+    <li>Function components with hooks? (Almost certainly.) Don't introduce a new pattern.</li>
+  </ul>
+
+  <div class="callout is-key"><span class="callout-label">Say it out loud</span>
+    <p>"I see there's a <code>getDateGroup</code> helper and an <code>Icon</code> component, and the CSS uses variables, so I'll build on those." One sentence like this tells the interviewer more than ten minutes of silent coding.</p></div>
+
+  <h2>Practice</h2>
+  <p>In each mock interview, before writing any code, set a 5-minute timer and answer: where does my component mount, what data comes in, what can I reuse, how is styling done? The mocks hide useful helpers on purpose.</p>
+  <div data-quiz="codebase"></div>
+</template>
+
+<template id="tpl-figma">
+  <h1>Figma to CSS</h1>
+  <p class="lede">You don't need to be a designer. You need to read numbers off a Figma file and translate them to CSS quickly.</p>
+
+  <h2>Figma in five minutes</h2>
+  <ul>
+    <li><strong>Left panel:</strong> layers. Frames are containers, like divs. Click to select.</li>
+    <li><strong>Right panel:</strong> properties of the selection: size, auto layout, fill, stroke, effects, text. With view-only access you may see an Inspect or Dev Mode panel with CSS instead. The numbers are the same either way.</li>
+    <li><strong>Measure spacing:</strong> select one layer, hold <span class="kbd">Alt</span> (<span class="kbd">Option</span> on Mac) and hover another. Figma shows the distance in red.</li>
+    <li><strong>Zoom:</strong> <span class="kbd">Shift</span> <span class="kbd">2</span> zooms to the selection, <span class="kbd">Shift</span> <span class="kbd">1</span> fits everything. Hold <span class="kbd">Space</span> and drag to pan.</li>
+    <li><strong>Select deep:</strong> <span class="kbd">Cmd/Ctrl</span>-click selects the innermost layer under the cursor.</li>
+  </ul>
+
+  <h2>The translation table</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Figma</th><th>CSS</th></tr>
+    <tr><td>Auto layout, horizontal / vertical</td><td><code>display: flex</code> + <code>flex-direction: row / column</code></td></tr>
+    <tr><td>Spacing between items</td><td><code>gap</code></td></tr>
+    <tr><td>Padding</td><td><code>padding</code> (Figma lists it in the same order: top, right, bottom, left)</td></tr>
+    <tr><td>Alignment (the 9-dot grid)</td><td><code>justify-content</code> on the main axis, <code>align-items</code> on the cross axis</td></tr>
+    <tr><td>Spacing mode "Auto" (space between)</td><td><code>justify-content: space-between</code></td></tr>
+    <tr><td>Width "Hug contents"</td><td>Nothing (auto), or <code>width: fit-content</code></td></tr>
+    <tr><td>Width "Fill container"</td><td><code>flex: 1</code> along the main axis (+ <code>min-width: 0</code> if it holds text); <code>align-self: stretch</code> or <code>width: 100%</code> across it</td></tr>
+    <tr><td>Width "Fixed"</td><td><code>width: 240px</code> (and <code>flex-shrink: 0</code> if it must not squish)</td></tr>
+    <tr><td>Fill</td><td><code>background</code> (text fill → <code>color</code>)</td></tr>
+    <tr><td>Stroke 1, inside</td><td><code>border: 1px solid</code> with <code>box-sizing: border-box</code></td></tr>
+    <tr><td>Corner radius</td><td><code>border-radius</code></td></tr>
+    <tr><td>Drop shadow x, y, blur, spread, color</td><td><code>box-shadow: x y blur spread color</code></td></tr>
+    <tr><td>Layer opacity</td><td><code>opacity</code>. Fill opacity → <code>rgba()</code> or 8-digit hex</td></tr>
+    <tr><td>Clip content</td><td><code>overflow: hidden</code></td></tr>
+    <tr><td>Absolute position (inside auto layout)</td><td><code>position: absolute</code> on the child, <code>position: relative</code> on the parent</td></tr>
+    <tr><td>Text: size / line height</td><td><code>font-size</code> / <code>line-height</code> (px copies across; % → unitless, so 150% = 1.5)</td></tr>
+    <tr><td>Letter spacing 2%</td><td><code>letter-spacing: 0.02em</code></td></tr>
+    <tr><td>Text case: Upper</td><td><code>text-transform: uppercase</code></td></tr>
+    <tr><td>Truncate text</td><td><code>white-space: nowrap; overflow: hidden; text-overflow: ellipsis</code></td></tr>
+  </table></div>
+
+  <h2>Order of fidelity</h2>
+  <ol>
+    <li>Layout structure: rows, columns, what fills and what hugs</li>
+    <li>Spacing scale: the gaps and paddings (they usually repeat: 4, 8, 12, 16, 24)</li>
+    <li>Typography: size, weight, line height</li>
+    <li>Colors (use the codebase's variables)</li>
+    <li>Radius, borders, shadows</li>
+    <li>States: hover, focus, active, disabled. Designs often show these in a separate frame, so look for one.</li>
+  </ol>
+  <p>If the design uses a font the codebase doesn't load, keep the codebase font and mention it. Don't burn time on it.</p>
+
+  <h2>Practice with the Design tab</h2>
+  <p>Every drill and mock has a <strong>Design</strong> tab with a live target and an Inspect mode. Hover to read sizes, padding (shaded blue), gap, type and colors. Click to pin. It's the closest thing to Figma's inspect panel you can practice against here. Then do one round with a real Figma Community file so the actual UI isn't new on Wednesday.</p>
+  <div data-quiz="figma"></div>
+</template>
+
+
+
+
+
+
+
+<template id="tpl-lookup">
+  <h1>Thinking in lookups</h1>
+  <p class="lede">Google and MDN are allowed. So the skill being tested isn't memory. It's how fast you get from "the design needs this" to working code. That speed comes from two habits: breaking the problem into pieces, and knowing what each piece is called.</p>
+
+  <div class="callout is-key"><span class="callout-label">The core idea</span>
+    <p>You can only search for what you can name. Almost every UI request is a combination of a few dozen named building blocks. Learn the names, and anything thrown at you becomes three or four short searches.</p></div>
+
+  <h2>The loop</h2>
+  <ol class="phases">
+    <li class="phase"><span class="phase-time">1</span><div><h3>Restate it as behavior</h3><p>"When the user does X, Y appears / changes / is saved." Strip the product words. "Starred chats go to the top" becomes "items with a flag render in a separate group first."</p></div></li>
+    <li class="phase"><span class="phase-time">2</span><div><h3>Break it into layers</h3><p>Ask the six questions below. Each answer is one small, searchable piece.</p></div></li>
+    <li class="phase"><span class="phase-time">3</span><div><h3>Name each piece</h3><p>Is it React, plain JavaScript, a browser API, or CSS? Then its name: "debounce", "sticky", "click outside", "RelativeTimeFormat". The vocabulary page lists about 70 of these.</p></div></li>
+    <li class="phase"><span class="phase-time">4</span><div><h3>Search with the formula</h3><p><b>[technology] + [exact name or precise words] + [mdn / react]</b>. Short, specific, no full sentences.</p></div></li>
+    <li class="phase"><span class="phase-time">5</span><div><h3>Read the example, not the article</h3><p>Jump to the code. Copy the smallest part. Rename to your variables. Run it.</p></div></li>
+    <li class="phase"><span class="phase-time">6</span><div><h3>Timebox to 2 minutes</h3><p>Not found? Say so, ship a simpler version, and note what you'd do with more time.</p></div></li>
+  </ol>
+
+  <h2>The six questions</h2>
+  <p>Run every unfamiliar requirement through these. You don't need all six every time, but asking them is how you find the pieces you'd otherwise miss.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Ask</th><th>Layer</th><th>Typical answers</th></tr>
+    <tr><td>What data do I have, and what shape does the screen need?</td><td>Data</td><td>filter, sort, group, count, format a date or number</td></tr>
+    <tr><td>What can change on this screen?</td><td>State</td><td>selected id, open/closed, query, list, loading, error</td></tr>
+    <tr><td>What makes it change?</td><td>Event</td><td>click, typing, key press, hover, focus, scroll, resize, a timer, a response arriving</td></tr>
+    <tr><td>What does each state look like?</td><td>Render + style</td><td>conditional JSX, a class name, a layout rule, an animation</td></tr>
+    <tr><td>Does it need something outside React?</td><td>Browser API</td><td>clipboard, storage, timers, observers, URL, focus, scrolling</td></tr>
+    <tr><td>Who else needs this state?</td><td>Placement</td><td>keep it local, or lift it to the parent</td></tr>
+  </table></div>
+
+  <h3>Worked example</h3>
+  <p><em>"Add a ⋯ menu to each comment with Delete. It should close when you click elsewhere."</em></p>
+  <ul>
+    <li><b>State:</b> <code>menuOpen</code> per comment → it lives in a <code>Comment</code> component.</li>
+    <li><b>Event:</b> button click toggles it; a click <em>outside</em> closes it. I don't know how to detect "outside" offhand → that's the piece to look up.</li>
+    <li><b>Render + style:</b> <code>{menuOpen &amp;&amp; &lt;Menu/&gt;}</code>, absolutely positioned under the button. I know this.</li>
+    <li><b>Name it:</b> "click outside". It involves a <code>ref</code> and a <code>document</code> listener.</li>
+    <li><b>Search:</b> <code>react click outside to close dropdown</code> → the first result shows <code>ref.current.contains(e.target)</code>. Two minutes, done.</li>
+  </ul>
+  <p>Notice that only one of four pieces needed a search. That's typical. The breakdown tells you <em>which</em> piece to search for, so you don't google the whole feature.</p>
+
+  <h2>Which layer → where to look</h2>
+  <div class="table-wrap"><table>
+    <tr><th>If the piece is…</th><th>Best source</th><th>Add to your query</th></tr>
+    <tr><td>CSS (layout, text, animation)</td><td>MDN, or CSS-Tricks guides for flexbox and grid</td><td><code>css … mdn</code></td></tr>
+    <tr><td>JavaScript language (arrays, strings, dates, Intl)</td><td>MDN</td><td><code>js … mdn</code></td></tr>
+    <tr><td>Browser API (clipboard, storage, observers, events)</td><td>MDN</td><td><code>… api mdn</code></td></tr>
+    <tr><td>React (hooks, events, refs, portals)</td><td>react.dev</td><td><code>react …</code></td></tr>
+    <tr><td>"How do people usually build X in React"</td><td>Stack Overflow, blog posts</td><td><code>react … without library</code></td></tr>
+    <tr><td>Accessibility (roles, keyboard)</td><td>MDN ARIA pages, the WAI-ARIA patterns site</td><td><code>aria … pattern</code></td></tr>
+  </table></div>
+
+  <h2>Queries that work, and ones that don't</h2>
+  <div class="table-wrap"><table class="qcompare">
+    <tr><th>Vague (slow)</th><th>Precise (fast)</th></tr>
+    <tr><td>how to make text not go to next line and show dots</td><td><code>css text-overflow ellipsis</code></td></tr>
+    <tr><td>react how to close popup when clicking somewhere else on page</td><td><code>react click outside to close dropdown</code></td></tr>
+    <tr><td>javascript show time like facebook</td><td><code>js relative time format mdn</code></td></tr>
+    <tr><td>how to make table top row not move</td><td><code>sticky table header css</code></td></tr>
+    <tr><td>react wait for user to finish typing</td><td><code>react debounce input useEffect</code></td></tr>
+    <tr><td>sort array with numbers in strings correctly</td><td><code>javascript natural sort localecompare numeric</code></td></tr>
+  </table></div>
+  <p>The left column isn't useless. When you <em>can't</em> name something, a plain description is the right first search. Read the titles of the results, pick up the real term ("oh, it's called <em>line-clamp</em>"), then search again precisely.</p>
+
+  <h2>Reading results in 30 seconds</h2>
+  <ul>
+    <li><b>MDN:</b> skip the intro. Scroll to <b>Syntax</b> or the <b>Try it</b> box, then <b>Examples</b>. Use <span class="kbd">Ctrl/⌘</span> <span class="kbd">F</span> for the option name you need.</li>
+    <li><b>react.dev:</b> go to the <b>Usage</b> section for patterns, and <b>Troubleshooting</b> when something misbehaves.</li>
+    <li><b>Stack Overflow:</b> check the answer's date. Prefer answers using hooks (<code>useState</code>, <code>useEffect</code>). Copy the core lines, not the whole thing.</li>
+    <li><b>Blog posts:</b> scroll straight to the last code block. It's usually the finished version.</li>
+  </ul>
+
+  <h2>Adapting what you find</h2>
+  <p>Found code is rarely in your shape. Translate it:</p>
+  <div class="table-wrap"><table>
+    <tr><th>You find</th><th>Write instead</th></tr>
+    <tr><td><code>this.state</code>, <code>this.setState</code></td><td><code>useState</code></td></tr>
+    <tr><td><code>componentDidMount</code></td><td><code>useEffect(() =&gt; …, [])</code></td></tr>
+    <tr><td><code>componentWillUnmount</code></td><td>the function returned from that effect</td></tr>
+    <tr><td><code>componentDidUpdate</code> checking a prop</td><td><code>useEffect(() =&gt; …, [thatProp])</code></td></tr>
+    <tr><td><code>document.querySelector('#x')</code></td><td><code>useRef</code> + <code>ref={…}</code></td></tr>
+    <tr><td><code>element.addEventListener</code> in plain JS</td><td>a JSX prop (<code>onClick</code>), or a listener in an effect with cleanup for <code>window</code>/<code>document</code></td></tr>
+    <tr><td><code>el.classList.add('open')</code></td><td>state + a conditional <code>className</code></td></tr>
+    <tr><td>A library (lodash, moment, react-beautiful-dnd)</td><td>the native equivalent, or say you'd use the library in production</td></tr>
+  </table></div>
+
+  <h2>Narrate the lookup</h2>
+  <p>Looking things up is normal on the job, and interviewers know it. What they notice is whether you knew <em>what</em> to look up.</p>
+  <ul>
+    <li>"This is <code>Intl.RelativeTimeFormat</code>. I'll check the exact option names on MDN."</li>
+    <li>"I don't remember what this is called. It's the dash state on a checkbox. Let me search 'checkbox dash state'... it's <code>indeterminate</code>."</li>
+    <li>"There are drag-and-drop libraries, but I'll use the native API here to keep it dependency-free."</li>
+  </ul>
+
+  <h2>When nothing turns up: the fallback ladder</h2>
+  <ol>
+    <li><b>Native HTML first.</b> <code>&lt;details&gt;</code> for expand/collapse, <code>&lt;dialog&gt;</code> for modals, <code>title</code> for tooltips, <code>&lt;input type="date"&gt;</code> for date pickers, <code>&lt;progress&gt;</code> for progress bars.</li>
+    <li><b>Simpler interaction.</b> A "Load more" button instead of infinite scroll. Up/down buttons instead of drag and drop. A full date instead of "3 hours ago".</li>
+    <li><b>Say what you'd do.</b> "With more time I'd swap this for IntersectionObserver." That still scores.</li>
+  </ol>
+
+  <h2>Set up your browser on Wednesday</h2>
+  <ul data-checklist="lookupsetup">
+    <li data-id="1">A second browser tab with developer.mozilla.org already open</li>
+    <li data-id="2">react.dev/reference/react open in a third tab<small>The hooks list on the left is a fast index.</small></li>
+    <li data-id="3">Know how to open DevTools on the preview (right-click → Inspect) to try CSS live</li>
+    <li data-id="4">Ask the interviewer whether your own notes are allowed. If not, rely on search only</li>
+  </ul>
+  <p>Next: skim the vocabulary, then practice the loop on 24 scenarios in <a href="#names" data-goto="names">Name it, search it</a>.</p>
+</template>
+
+<template id="tpl-vocab">
+  <h1>Lookup vocabulary</h1>
+  <p class="lede">About 70 building blocks that cover nearly any UI request. Learn the middle column. That's what you type into Google.</p>
+  <p>Turn on <b>Quiz me</b> to hide the names, then try to recall each one before clicking. Every query is a live link, so you can check what it actually returns.</p>
+  <div data-vocab></div>
+  <div class="callout"><span class="callout-label">Not on the list?</span>
+    <p>Describe it in plain words, plus "css" or "react". Read the result titles to find the real name, then search again with that name. Two searches, under a minute.</p></div>
+</template>
+
+<template id="tpl-names">
+  <h1>Name it, search it</h1>
+  <p class="lede">24 requirements of the kind an interviewer might throw at you, most of them never covered in this kit. For each, write how you'd break it down and the exact queries you'd type, then reveal and compare.</p>
+  <ul>
+    <li>Don't aim to know the code. Aim to know <b>the name and the query</b>.</li>
+    <li>Turn on the 90-second timer once the first pass feels easy. That's the pace you want on Wednesday.</li>
+    <li>Use <b>Missed first</b> on Tuesday evening to review only your weak spots.</li>
+  </ul>
+  <div data-lookdrill></div>
+  <h2>Then do it for real</h2>
+  <p>These two exercises are built around things this kit never taught. Write the lookup plan in the Task tab first, then build with Google and MDN open in another tab.</p>
+  <div data-exs="c1,c2"></div>
+</template>
+
+<template id="tpl-drills">
+  <h1>Drills</h1>
+  <p class="lede">Short, single-skill exercises with a target design and a starter. Do them in order the first time; later, redo whichever skill your mock debriefs flag.</p>
+  <h2>How to run a drill</h2>
+  <ol>
+    <li>Read the Task tab. Look at the Design tab and inspect a few elements.</li>
+    <li>Start the timer. Talk out loud.</li>
+    <li>When time's up, tick the self-review honestly, then compare with the Solution tab.</li>
+    <li>If you went way over, reset (the circular arrow in Explorer) and redo it tomorrow.</li>
+  </ol>
+  <h2>CSS and layout</h2>
+  <div data-exs="d1,d2"></div>
+  <h2>State, effects and forms</h2>
+  <div data-exs="d3,d4,d5,d6"></div>
+  <h2>Interaction patterns</h2>
+  <div data-exs="d7,d8,d9"></div>
+  <h2>Curveballs: things you'll need to look up</h2>
+  <div data-exs="c1,c2"></div>
+  <h2>Workspace shortcuts</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Keys</th><th>Action</th></tr>
+    <tr><td><span class="kbd">Ctrl/⌘</span> <span class="kbd">S</span></td><td>Run (the preview also rebuilds automatically when Auto-run is on)</td></tr>
+    <tr><td><span class="kbd">Tab</span> / <span class="kbd">Shift</span> <span class="kbd">Tab</span></td><td>Indent / outdent (works on selected lines)</td></tr>
+    <tr><td><span class="kbd">Ctrl/⌘</span> <span class="kbd">/</span></td><td>Toggle comment</td></tr>
+    <tr><td><span class="kbd">Enter</span> after <code>{</code> <code>(</code> or a JSX tag</td><td>Auto-indent</td></tr>
+  </table></div>
+  <p>Brackets close automatically. There's no autocomplete, as in the interview.</p>
+</template>
+
+<template id="tpl-speed">
+  <h1>Speed runs</h1>
+  <p class="lede">The same patterns from blank files, against the clock, with no references. This is how you build the muscle memory that frees your head for the actual problem on Wednesday.</p>
+  <h2>The rules</h2>
+  <ul>
+    <li>Component files start blank. Data and CSS are still there, so you're only typing React.</li>
+    <li>No looking at the drill solution, these lessons or the docs until the timer ends.</li>
+    <li><strong>If one stalls, that's your weak spot.</strong> Spend extra time there and nowhere else.</li>
+    <li>Target: each one a bit faster than your last attempt, with no peeking. Do two as a warm-up on Wednesday morning.</li>
+  </ul>
+  <div data-speeds="d6,d3,d5,d7,d8"></div>
+  <div class="callout"><span class="callout-label">What each one drills</span>
+    <p><b>Feedback list</b>: controlled form, preventDefault, validation, add/toggle/delete. <b>Orders</b>: useEffect, loading, error and empty states. <b>Directory search</b>: filter as derived data. <b>Confirm modal</b>: createPortal, Escape listener with cleanup, backdrop click. <b>Tabs and accordion</b>: single active-item state.</p></div>
+</template>
+
+<template id="tpl-mocks">
+  <h1>Mock interviews</h1>
+  <p class="lede">Each is a small, realistic codebase with a design target, a timer and a requirement change partway through, the way an interviewer would add one.</p>
+  <h2>Run it like the real thing</h2>
+  <ol>
+    <li><strong>Pick your duration.</strong> Click the minutes next to the timer to switch between 45, 55, 60 and 90 minutes. Use whatever your recruiter tells you.</li>
+    <li><strong>Talk out loud the whole time,</strong> or record yourself with your phone. Playing it back is uncomfortable and very useful.</li>
+    <li><strong>First 5 minutes: read.</strong> Task, Design tab, every file. No typing.</li>
+    <li><strong>Scope out loud</strong> before coding.</li>
+    <li>When the new requirement arrives, <strong>stop and re-plan aloud</strong> before touching code.</li>
+    <li>At time: self-review, then the debrief box. Where did time bleed?</li>
+    <li>Only then open the Solution tab.</li>
+  </ol>
+  <div class="callout"><span class="callout-label">Start with the feature extensions</span>
+    <p>The most likely real format is <b>extending a page that already works</b>, not building one from scratch. <b>Customers: sort + filter</b> and <b>Tasks: new task modal</b> are built that way. The table or list is already there; you add the Figma feature. Requirements are tagged Core / Next, and Core working = a pass.</p>
+    <p><b>API keys</b> is a build-from-scratch version at a fair size. Chat sidebar, Team members and Usage dashboard are deliberately oversized: use them only to practise choosing what to build first.</p></div>
+  <div data-exs="m7,m5,m6,m4,m1,m2,m3"></div>
+  <h2>After each mock: patch the leak</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Time went to…</th><th>Do this next</th></tr>
+    <tr><td>Guessing at flexbox, spacing, alignment</td><td>Flexbox, and Grid, positioning, overflow; then Profile card and Project cards</td></tr>
+    <tr><td>Figuring out where state goes</td><td>State and rendering (§6), Structuring a feature; then Inbox</td></tr>
+    <tr><td>Effects, loading states, stale results</td><td>Effects and loading data, then the Orders speed run</td></tr>
+    <tr><td>Typing patterns slowly, syntax recall</td><td>All five speed runs, twice</td></tr>
+    <tr><td>Getting oriented in the code</td><td>Reading a codebase fast, then redo only the first 5 minutes of the mock</td></tr>
+    <tr><td>Didn't know what to search for</td><td>Name it, search it (Missed first), then a curveball</td></tr>
+    <tr><td>Stuck on an error</td><td>Debugging fast</td></tr>
+  </table></div>
+</template>
+
+<template id="tpl-talk">
+  <h1>Talking while you code</h1>
+  <p class="lede">The interviewer can only score what they can see or hear. Narration makes your judgment visible. Silence for five minutes reads as stuck, even when you're not.</p>
+
+  <h2>Opening (first 5 minutes)</h2>
+  <ul>
+    <li>"Let me read the whole task and look at the design before I touch code."</li>
+    <li>"I'll take a few minutes to find my way around the codebase: where this mounts, where the data comes from, and what I can reuse."</li>
+    <li>"I see a <code>formatDate</code> helper and the CSS uses variables, so I'll use those."</li>
+  </ul>
+
+  <h2>Clarifying questions worth asking</h2>
+  <ul>
+    <li>"Should I treat the API as fixed, or can I change it?"</li>
+    <li>"Is this design the only breakpoint, or should it work on mobile too?"</li>
+    <li>"Are hover and focus states in another frame, or should I use my judgment?"</li>
+    <li>"What should happen when the list is empty or the request fails?"</li>
+    <li>"Do you care more about getting everything working, or about matching the design closely?"</li>
+  </ul>
+  <p>Ask two or three, not ten. If the answer is "your call", make a call and say it.</p>
+
+  <h2>Scoping</h2>
+  <p>"I'll get the list and grouping fully working first, then search, then starring. I'll add loading and empty states, and leave keyboard shortcuts for the end if there's time."</p>
+
+  <h2>While building</h2>
+  <ul>
+    <li>"I'll hardcode one row first to get the markup right, then map over the data."</li>
+    <li>"The filtered list is derived from the query, so I won't put it in state."</li>
+    <li>"I'm putting the selected id in the parent because both the list and the detail need it."</li>
+    <li>"I'll come back to the exact spacing. Getting the behavior working first."</li>
+  </ul>
+
+  <h2>When stuck</h2>
+  <ul>
+    <li>"This isn't truncating. My guess is the flex child needs <code>min-width: 0</code>. Let me check."</li>
+    <li>"I've spent a few minutes on this. I'll take the simpler approach and note the tradeoff."</li>
+    <li>It's fine to ask: "Is it OK if I look up the exact syntax for <code>line-clamp</code> on MDN?"</li>
+  </ul>
+
+  <h2>When the requirement changes</h2>
+  <p>"OK, starred chats go in their own section. Grouping is already derived from the list, so this is one more section built from the same data, plus a filter on the date groups. Small change."</p>
+
+  <h2>Closing</h2>
+  <p>"Here's what works. Here's what I'd do next with more time: keyboard navigation, tests for the grouping helper, and the mobile layout. One tradeoff I made was optimistic updates without rollback."</p>
+
+  <h2>Avoid</h2>
+  <ul>
+    <li>Apologizing for every typo. Fix it and keep going.</li>
+    <li>Arguing with the design. Ask, then follow it.</li>
+    <li>Narrating keystrokes ("now I'm typing const…"). Narrate decisions.</li>
+  </ul>
+</template>
+
+<template id="tpl-explain">
+  <h1>Explain-out-loud questions</h1>
+  <p class="lede">Interviewers often ask "why" while you code. Answer each of these out loud in two or three sentences, then open it and compare.</p>
+  <div data-explain></div>
+</template>
+
+<template id="tpl-debug">
+  <h1>Debugging fast</h1>
+  <p class="lede">Read the first line of the error. It almost always names the problem. Then check the one most likely cause before trying anything else.</p>
+  <div class="table-wrap"><table>
+    <tr><th>You see</th><th>Usual cause</th><th>Fix</th></tr>
+    <tr><td>Objects are not valid as a React child</td><td>Rendering <code>{user}</code></td><td>Render a field: <code>{user.name}</code></td></tr>
+    <tr><td>Cannot read properties of undefined (reading 'map')</td><td>Data not loaded yet, or a different shape than you think</td><td>Initialize to <code>[]</code>, show loading, check api.js</td></tr>
+    <tr><td>Too many re-renders</td><td><code>onClick={setX(1)}</code>, or setState during render</td><td><code>onClick={() =&gt; setX(1)}</code></td></tr>
+    <tr><td>Each child in a list should have a unique "key"</td><td>Missing or duplicate key</td><td><code>key={item.id}</code> on the outermost element in map</td></tr>
+    <tr><td>Element type is invalid… got: undefined</td><td>Default vs named import mismatch</td><td>Match the export: <code>import X</code> vs <code>import { X }</code></td></tr>
+    <tr><td>Module not found: Can't resolve './X'</td><td>Wrong path, case or folder</td><td>Check the tree. <code>../</code> goes up a folder</td></tr>
+    <tr><td>Input won't accept typing</td><td><code>value</code> without <code>onChange</code></td><td>Add <code>onChange</code> that sets state</td></tr>
+    <tr><td>UI doesn't update after a change</td><td>Mutated state (<code>push</code>, <code>sort</code>, <code>obj.x = …</code>)</td><td>New array or object: spread, map, filter</td></tr>
+    <tr><td>Effect runs in a loop</td><td>It sets state that's in its own dependency array</td><td>Fix the dependencies, or derive instead of syncing</td></tr>
+    <tr><td>Value is stale right after setState</td><td>State updates on the next render</td><td>Use the value you just computed, or <code>prev =&gt;</code></td></tr>
+    <tr><td>Text overflows instead of truncating</td><td>Flex child with min-width:auto</td><td><code>min-width: 0</code> on the flex child</td></tr>
+    <tr><td><code>height: 100%</code> does nothing</td><td>Parent has no defined height</td><td>Give the chain a height, or use flex</td></tr>
+    <tr><td>A "0" appears on the page</td><td><code>{count &amp;&amp; …}</code> with count 0</td><td><code>{count &gt; 0 &amp;&amp; …}</code></td></tr>
+  </table></div>
+
+  <h2>The method</h2>
+  <ol>
+    <li>Read the error's first line and the file and line number.</li>
+    <li>Say your guess out loud.</li>
+    <li>Check it with a <code>console.log</code> right before the failing line, or in the Console tab.</li>
+    <li>Still lost? Comment out half of the new code and see which half breaks.</li>
+  </ol>
+  <p>The workspace shows compile errors in a red overlay and in the Terminal, like Create React App, and runtime errors and React warnings in the Console tab. Break something on purpose in a drill to see what each looks like.</p>
+  <div data-quiz="debug"></div>
+</template>
+
+<template id="tpl-cheat">
+  <h1>Cheat sheet</h1>
+  <p class="lede">Read once on Wednesday morning. Everything else is already in your fingers.</p>
+  <script type="text/x-code" data-lang="jsx" data-title="component skeleton">
+import React, { useEffect, useState } from 'react';
+import { getThings } from '../api';
+
+export default function ThingList({ onSelect, selectedId }) {
+  const [things, setThings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getThings().then((d) => { if (!cancelled) { setThings(d); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const visible = things.filter((t) => t.name.toLowerCase().includes(q));
+
+  return (
+    <section className="thing-list">
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" />
+      {loading && <p>Loading…</p>}
+      {!loading && visible.length === 0 && <p>No matches.</p>}
+      <ul>
+        {visible.map((t) => (
+          <li key={t.id}>
+            <button className={t.id === selectedId ? 'is-active' : ''} onClick={() => onSelect(t.id)}>
+              {t.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+</script>
+  <script type="text/x-code" data-lang="css" data-title="layout in 10 lines">
+* { box-sizing: border-box; }
+.row { display: flex; align-items: center; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+.push-right { margin-left: auto; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card { position: relative; } .badge { position: absolute; top: 12px; right: 12px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+</script>
+  <h2>Edge-case reflexes</h2>
+  <p>Seconds to add, noticed every time:</p>
+  <ul>
+    <li>Loading, empty and error states</li>
+    <li>Long text truncates; long words wrap</li>
+    <li>Pluralization: "1 member", "2 members"</li>
+    <li>Disabled button while submitting; no double submit</li>
+    <li>Real <code>&lt;button&gt;</code>s, labels on inputs, alt text on images</li>
+    <li>Visible focus, and everything reachable with the keyboard</li>
+  </ul>
+  <h2>Flow</h2>
+  <p><strong>Read 5 → scope out loud → structure → behavior → states → polish → walk through.</strong> Keep it running. Narrate decisions.</p>
+</template>
+
+<template id="tpl-day">
+  <h1>Interview day</h1>
+  <p class="lede">Remove every source of friction that isn't the problem itself.</p>
+  <h2>The night before</h2>
+  <ul data-checklist="night">
+    <li data-id="1">Figma logged in, in the browser you'll use</li>
+    <li data-id="2">Screen sharing tested in Google Meet</li>
+    <li data-id="3">Recruiter's answers noted: length, JS or TS, styling approach, docs allowed</li>
+    <li data-id="4">Sleep. One more mock at midnight is worth less than rest.</li>
+  </ul>
+  <h2>One hour before</h2>
+  <ul data-checklist="hour">
+    <li data-id="1">Two speed runs from memory, then stop coding</li>
+    <li data-id="2">Read Gotchas and the cheat sheet once</li>
+    <li data-id="3">Laptop charging. Notifications off (Do Not Disturb). Close Slack, mail and extra tabs</li>
+    <li data-id="4">Browser zoom at 100%; editor font readable when shared</li>
+    <li data-id="5">Water, a notepad and a pen for sketching components</li>
+    <li data-id="6">Two or three questions ready for the end: what the team is building, how design and engineering work together, what a first project looks like</li>
+  </ul>
+  <h2>In the room</h2>
+  <ul data-checklist="room">
+    <li data-id="1">Read everything first. Say you're reading</li>
+    <li data-id="2">Ask two or three clarifying questions</li>
+    <li data-id="3">Scope out loud before coding</li>
+    <li data-id="4">Structure → behavior → states → polish, keeping the build green</li>
+    <li data-id="5">New requirement: pause, re-plan aloud, smallest change</li>
+    <li data-id="6">Last 5 minutes: walk through, name next steps and tradeoffs</li>
+  </ul>
+  <div class="callout is-key"><span class="callout-label">Remember</span>
+    <p>They are not hunting for the cleverest code. They want to see how you'd work on their team: read before you write, reuse what's there, build in small steps, stay calm, talk it through. That's all practiceable, and you've practiced it.</p></div>
+</template>

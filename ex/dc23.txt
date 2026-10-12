@@ -1,0 +1,348 @@
+@@@ shared src/utils/time.ts
+export const FOCUS_SECONDS = 25 * 60;
+export const BREAK_SECONDS = 5 * 60;
+
+// formatTime(1500) -> "25:00", formatTime(65) -> "01:05", formatTime(0) -> "00:00"
+export function formatTime(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+@@@ shared src/components/TaskList.tsx
+import React, { useState } from 'react';
+
+type Task = { id: string; title: string; done: boolean };
+
+const INITIAL: Task[] = [
+  { id: 't1', title: 'Draft Q4 hiring plan', done: true },
+  { id: 't2', title: 'Review onboarding PR', done: false },
+  { id: 't3', title: 'Write release notes', done: false },
+];
+
+export default function TaskList() {
+  const [tasks, setTasks] = useState<Task[]>(INITIAL);
+
+  function toggle(id: string) {
+    setTasks((prev) => {
+      return prev.map((t) => {
+        if (t.id !== id) {
+          return t;
+        }
+        return { ...t, done: !t.done };
+      });
+    });
+  }
+
+  return (
+    <section className="panel">
+      <h2>Today</h2>
+      <ul className="tasks">
+        {tasks.map((t) => {
+          let cls = 'task';
+          if (t.done) {
+            cls = 'task is-done';
+          }
+          return (
+            <li key={t.id} className={cls}>
+              <label>
+                <input type="checkbox" checked={t.done} onChange={() => { toggle(t.id); }} />
+                {t.title}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+@@@ starter src/App.tsx
+import React from 'react';
+import TaskList from './components/TaskList';
+import { formatTime, FOCUS_SECONDS } from './utils/time';
+
+const DAILY_GOAL = 4;
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">● Ripe</span>
+      <span className="header-note">Deep work, one tomato at a time</span>
+    </header>
+  );
+}
+
+function SessionDots({ completed }: { completed: number }) {
+  const dots = [];
+  for (let i = 0; i < DAILY_GOAL; i++) {
+    let cls = 'dot';
+    if (i < completed) {
+      cls = 'dot is-done';
+    }
+    dots.push(<span key={i} className={cls} />);
+  }
+  return (
+    <div className="sessions">
+      <div className="dots">{dots}</div>
+      <span className="sessions-label">{completed} of {DAILY_GOAL} sessions</span>
+    </div>
+  );
+}
+
+// TODO: make the timer count down. Start/Pause, Reset, and switch to a
+// 5-minute break when focus reaches 00:00.
+function Timer() {
+  return (
+    <section className="timer mode-focus">
+      <span className="mode-pill">Focus</span>
+      <div className="time">{formatTime(FOCUS_SECONDS)}</div>
+      <div className="controls">
+        <button type="button" className="btn btn-primary">Start</button>
+        <button type="button" className="btn btn-ghost">Reset</button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <Header />
+      <main className="main">
+        <Timer />
+        <SessionDots completed={0} />
+        <TaskList />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFF5F3;
+  --surface: #FFFFFF;
+  --text: #3A1F1C;
+  --muted: #9A7B76;
+  --tomato: #E5484D;
+  --tomato-soft: #FDE2E1;
+  --leaf: #2F9E6B;
+  --leaf-soft: #DDF3E8;
+  --border: #F4DCD7;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Avenir Next', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 18px 24px; }
+.logo { font-weight: 800; font-size: 20px; color: var(--tomato); }
+.header-note { font-size: 13px; color: var(--muted); }
+
+.main { max-width: 440px; margin: 0 auto; padding: 8px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+.timer { background: var(--surface); border-radius: 28px; padding: 28px 24px 26px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 10px 30px rgba(229, 72, 77, 0.12); border-top: 6px solid var(--tomato); }
+.mode-pill { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; background: var(--tomato-soft); color: var(--tomato); }
+.time { font-size: 72px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+.controls { display: flex; gap: 10px; }
+.btn { height: 44px; min-width: 110px; padding: 0 22px; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn-primary { border: 0; background: var(--tomato); color: #fff; }
+.btn-primary:hover { filter: brightness(0.95); }
+.btn-ghost { border: 2px solid var(--border); background: none; color: var(--text); }
+
+.sessions { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.dots { display: flex; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); }
+.dot.is-done { background: var(--tomato); }
+.sessions-label { font-size: 13px; color: var(--muted); }
+
+.panel { background: var(--surface); border-radius: 18px; padding: 16px 18px; }
+.panel h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tasks { list-style: none; margin: 0; padding: 0; }
+.task label { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 15px; cursor: pointer; }
+.task input { width: 18px; height: 18px; accent-color: var(--tomato); }
+.task.is-done label { color: var(--muted); text-decoration: line-through; }
+@@@ solution src/App.tsx
+import React, { useEffect, useState } from 'react';
+import TaskList from './components/TaskList';
+import { formatTime, FOCUS_SECONDS, BREAK_SECONDS } from './utils/time';
+
+const DAILY_GOAL = 4;
+
+type Mode = 'focus' | 'break';
+
+function Header() {
+  return (
+    <header className="header">
+      <span className="logo">● Ripe</span>
+      <span className="header-note">Deep work, one tomato at a time</span>
+    </header>
+  );
+}
+
+function SessionDots({ completed }: { completed: number }) {
+  const dots = [];
+  for (let i = 0; i < DAILY_GOAL; i++) {
+    let cls = 'dot';
+    if (i < completed) {
+      cls = 'dot is-done';
+    }
+    dots.push(<span key={i} className={cls} />);
+  }
+  return (
+    <div className="sessions">
+      <div className="dots">{dots}</div>
+      <span className="sessions-label">{completed} of {DAILY_GOAL} sessions</span>
+    </div>
+  );
+}
+
+function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
+  const [mode, setMode] = useState<Mode>('focus');
+  const [secondsLeft, setSecondsLeft] = useState(FOCUS_SECONDS);
+  const [running, setRunning] = useState(false);
+
+  // One interval while running. The cleanup clears it when we pause,
+  // reset or unmount, so there can never be two intervals at once.
+  useEffect(() => {
+    if (!running) {
+      return;
+    }
+    const id = setInterval(() => {
+      // updater form: the interval callback would otherwise see a stale value
+      setSecondsLeft((s) => {
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      clearInterval(id);
+    };
+  }, [running]);
+
+  // Reaching 00:00 switches the mode.
+  useEffect(() => {
+    if (secondsLeft > 0) {
+      return;
+    }
+    if (mode === 'focus') {
+      setMode('break');
+      setSecondsLeft(BREAK_SECONDS);
+      onFocusComplete();
+    } else {
+      setMode('focus');
+      setSecondsLeft(FOCUS_SECONDS);
+      setRunning(false);
+    }
+  }, [secondsLeft, mode]);
+
+  function handleStartPause() {
+    setRunning((r) => {
+      return !r;
+    });
+  }
+
+  function handleReset() {
+    setRunning(false);
+    setMode('focus');
+    setSecondsLeft(FOCUS_SECONDS);
+  }
+
+  // derived
+  let total = FOCUS_SECONDS;
+  let modeLabel = 'Focus';
+  let cls = 'timer mode-focus';
+  if (mode === 'break') {
+    total = BREAK_SECONDS;
+    modeLabel = 'Break';
+    cls = 'timer mode-break';
+  }
+  const progress = ((total - secondsLeft) / total) * 100;
+
+  let startLabel = 'Start';
+  if (running) {
+    startLabel = 'Pause';
+  }
+
+  return (
+    <section className={cls}>
+      <span className="mode-pill">{modeLabel}</span>
+      <div className="time">{formatTime(secondsLeft)}</div>
+      <div className="progress" aria-hidden="true">
+        <div className="progress-fill" style={{ width: progress + '%' }} />
+      </div>
+      <div className="controls">
+        <button type="button" className="btn btn-primary" onClick={() => { handleStartPause(); }}>{startLabel}</button>
+        <button type="button" className="btn btn-ghost" onClick={() => { handleReset(); }}>Reset</button>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [completed, setCompleted] = useState(0);
+
+  function handleFocusComplete() {
+    setCompleted((c) => {
+      return c + 1;
+    });
+  }
+
+  return (
+    <div className="app">
+      <Header />
+      <main className="main">
+        <Timer onFocusComplete={handleFocusComplete} />
+        <SessionDots completed={completed} />
+        <TaskList />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFF5F3;
+  --surface: #FFFFFF;
+  --text: #3A1F1C;
+  --muted: #9A7B76;
+  --tomato: #E5484D;
+  --tomato-soft: #FDE2E1;
+  --leaf: #2F9E6B;
+  --leaf-soft: #DDF3E8;
+  --border: #F4DCD7;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Avenir Next', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 18px 24px; }
+.logo { font-weight: 800; font-size: 20px; color: var(--tomato); }
+.header-note { font-size: 13px; color: var(--muted); }
+
+.main { max-width: 440px; margin: 0 auto; padding: 8px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+.timer { background: var(--surface); border-radius: 28px; padding: 28px 24px 26px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 10px 30px rgba(229, 72, 77, 0.12); border-top: 6px solid var(--tomato); }
+.mode-pill { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; background: var(--tomato-soft); color: var(--tomato); }
+.time { font-size: 72px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+.controls { display: flex; gap: 10px; }
+.btn { height: 44px; min-width: 110px; padding: 0 22px; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn-primary { border: 0; background: var(--tomato); color: #fff; }
+.btn-primary:hover { filter: brightness(0.95); }
+.btn-ghost { border: 2px solid var(--border); background: none; color: var(--text); }
+
+.sessions { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.dots { display: flex; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); }
+.dot.is-done { background: var(--tomato); }
+.sessions-label { font-size: 13px; color: var(--muted); }
+
+.panel { background: var(--surface); border-radius: 18px; padding: 16px 18px; }
+.panel h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tasks { list-style: none; margin: 0; padding: 0; }
+.task label { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 15px; cursor: pointer; }
+.task input { width: 18px; height: 18px; accent-color: var(--tomato); }
+.task.is-done label { color: var(--muted); text-decoration: line-through; }
+
+/* ---- Added: running timer ---- */
+.timer.mode-break { border-top-color: var(--leaf); box-shadow: 0 10px 30px rgba(47, 158, 107, 0.14); }
+.mode-break .mode-pill { background: var(--leaf-soft); color: var(--leaf); }
+.mode-break .btn-primary { background: var(--leaf); }
+.progress { width: 100%; max-width: 260px; height: 6px; border-radius: 999px; background: var(--tomato-soft); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--tomato); border-radius: inherit; transition: width 0.3s linear; }
+.mode-break .progress { background: var(--leaf-soft); }
+.mode-break .progress-fill { background: var(--leaf); }

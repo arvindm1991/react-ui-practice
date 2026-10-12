@@ -1,0 +1,599 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Notification = {
+  id: string;
+  actor: string;      // who did the thing
+  text: string;       // what they did, e.g. "commented on Launch checklist"
+  createdAt: string;  // ISO date-time
+  read: boolean;
+};
+
+const NOTIFICATIONS: Notification[] = [
+  { id: 'n1', actor: 'Priya Shah', text: 'assigned you to "Pricing page copy"', createdAt: '2026-10-10T14:42:00', read: false },
+  { id: 'n2', actor: 'Marcus Lee', text: 'commented on "Launch checklist": Can we move QA to Thursday?', createdAt: '2026-10-10T13:05:00', read: false },
+  { id: 'n3', actor: 'Dana Okafor', text: 'moved "Onboarding emails" to Done', createdAt: '2026-10-10T09:20:00', read: true },
+  { id: 'n4', actor: 'Priya Shah', text: 'mentioned you in "Q4 roadmap review"', createdAt: '2026-10-09T17:48:00', read: false },
+  { id: 'n5', actor: 'Tom Becker', text: 'set the due date of "Billing migration" to Oct 14', createdAt: '2026-10-09T11:30:00', read: true },
+  { id: 'n6', actor: 'Marcus Lee', text: 'completed "Fix SSO redirect loop"', createdAt: '2026-10-08T16:02:00', read: false },
+  { id: 'n7', actor: 'Dana Okafor', text: 'invited you to the project "Mobile app v2"', createdAt: '2026-10-06T10:15:00', read: true },
+  { id: 'n8', actor: 'Tom Becker', text: 'attached 2 files to "Brand refresh"', createdAt: '2026-10-03T08:40:00', read: true },
+];
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /notifications -> Notification[] (newest first)
+export async function getNotifications(): Promise<Notification[]> {
+  await randomDelay(400, 1000);
+  return NOTIFICATIONS.map((n) => ({ ...n }));
+}
+
+// POST /notifications/:id/read
+export async function markRead(id: string): Promise<{ ok: true }> {
+  await randomDelay(300, 700);
+  const n = NOTIFICATIONS.find((x) => x.id === id);
+  if (n) {
+    n.read = true;
+  }
+  return { ok: true };
+}
+
+// POST /notifications/read-all
+export async function markAllRead(): Promise<{ ok: true }> {
+  await randomDelay(300, 700);
+  NOTIFICATIONS.forEach((n) => {
+    n.read = true;
+  });
+  return { ok: true };
+}
+@@@ shared src/components/Avatar.tsx
+import React from 'react';
+
+const COLORS = ['#6366F1', '#0EA5E9', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6'];
+
+// Initials in a colored circle. The color is stable per name.
+export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+  const initials = name
+    .split(' ')
+    .map((part) => {
+      return part[0];
+    })
+    .join('')
+    .slice(0, 2);
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i);
+  }
+  const style = { width: size, height: size, fontSize: size * 0.4, background: COLORS[sum % COLORS.length] };
+  return <span className="avatar" style={style}>{initials}</span>;
+}
+@@@ shared src/components/Icons.tsx
+import React from 'react';
+
+export function BellIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+export function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+@@@ shared src/utils/time.ts
+// The app's "now". Fixed so the demo data always reads the same.
+export const NOW = new Date('2026-10-10T15:00:00');
+
+// timeAgo('2026-10-10T14:42:00') -> "18m ago", a day earlier -> "1d ago"
+export function timeAgo(iso: string): string {
+  const minutes = Math.round((NOW.getTime() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) {
+    return 'just now';
+  }
+  if (minutes < 60) {
+    return minutes + 'm ago';
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return hours + 'h ago';
+  }
+  return Math.floor(hours / 24) + 'd ago';
+}
+
+// isToday('2026-10-10T09:20:00') -> true (same calendar day as NOW)
+export function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  return d.getFullYear() === NOW.getFullYear() && d.getMonth() === NOW.getMonth() && d.getDate() === NOW.getDate();
+}
+@@@ starter src/App.tsx
+import React from 'react';
+import { Avatar } from './components/Avatar';
+import { BellIcon, SearchIcon } from './components/Icons';
+
+type Card = { id: string; title: string; tag: string; assignee: string };
+type Column = { id: string; title: string; cards: Card[] };
+
+const COLUMNS: Column[] = [
+  { id: 'todo', title: 'To do', cards: [
+    { id: 'c1', title: 'Pricing page copy', tag: 'Marketing', assignee: 'Arvind Murali' },
+    { id: 'c2', title: 'Billing migration', tag: 'Platform', assignee: 'Tom Becker' },
+  ] },
+  { id: 'doing', title: 'In progress', cards: [
+    { id: 'c3', title: 'Launch checklist', tag: 'Launch', assignee: 'Marcus Lee' },
+    { id: 'c4', title: 'Brand refresh', tag: 'Design', assignee: 'Dana Okafor' },
+  ] },
+  { id: 'done', title: 'Done', cards: [
+    { id: 'c5', title: 'Onboarding emails', tag: 'Marketing', assignee: 'Dana Okafor' },
+    { id: 'c6', title: 'Fix SSO redirect loop', tag: 'Platform', assignee: 'Marcus Lee' },
+  ] },
+];
+
+function BellButton() {
+  // TODO: unread badge + notifications dropdown
+  return (
+    <button type="button" className="icon-btn bell-btn" aria-label="Notifications">
+      <BellIcon />
+    </button>
+  );
+}
+
+function AppHeader() {
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <span className="brand-mark">T</span>
+        Tasklane
+      </div>
+      <nav className="nav">
+        <button type="button" className="nav-link is-active">Board</button>
+        <button type="button" className="nav-link">Timeline</button>
+        <button type="button" className="nav-link">Reports</button>
+      </nav>
+      <div className="topbar-right">
+        <label className="search">
+          <SearchIcon />
+          <input placeholder="Search tasks" />
+        </label>
+        <BellButton />
+        <Avatar name="Arvind Murali" size={32} />
+      </div>
+    </header>
+  );
+}
+
+function TaskCard({ card }: { card: Card }) {
+  return (
+    <article className="task-card">
+      <span className="tag">{card.tag}</span>
+      <p className="task-title">{card.title}</p>
+      <div className="task-foot">
+        <Avatar name={card.assignee} size={22} />
+        <span>{card.assignee.split(' ')[0]}</span>
+      </div>
+    </article>
+  );
+}
+
+function BoardColumn({ column }: { column: Column }) {
+  return (
+    <section className="column">
+      <h2 className="column-title">
+        {column.title}
+        <span className="count">{column.cards.length}</span>
+      </h2>
+      {column.cards.map((card) => {
+        return <TaskCard key={card.id} card={card} />;
+      })}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <AppHeader />
+      <main className="page">
+        <h1 className="page-title">Website relaunch</h1>
+        <div className="board">
+          {COLUMNS.map((col) => {
+            return <BoardColumn key={col.id} column={col} />;
+          })}
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --border: #E6E8F0;
+  --text: #1B1F3B;
+  --muted: #6B7090;
+  --primary: #5B5BD6;
+  --primary-soft: #EEEEFC;
+  --danger: #E5484D;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 14px; }
+.nav { display: flex; gap: 4px; }
+.nav-link { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--muted); cursor: pointer; }
+.nav-link:hover { background: var(--bg); }
+.nav-link.is-active { color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.search { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+.search input { border: 0; outline: 0; font: inherit; width: 140px; background: none; }
+
+.icon-btn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { background: var(--bg); color: var(--text); }
+.bell-btn { position: relative; }
+
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 600; }
+
+.page { padding: 24px 20px; }
+.page-title { margin: 0 0 16px; font-size: 20px; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 16px; }
+.column { background: #EEF0F6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.column-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.count { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(27, 31, 59, 0.04); }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 4px; padding: 2px 6px; }
+.task-title { margin: 8px 0 10px; font-weight: 600; }
+.task-foot { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+@@@ solution src/components/NotificationsMenu.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getNotifications, markRead, markAllRead } from '../api';
+import type { Notification } from '../api';
+import { Avatar } from './Avatar';
+import { BellIcon } from './Icons';
+import { isToday, timeAgo } from '../utils/time';
+
+type ItemProps = {
+  item: Notification;
+  onClick: (id: string) => void;
+};
+
+function NotificationItem({ item, onClick }: ItemProps) {
+  let cls = 'notif-item';
+  let dot = null;
+  if (!item.read) {
+    cls = 'notif-item is-unread';
+    dot = <span className="unread-dot" aria-label="Unread" />;
+  }
+  return (
+    <li>
+      <button type="button" className={cls} onClick={() => { onClick(item.id); }}>
+        <Avatar name={item.actor} size={36} />
+        <span className="notif-body">
+          <span className="notif-text"><b>{item.actor}</b> {item.text}</span>
+          <span className="notif-time">{timeAgo(item.createdAt)}</span>
+        </span>
+        {dot}
+      </button>
+    </li>
+  );
+}
+
+type GroupProps = {
+  title: string;
+  items: Notification[];
+  onItemClick: (id: string) => void;
+};
+
+// Change: one heading + list per group. An empty group renders nothing.
+function NotificationGroup({ title, items, onItemClick }: GroupProps) {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <section className="notif-group">
+      <h3 className="notif-group-title">{title}</h3>
+      <ul className="notif-list">
+        {items.map((item) => {
+          return <NotificationItem key={item.id} item={item} onClick={onItemClick} />;
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export function NotificationsMenu() {
+  const [items, setItems] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Load on mount, not on open: the badge needs the count before the menu is ever opened.
+  useEffect(() => {
+    let cancelled = false;
+    getNotifications().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setItems(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Outside click + Escape. Only listen while the menu is open.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function handleMouseDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  function handleToggle() {
+    setOpen((prev) => {
+      return !prev;
+    });
+  }
+
+  // Optimistic: update the UI now, tell the server in the background.
+  function handleItemClick(id: string) {
+    setItems((prev) => {
+      return prev.map((n) => {
+        if (n.id === id) {
+          return { ...n, read: true };
+        }
+        return n;
+      });
+    });
+    markRead(id);
+  }
+
+  function handleMarkAll() {
+    setItems((prev) => {
+      return prev.map((n) => {
+        return { ...n, read: true };
+      });
+    });
+    markAllRead();
+  }
+
+  // derived: never stored in state
+  const unreadCount = items.filter((n) => {
+    return !n.read;
+  }).length;
+  const todayItems = items.filter((n) => {
+    return isToday(n.createdAt);
+  });
+  const earlierItems = items.filter((n) => {
+    return !isToday(n.createdAt);
+  });
+
+  let badge = null;
+  if (unreadCount > 0) {
+    badge = <span className="bell-badge">{unreadCount}</span>;
+  }
+
+  let dropdown = null;
+  if (open) {
+    let body;
+    if (loading) {
+      body = <p className="notif-empty">Loading notifications…</p>;
+    } else if (items.length === 0) {
+      body = <p className="notif-empty">You're all caught up.</p>;
+    } else {
+      body = (
+        <div className="notif-scroll">
+          <NotificationGroup title="Today" items={todayItems} onItemClick={handleItemClick} />
+          <NotificationGroup title="Earlier" items={earlierItems} onItemClick={handleItemClick} />
+        </div>
+      );
+    }
+    dropdown = (
+      <div className="notif-menu" role="dialog" aria-label="Notifications">
+        <div className="notif-head">
+          <h2>Notifications</h2>
+          <button type="button" className="link-btn" disabled={unreadCount === 0} onClick={() => { handleMarkAll(); }}>
+            Mark all as read
+          </button>
+        </div>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div className="notif-wrap" ref={wrapRef}>
+      <button type="button" className="icon-btn bell-btn" aria-label="Notifications" aria-expanded={open} onClick={() => { handleToggle(); }}>
+        <BellIcon />
+        {badge}
+      </button>
+      {dropdown}
+    </div>
+  );
+}
+@@@ solution src/App.tsx
+import React from 'react';
+import { Avatar } from './components/Avatar';
+import { SearchIcon } from './components/Icons';
+import { NotificationsMenu } from './components/NotificationsMenu';
+
+type Card = { id: string; title: string; tag: string; assignee: string };
+type Column = { id: string; title: string; cards: Card[] };
+
+const COLUMNS: Column[] = [
+  { id: 'todo', title: 'To do', cards: [
+    { id: 'c1', title: 'Pricing page copy', tag: 'Marketing', assignee: 'Arvind Murali' },
+    { id: 'c2', title: 'Billing migration', tag: 'Platform', assignee: 'Tom Becker' },
+  ] },
+  { id: 'doing', title: 'In progress', cards: [
+    { id: 'c3', title: 'Launch checklist', tag: 'Launch', assignee: 'Marcus Lee' },
+    { id: 'c4', title: 'Brand refresh', tag: 'Design', assignee: 'Dana Okafor' },
+  ] },
+  { id: 'done', title: 'Done', cards: [
+    { id: 'c5', title: 'Onboarding emails', tag: 'Marketing', assignee: 'Dana Okafor' },
+    { id: 'c6', title: 'Fix SSO redirect loop', tag: 'Platform', assignee: 'Marcus Lee' },
+  ] },
+];
+
+function AppHeader() {
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <span className="brand-mark">T</span>
+        Tasklane
+      </div>
+      <nav className="nav">
+        <button type="button" className="nav-link is-active">Board</button>
+        <button type="button" className="nav-link">Timeline</button>
+        <button type="button" className="nav-link">Reports</button>
+      </nav>
+      <div className="topbar-right">
+        <label className="search">
+          <SearchIcon />
+          <input placeholder="Search tasks" />
+        </label>
+        <NotificationsMenu />
+        <Avatar name="Arvind Murali" size={32} />
+      </div>
+    </header>
+  );
+}
+
+function TaskCard({ card }: { card: Card }) {
+  return (
+    <article className="task-card">
+      <span className="tag">{card.tag}</span>
+      <p className="task-title">{card.title}</p>
+      <div className="task-foot">
+        <Avatar name={card.assignee} size={22} />
+        <span>{card.assignee.split(' ')[0]}</span>
+      </div>
+    </article>
+  );
+}
+
+function BoardColumn({ column }: { column: Column }) {
+  return (
+    <section className="column">
+      <h2 className="column-title">
+        {column.title}
+        <span className="count">{column.cards.length}</span>
+      </h2>
+      {column.cards.map((card) => {
+        return <TaskCard key={card.id} card={card} />;
+      })}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <AppHeader />
+      <main className="page">
+        <h1 className="page-title">Website relaunch</h1>
+        <div className="board">
+          {COLUMNS.map((col) => {
+            return <BoardColumn key={col.id} column={col} />;
+          })}
+        </div>
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --border: #E6E8F0;
+  --text: #1B1F3B;
+  --muted: #6B7090;
+  --primary: #5B5BD6;
+  --primary-soft: #EEEEFC;
+  --danger: #E5484D;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 14px; }
+.nav { display: flex; gap: 4px; }
+.nav-link { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--muted); cursor: pointer; }
+.nav-link:hover { background: var(--bg); }
+.nav-link.is-active { color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.search { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+.search input { border: 0; outline: 0; font: inherit; width: 140px; background: none; }
+
+.icon-btn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { background: var(--bg); color: var(--text); }
+.bell-btn { position: relative; }
+
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 600; }
+
+.page { padding: 24px 20px; }
+.page-title { margin: 0 0 16px; font-size: 20px; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 16px; }
+.column { background: #EEF0F6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.column-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.count { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(27, 31, 59, 0.04); }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 4px; padding: 2px 6px; }
+.task-title { margin: 8px 0 10px; font-weight: 600; }
+.task-foot { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+
+/* ---- Added: notifications dropdown ---- */
+.notif-wrap { position: relative; }
+.bell-badge { position: absolute; top: 3px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; border: 2px solid var(--surface); box-sizing: content-box; }
+
+.notif-menu { position: absolute; top: 44px; right: -44px; width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(27, 31, 59, 0.14); overflow: hidden; z-index: 20; }
+.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.notif-head h2 { margin: 0; font-size: 15px; }
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
+.notif-scroll { max-height: 420px; overflow-y: auto; }
+.notif-empty { margin: 0; padding: 28px 16px; text-align: center; color: var(--muted); }
+
+.notif-group-title { margin: 0; padding: 10px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.notif-list { list-style: none; margin: 0; padding: 0 0 6px; }
+.notif-item { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border: 0; background: none; font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.notif-item:hover { background: var(--bg); }
+.notif-item.is-unread { background: #F7F7FE; }
+.notif-item.is-unread:hover { background: var(--primary-soft); }
+.notif-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.notif-text { font-size: 13px; line-height: 1.4; }
+.notif-time { font-size: 12px; color: var(--muted); }
+.unread-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }

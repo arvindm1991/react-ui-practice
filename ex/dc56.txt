@@ -1,0 +1,458 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+// (Images are generated SVGs so the gallery works offline.)
+export type Photo = {
+  id: string;
+  title: string;
+  location: string;
+  src: string;      // full-size image URL
+  thumb: string;    // thumbnail URL
+};
+
+type Palette = [string, string, string, string, string, string]; // sky top, sky bottom, sun, far, mid, near
+
+const SHOTS: { title: string; location: string; palette: Palette }[] = [
+  { title: 'First light over the fjord', location: 'Seyðisfjörður', palette: ['#1E2A4A', '#F2A65A', '#FFE3B3', '#3B4A6B', '#26324D', '#141B2D'] },
+  { title: 'Black sand, white noise', location: 'Reynisfjara', palette: ['#8FA3B8', '#D9DEE2', '#FFFFFF', '#5D6B78', '#3A444D', '#1C2126'] },
+  { title: 'Glacier tongue', location: 'Sólheimajökull', palette: ['#A7C7E7', '#E8F1F8', '#FFFFFF', '#9FB7CC', '#C9DCEB', '#4E6578'] },
+  { title: 'Moss and basalt', location: 'Eldhraun', palette: ['#6E8B74', '#C7D3B5', '#F4F1DE', '#55705B', '#3E5A44', '#24382A'] },
+  { title: 'Midnight sun', location: 'Húsavík', palette: ['#4B2C5E', '#F28C7E', '#FFD6A5', '#6B3E6E', '#432A4F', '#22172B'] },
+  { title: 'The long road east', location: 'Route 1', palette: ['#5B7DB1', '#BFD4EA', '#FFF6D8', '#7C93B5', '#4F6688', '#2A3850'] },
+  { title: 'Steam at Hverir', location: 'Mývatn', palette: ['#C9B79C', '#EFE6D8', '#FFFDF6', '#B08F6A', '#8A6A49', '#4A3726'] },
+  { title: 'Aurora, 2 a.m.', location: 'Þingvellir', palette: ['#06121F', '#1D6B5F', '#9BF6C9', '#0F2A33', '#0A1E25', '#040C10'] },
+  { title: 'Puffin cliffs', location: 'Látrabjarg', palette: ['#7FA7C9', '#DCE8F2', '#FFFFFF', '#6C8597', '#47596A', '#26313B'] },
+  { title: 'Icebergs at dusk', location: 'Jökulsárlón', palette: ['#2D3A6B', '#E59EB5', '#FCE1EA', '#5A6FA6', '#8FB3D9', '#1B2440'] },
+  { title: 'Waterfall in the rain', location: 'Skógafoss', palette: ['#6B7A80', '#B9C4C7', '#E9EEEF', '#566469', '#3C474B', '#20282B'] },
+  { title: 'Last ferry home', location: 'Vestmannaeyjar', palette: ['#2E4057', '#F6AE2D', '#FFE8A3', '#4A5D73', '#33465C', '#1A2533'] },
+];
+
+// A smooth-ish ridge line for one mountain layer, the same every time.
+function ridge(seed: number, base: number, amp: number): string {
+  const pts: string[] = ['0,800'];
+  for (let x = 0; x <= 1200; x += 60) {
+    const y = base - amp * (0.55 + 0.45 * Math.sin(x / 140 + seed) * Math.cos(x / 310 + seed * 1.7));
+    pts.push(x + ',' + Math.round(y));
+  }
+  pts.push('1200,800');
+  return pts.join(' ');
+}
+
+function landscape(p: Palette, seed: number): string {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">' +
+    '<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + p[0] + '"/><stop offset="1" stop-color="' + p[1] + '"/></linearGradient></defs>' +
+    '<rect width="1200" height="800" fill="url(#s)"/>' +
+    '<circle cx="' + (300 + (seed * 137) % 600) + '" cy="300" r="70" fill="' + p[2] + '" opacity="0.9"/>' +
+    '<polygon points="' + ridge(seed, 470, 180) + '" fill="' + p[3] + '"/>' +
+    '<polygon points="' + ridge(seed + 2, 580, 150) + '" fill="' + p[4] + '"/>' +
+    '<polygon points="' + ridge(seed + 4, 700, 110) + '" fill="' + p[5] + '"/>' +
+    '</svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+const PHOTOS: Photo[] = SHOTS.map((s, i) => {
+  const url = landscape(s.palette, i + 1);
+  return { id: 'p' + (i + 1), title: s.title, location: s.location, src: url, thumb: url };
+});
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /albums/iceland-2025/photos -> Photo[]
+export async function getPhotos(): Promise<Photo[]> {
+  await randomDelay(400, 1000);
+  return PHOTOS.map((p) => ({ ...p }));
+}
+@@@ shared src/utils/wrap.ts
+// Wrap an index into [0, length): wrapIndex(12, 12) -> 0, wrapIndex(-1, 12) -> 11
+export function wrapIndex(i: number, length: number): number {
+  return ((i % length) + length) % length;
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPhotos } from './api';
+import type { Photo } from './api';
+
+type ThumbnailProps = {
+  photo: Photo;
+};
+
+function Thumbnail({ photo }: ThumbnailProps) {
+  // TODO: open the lightbox (see the task)
+  return (
+    <button type="button" className="thumb" aria-label={'Open ' + photo.title}>
+      <img src={photo.thumb} alt="" loading="lazy" />
+      <span className="thumb-caption">{photo.title}</span>
+    </button>
+  );
+}
+
+function Header({ count }: { count: number }) {
+  return (
+    <header className="header">
+      <p className="kicker">Atlas · Field notes</p>
+      <h1>Iceland, late summer</h1>
+      <p className="meta">{count} photographs · Ring Road, 14 days</p>
+    </header>
+  );
+}
+
+export default function App() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPhotos().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPhotos(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let grid;
+  if (loading) {
+    grid = <p className="loading">Developing film…</p>;
+  } else {
+    grid = (
+      <div className="grid">
+        {photos.map((p) => {
+          return <Thumbnail key={p.id} photo={p} />;
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <Header count={photos.length} />
+      {grid}
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #0D0D0C;
+  --surface: #171715;
+  --text: #EDE9E1;
+  --muted: #8E897E;
+  --accent: #E7C873;
+  --serif: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 1100px; margin: 0 auto; padding: 40px 24px 60px; }
+.header { margin-bottom: 28px; }
+.kicker { margin: 0; font-size: 11px; letter-spacing: 2.4px; text-transform: uppercase; color: var(--accent); }
+.header h1 { margin: 6px 0 4px; font: italic 400 40px/1.1 var(--serif); letter-spacing: -0.4px; }
+.meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.loading { color: var(--muted); font-style: italic; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.thumb { position: relative; display: block; padding: 0; border: 0; border-radius: 4px; overflow: hidden; aspect-ratio: 3 / 2; background: var(--surface); cursor: zoom-in; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+.thumb:hover img { transform: scale(1.04); }
+.thumb-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 10px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); color: #fff; font: italic 16px var(--serif); text-align: left; opacity: 0; transition: opacity 0.2s; }
+.thumb:hover .thumb-caption, .thumb:focus-visible .thumb-caption { opacity: 1; }
+.thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@@@ solution src/App.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getPhotos } from './api';
+import type { Photo } from './api';
+import { wrapIndex } from './utils/wrap';
+
+const SWIPE_THRESHOLD = 60; // px
+
+type ThumbnailProps = {
+  photo: Photo;
+  onOpen: () => void;
+  buttonRef: (el: HTMLButtonElement | null) => void;
+};
+
+function Thumbnail({ photo, onOpen, buttonRef }: ThumbnailProps) {
+  return (
+    <button type="button" className="thumb" aria-label={'Open ' + photo.title} ref={buttonRef} onClick={() => { onOpen(); }}>
+      <img src={photo.thumb} alt="" loading="lazy" />
+      <span className="thumb-caption">{photo.title}</span>
+    </button>
+  );
+}
+
+function Header({ count }: { count: number }) {
+  return (
+    <header className="header">
+      <p className="kicker">Atlas · Field notes</p>
+      <h1>Iceland, late summer</h1>
+      <p className="meta">{count} photographs · Ring Road, 14 days</p>
+    </header>
+  );
+}
+
+type LightboxProps = {
+  photos: Photo[];
+  index: number;
+  onChange: (index: number) => void;
+  onClose: () => void;
+};
+
+function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dragStartRef = useRef<number | null>(null);
+  const [dragX, setDragX] = useState(0);
+
+  const photo = photos[index];
+  const total = photos.length;
+
+  // Move focus into the dialog when it opens.
+  useEffect(() => {
+    if (closeRef.current) {
+      closeRef.current.focus();
+    }
+  }, []);
+
+  // Preload neighbours so ←/→ feel instant.
+  useEffect(() => {
+    [wrapIndex(index + 1, total), wrapIndex(index - 1, total)].forEach((i) => {
+      const img = new Image();
+      img.src = photos[i].src;
+    });
+  }, [index, photos, total]);
+
+  function next() {
+    onChange(wrapIndex(index + 1, total));
+  }
+
+  function prev() {
+    onChange(wrapIndex(index - 1, total));
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'ArrowRight') {
+      next();
+    } else if (e.key === 'ArrowLeft') {
+      prev();
+    } else if (e.key === 'Escape') {
+      onClose();
+    } else if (e.key === 'Tab' && dialogRef.current) {
+      // Focus trap: wrap from the last control to the first and back.
+      const els = dialogRef.current.querySelectorAll<HTMLElement>('button');
+      const first = els[0];
+      const last = els[els.length - 1];
+      if (e.shiftKey && (e.target === first || e.target === dialogRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && e.target === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  // ---- change: drag to swipe ----
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) {
+      return;
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartRef.current = e.clientX;
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartRef.current === null) {
+      return;
+    }
+    setDragX(e.clientX - dragStartRef.current);
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartRef.current === null) {
+      return;
+    }
+    const dx = e.clientX - dragStartRef.current;
+    dragStartRef.current = null;
+    setDragX(0);
+    if (dx <= -SWIPE_THRESHOLD) {
+      next();
+    } else if (dx >= SWIPE_THRESHOLD) {
+      prev();
+    }
+  }
+
+  let imgCls = 'lightbox-img';
+  if (dragX !== 0) {
+    imgCls = 'lightbox-img is-dragging';
+  }
+
+  return (
+    <div
+      className="lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={photo.title}
+      tabIndex={-1}
+      ref={dialogRef}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="lightbox-top">
+        <span className="lightbox-count" aria-live="polite">{index + 1} of {total}</span>
+        <button type="button" className="lb-btn lb-close" aria-label="Close" ref={closeRef} onClick={() => { onClose(); }}>✕</button>
+      </div>
+      <div
+        className="lightbox-stage"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <button type="button" className="lb-btn lb-nav lb-prev" aria-label="Previous photo" onClick={() => { prev(); }} onPointerDown={(e) => { e.stopPropagation(); }}>←</button>
+        <img
+          key={photo.id}
+          className={imgCls}
+          src={photo.src}
+          alt={photo.title}
+          draggable={false}
+          style={{ transform: 'translateX(' + dragX + 'px)' }}
+        />
+        <button type="button" className="lb-btn lb-nav lb-next" aria-label="Next photo" onClick={() => { next(); }} onPointerDown={(e) => { e.stopPropagation(); }}>→</button>
+      </div>
+      <div className="lightbox-caption">
+        <h2>{photo.title}</h2>
+        <p>{photo.location}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // One DOM node per thumbnail, so focus can go back to the right one.
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPhotos().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setPhotos(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Return focus to the thumbnail of the photo you were looking at.
+  function handleClose() {
+    const idx = openIndex;
+    setOpenIndex(null);
+    if (idx !== null) {
+      const el = thumbRefs.current[idx];
+      if (el) {
+        el.focus();
+      }
+    }
+  }
+
+  let grid;
+  if (loading) {
+    grid = <p className="loading">Developing film…</p>;
+  } else {
+    grid = (
+      <div className="grid">
+        {photos.map((p, i) => {
+          return (
+            <Thumbnail
+              key={p.id}
+              photo={p}
+              onOpen={() => { setOpenIndex(i); }}
+              buttonRef={(el) => { thumbRefs.current[i] = el; }}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  let lightbox = null;
+  if (openIndex !== null) {
+    lightbox = <Lightbox photos={photos} index={openIndex} onChange={setOpenIndex} onClose={handleClose} />;
+  }
+
+  return (
+    <div className="app">
+      <Header count={photos.length} />
+      {grid}
+      {lightbox}
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #0D0D0C;
+  --surface: #171715;
+  --text: #EDE9E1;
+  --muted: #8E897E;
+  --accent: #E7C873;
+  --serif: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+.app { max-width: 1100px; margin: 0 auto; padding: 40px 24px 60px; }
+.header { margin-bottom: 28px; }
+.kicker { margin: 0; font-size: 11px; letter-spacing: 2.4px; text-transform: uppercase; color: var(--accent); }
+.header h1 { margin: 6px 0 4px; font: italic 400 40px/1.1 var(--serif); letter-spacing: -0.4px; }
+.meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.loading { color: var(--muted); font-style: italic; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.thumb { position: relative; display: block; padding: 0; border: 0; border-radius: 4px; overflow: hidden; aspect-ratio: 3 / 2; background: var(--surface); cursor: zoom-in; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+.thumb:hover img { transform: scale(1.04); }
+.thumb-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 10px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); color: #fff; font: italic 16px var(--serif); text-align: left; opacity: 0; transition: opacity 0.2s; }
+.thumb:hover .thumb-caption, .thumb:focus-visible .thumb-caption { opacity: 1; }
+.thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- Added: lightbox ---- */
+.lightbox { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: rgba(8, 8, 7, 0.96); animation: fade-in 0.18s ease; }
+.lightbox:focus { outline: none; }
+@keyframes fade-in { from { opacity: 0; } }
+
+.lightbox-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; }
+.lightbox-count { font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.lightbox-stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 0 72px; touch-action: pan-y; user-select: none; cursor: grab; }
+.lightbox-stage:active { cursor: grabbing; }
+.lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 2px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); transition: transform 0.25s ease; animation: fade-in 0.25s ease; }
+.lightbox-img.is-dragging { transition: none; }
+
+.lb-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid rgba(237, 233, 225, 0.18); border-radius: 50%; background: rgba(23, 23, 21, 0.6); color: var(--text); font-size: 18px; cursor: pointer; }
+.lb-btn:hover { background: rgba(237, 233, 225, 0.12); }
+.lb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lb-close { width: 38px; height: 38px; font-size: 14px; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.lb-prev { left: 16px; }
+.lb-next { right: 16px; }
+
+.lightbox-caption { padding: 16px 24px 24px; text-align: center; }
+.lightbox-caption h2 { margin: 0; font: italic 400 24px var(--serif); }
+.lightbox-caption p { margin: 2px 0 0; font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); }

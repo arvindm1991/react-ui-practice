@@ -1,0 +1,394 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Account = {
+  id: string;
+  email: string;
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// POST /accounts -> Account
+// Rejects with a readable message if the email is already registered.
+// (Try taken@example.com.)
+export async function createAccount(email: string, password: string): Promise<Account> {
+  await randomDelay(600, 1200);
+  if (email.trim().toLowerCase() === 'taken@example.com') {
+    throw new Error('An account with this email already exists. Try logging in instead.');
+  }
+  if (password.length < 8) {
+    throw new Error('Password is too short.');
+  }
+  return { id: 'acc_' + Math.random().toString(36).slice(2, 8), email: email.trim() };
+}
+@@@ shared src/components/Field.tsx
+import React from 'react';
+
+type FieldProps = {
+  id: string;
+  label: string;
+  error?: string | null; // pass null/undefined to show no error
+  children: React.ReactNode;
+};
+
+// Label + input slot + error line. The input itself is passed as children.
+export function Field({ id, label, error, children }: FieldProps) {
+  let errorLine = null;
+  let cls = 'field';
+  if (error) {
+    cls = 'field has-error';
+    errorLine = <p className="field-error" id={id + '-error'}>{error}</p>;
+  }
+  return (
+    <div className={cls}>
+      <label htmlFor={id}>{label}</label>
+      {children}
+      {errorLine}
+    </div>
+  );
+}
+@@@ shared src/utils/validate.ts
+// isValidEmail("a@b.co") -> true. Good enough for a form; the server double-checks.
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+}
+
+export type PasswordRule = {
+  id: string;
+  label: string;
+  test: (password: string) => boolean;
+};
+
+export const PASSWORD_RULES: PasswordRule[] = [
+  { id: 'length', label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
+  { id: 'number', label: 'Contains a number', test: (pw) => /\d/.test(pw) },
+  { id: 'upper', label: 'Contains an uppercase letter', test: (pw) => /[A-Z]/.test(pw) },
+];
+@@@ starter src/App.tsx
+import React, { useState } from 'react';
+import { Field } from './components/Field';
+
+function BrandPanel() {
+  return (
+    <aside className="brand-panel">
+      <div className="logo">✦ Northstar</div>
+      <div>
+        <p className="quote">“It turned my messy notes into a launch post in thirty seconds.”</p>
+        <p className="quote-by">Dana Whitfield, founder at Kiln</p>
+      </div>
+      <p className="fine">Trusted by 40,000 writers and teams.</p>
+    </aside>
+  );
+}
+
+// TODO: validation, password checklist, and submitting with createAccount().
+function SignupForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+  }
+
+  return (
+    <form className="form" onSubmit={(e) => { handleSubmit(e); }} noValidate>
+      <h1>Create your account</h1>
+      <p className="sub">Start writing with AI in under a minute. No card required.</p>
+      <Field id="email" label="Work email">
+        <input id="email" type="email" className="input" placeholder="you@company.com" value={email} onChange={(e) => { setEmail(e.target.value); }} />
+      </Field>
+      <Field id="password" label="Password">
+        <input id="password" type="password" className="input" value={password} onChange={(e) => { setPassword(e.target.value); }} />
+      </Field>
+      <Field id="confirm" label="Confirm password">
+        <input id="confirm" type="password" className="input" value={confirm} onChange={(e) => { setConfirm(e.target.value); }} />
+      </Field>
+      <button type="submit" className="submit">Create account</button>
+      <p className="switch">Already have an account? <a>Log in</a></p>
+    </form>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="split">
+      <BrandPanel />
+      <main className="form-side">
+        <SignupForm />
+      </main>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --text: #111322;
+  --muted: #646A86;
+  --border: #D9DCE8;
+  --primary: #3E3AE8;
+  --primary-hover: #322ED0;
+  --ring: rgba(62, 58, 232, 0.18);
+  --danger: #D92D20;
+  --success: #12A150;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.split { display: flex; min-height: 100vh; }
+.brand-panel { width: 42%; max-width: 460px; padding: 32px; display: flex; flex-direction: column; justify-content: space-between; color: #fff; background: radial-gradient(circle at 20% 10%, #7C6CFF 0, transparent 50%), radial-gradient(circle at 90% 90%, #FF8FB1 0, transparent 45%), #1B1840; }
+.logo { font-weight: 800; font-size: 18px; letter-spacing: -0.01em; }
+.quote { margin: 0; font-size: 22px; line-height: 1.35; font-weight: 600; letter-spacing: -0.01em; }
+.quote-by { margin: 12px 0 0; font-size: 14px; opacity: 0.75; }
+.fine { margin: 0; font-size: 13px; opacity: 0.6; }
+
+.form-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+.form { width: 100%; max-width: 380px; }
+.form h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.sub { margin: 6px 0 24px; color: var(--muted); font-size: 14px; }
+
+.field { margin-bottom: 16px; }
+.field label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 15px; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
+.field.has-error .input { border-color: var(--danger); }
+.field.has-error .input:focus { box-shadow: 0 0 0 4px rgba(217, 45, 32, 0.15); }
+.field-error { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
+
+.submit { width: 100%; height: 44px; margin-top: 8px; border: 0; border-radius: var(--radius); background: var(--primary); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.submit:hover { background: var(--primary-hover); }
+.switch { margin: 16px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.switch a { color: var(--primary); font-weight: 600; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .brand-panel { display: none; }
+}
+@@@ solution src/App.tsx
+import React, { useState } from 'react';
+import { Field } from './components/Field';
+import { createAccount } from './api';
+import { isValidEmail, PASSWORD_RULES } from './utils/validate';
+
+type FieldName = 'email' | 'password' | 'confirm';
+type Status = 'idle' | 'submitting' | 'success';
+
+function BrandPanel() {
+  return (
+    <aside className="brand-panel">
+      <div className="logo">✦ Northstar</div>
+      <div>
+        <p className="quote">“It turned my messy notes into a launch post in thirty seconds.”</p>
+        <p className="quote-by">Dana Whitfield, founder at Kiln</p>
+      </div>
+      <p className="fine">Trusted by 40,000 writers and teams.</p>
+    </aside>
+  );
+}
+
+function PasswordChecklist({ password }: { password: string }) {
+  return (
+    <ul className="rules" aria-label="Password requirements">
+      {PASSWORD_RULES.map((rule) => {
+        let cls = 'rule';
+        let icon = '○';
+        if (rule.test(password)) {
+          cls = 'rule is-met';
+          icon = '✓';
+        }
+        return (
+          <li key={rule.id} className={cls}>
+            <span className="rule-icon">{icon}</span> {rule.label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SuccessPanel({ email }: { email: string }) {
+  return (
+    <div className="success">
+      <div className="success-icon">✓</div>
+      <h1>Check your inbox</h1>
+      <p className="sub">We sent a confirmation link to <b>{email}</b>.</p>
+    </div>
+  );
+}
+
+function SignupForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  // Which fields the user has left at least once. Errors wait until then (or until submit).
+  const [touched, setTouched] = useState<Record<FieldName, boolean>>({ email: false, password: false, confirm: false });
+  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  function handleBlur(field: FieldName) {
+    setTouched((prev) => {
+      return { ...prev, [field]: true };
+    });
+  }
+
+  // derived: errors are computed from the values every render, never stored
+  let emailError: string | null = null;
+  if (email.trim() === '') {
+    emailError = 'Email is required';
+  } else if (!isValidEmail(email)) {
+    emailError = 'Enter a valid email address';
+  }
+
+  const allRulesMet = PASSWORD_RULES.every((rule) => {
+    return rule.test(password);
+  });
+  let passwordError: string | null = null;
+  if (!allRulesMet) {
+    passwordError = 'Password doesn’t meet all the requirements';
+  }
+
+  let confirmError: string | null = null;
+  if (confirm === '') {
+    confirmError = 'Confirm your password';
+  } else if (confirm !== password) {
+    confirmError = 'Passwords don’t match';
+  }
+
+  const isValid = !emailError && !passwordError && !confirmError;
+
+  function visibleError(field: FieldName, error: string | null) {
+    if (touched[field] || submitted) {
+      return error;
+    }
+    return null;
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitted(true);
+    if (!isValid || status === 'submitting') {
+      return;
+    }
+    setStatus('submitting');
+    setApiError(null);
+    createAccount(email, password)
+      .then(() => {
+        setStatus('success');
+      })
+      .catch((err: Error) => {
+        setApiError(err.message);
+        setStatus('idle');
+      });
+  }
+
+  if (status === 'success') {
+    return <SuccessPanel email={email.trim()} />;
+  }
+
+  let banner = null;
+  if (apiError) {
+    banner = <div className="api-error" role="alert">{apiError}</div>;
+  }
+
+  const submitting = status === 'submitting';
+  let submitLabel = 'Create account';
+  if (submitting) {
+    submitLabel = 'Creating…';
+  }
+
+  return (
+    <form className="form" onSubmit={(e) => { handleSubmit(e); }} noValidate>
+      <h1>Create your account</h1>
+      <p className="sub">Start writing with AI in under a minute. No card required.</p>
+      {banner}
+      <Field id="email" label="Work email" error={visibleError('email', emailError)}>
+        <input id="email" type="email" className="input" placeholder="you@company.com" value={email} onChange={(e) => { setEmail(e.target.value); }} onBlur={() => { handleBlur('email'); }} />
+      </Field>
+      <Field id="password" label="Password" error={visibleError('password', passwordError)}>
+        <input id="password" type="password" className="input" value={password} onChange={(e) => { setPassword(e.target.value); }} onBlur={() => { handleBlur('password'); }} />
+        <PasswordChecklist password={password} />
+      </Field>
+      <Field id="confirm" label="Confirm password" error={visibleError('confirm', confirmError)}>
+        <input id="confirm" type="password" className="input" value={confirm} onChange={(e) => { setConfirm(e.target.value); }} onBlur={() => { handleBlur('confirm'); }} />
+      </Field>
+      <button type="submit" className="submit" disabled={submitting}>{submitLabel}</button>
+      <p className="switch">Already have an account? <a>Log in</a></p>
+    </form>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="split">
+      <BrandPanel />
+      <main className="form-side">
+        <SignupForm />
+      </main>
+    </div>
+  );
+}
+@@@ solution src/styles.css
+:root {
+  --bg: #FFFFFF;
+  --text: #111322;
+  --muted: #646A86;
+  --border: #D9DCE8;
+  --primary: #3E3AE8;
+  --primary-hover: #322ED0;
+  --ring: rgba(62, 58, 232, 0.18);
+  --danger: #D92D20;
+  --success: #12A150;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); }
+
+.split { display: flex; min-height: 100vh; }
+.brand-panel { width: 42%; max-width: 460px; padding: 32px; display: flex; flex-direction: column; justify-content: space-between; color: #fff; background: radial-gradient(circle at 20% 10%, #7C6CFF 0, transparent 50%), radial-gradient(circle at 90% 90%, #FF8FB1 0, transparent 45%), #1B1840; }
+.logo { font-weight: 800; font-size: 18px; letter-spacing: -0.01em; }
+.quote { margin: 0; font-size: 22px; line-height: 1.35; font-weight: 600; letter-spacing: -0.01em; }
+.quote-by { margin: 12px 0 0; font-size: 14px; opacity: 0.75; }
+.fine { margin: 0; font-size: 13px; opacity: 0.6; }
+
+.form-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+.form { width: 100%; max-width: 380px; }
+.form h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.sub { margin: 6px 0 24px; color: var(--muted); font-size: 14px; }
+
+.field { margin-bottom: 16px; }
+.field label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: 15px; color: var(--text); background: #fff; }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
+.field.has-error .input { border-color: var(--danger); }
+.field.has-error .input:focus { box-shadow: 0 0 0 4px rgba(217, 45, 32, 0.15); }
+.field-error { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
+
+.submit { width: 100%; height: 44px; margin-top: 8px; border: 0; border-radius: var(--radius); background: var(--primary); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.submit:hover { background: var(--primary-hover); }
+.switch { margin: 16px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.switch a { color: var(--primary); font-weight: 600; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .brand-panel { display: none; }
+}
+
+/* ---- Added: validation, checklist, submit states ---- */
+.rules { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.rule { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.rule-icon { width: 16px; text-align: center; font-weight: 700; }
+.rule.is-met { color: var(--success); }
+
+.api-error { margin-bottom: 16px; padding: 10px 12px; border: 1px solid #FECDCA; border-radius: var(--radius); background: #FEF3F2; color: #B42318; font-size: 14px; }
+
+.submit:disabled { opacity: 0.7; cursor: progress; }
+
+.success { width: 100%; max-width: 380px; text-align: center; }
+.success-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: #E7F8EE; color: var(--success); display: grid; place-items: center; font-size: 26px; font-weight: 800; }
