@@ -221,14 +221,59 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .sidebar { display: none; }
   .main { padding: 20px 16px; }
 }
+
+/* Toast (components/Toast.tsx) */
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--success); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: toast-in 0.18s ease-out; }
+.toast.is-error { border-left-color: var(--danger); }
+.toast-icon { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--bg); background: var(--success); }
+.toast.is-error .toast-icon { background: var(--danger); }
+.toast-msg { flex: 1; margin: 1px 0 0; font-size: 14px; line-height: 1.4; }
+.toast-close { width: 24px; height: 24px; flex-shrink: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.toast-close:hover { background: var(--border); color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@@@ starter src/components/Toast.tsx
+import React from 'react';
+
+export type ToastKind = 'success' | 'error';
+
+export type ToastData = {
+  id: number;
+  kind: ToastKind;
+  message: string;
+};
+
+type ToastProps = {
+  toast: ToastData;
+  onDismiss: (id: number) => void;
+};
+
+// One toast card (styles: .toast in styles.css). It only renders: it does not position
+// itself, keep a list, or time anything.
+export function Toast({ toast, onDismiss }: ToastProps) {
+  let cls = 'toast is-success';
+  let icon = '✓';
+  if (toast.kind === 'error') {
+    cls = 'toast is-error';
+    icon = '!';
+  }
+
+  return (
+    <div className={cls} role="status">
+      <span className="toast-icon">{icon}</span>
+      <p className="toast-msg">{toast.message}</p>
+      <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => { onDismiss(toast.id); }}>✕</button>
+    </div>
+  );
+}
 @@@ solution src/App.tsx
 import React, { useCallback, useRef, useState } from 'react';
 import { deployToStaging, rollbackProduction } from './api';
 import { Button } from './components/Button';
-import { ToastStack } from './components/Toasts';
-import type { ToastData, ToastKind } from './components/Toasts';
+import { Toast } from './components/Toast';
+import type { ToastData, ToastKind } from './components/Toast';
 
 const SERVICE = 'api-gateway';
+// CHANGE: the cap
 const MAX_TOASTS = 3;
 
 function Sidebar() {
@@ -274,6 +319,7 @@ function DeployHistory() {
   );
 }
 
+// CORE: Actions reports results through a callback prop
 type ActionsProps = {
   notify: (kind: ToastKind, message: string) => void;
 };
@@ -333,6 +379,7 @@ function Actions({ notify }: ActionsProps) {
 }
 
 export default function App() {
+  // CORE: the list lives in App: toasts sit outside Actions and outlive it.
   const [toasts, setToasts] = useState<ToastData[]>([]);
   // A ref, not state: changing it should not re-render anything.
   const nextId = useRef(1);
@@ -341,12 +388,13 @@ export default function App() {
     const toast = { id: nextId.current, kind: kind, message: message };
     nextId.current = nextId.current + 1;
     setToasts((prev) => {
-      // Change: keep only the newest MAX_TOASTS (the oldest drops off the top).
+      // CHANGE: keep only the newest MAX_TOASTS (the oldest drops off the top).
       return [...prev, toast].slice(-MAX_TOASTS);
     });
   }
 
-  // useCallback keeps the same function between renders. Each Toast's effect
+  // CORE: remove one toast by id.
+  // NEXT: useCallback keeps the same function between renders. Each Toast's effect
   // depends on it, so a new function every render would restart every timer.
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => {
@@ -367,67 +415,11 @@ export default function App() {
         <Actions notify={notify} />
         <DeployHistory />
       </main>
-      <ToastStack toasts={toasts} onDismiss={dismiss} />
-    </div>
-  );
-}
-@@@ solution src/components/Toasts.tsx
-import React, { useEffect } from 'react';
-
-export type ToastKind = 'success' | 'error';
-
-export type ToastData = {
-  id: number;
-  kind: ToastKind;
-  message: string;
-};
-
-const DISMISS_AFTER_MS = 3000;
-
-type ToastProps = {
-  toast: ToastData;
-  onDismiss: (id: number) => void;
-};
-
-function Toast({ toast, onDismiss }: ToastProps) {
-  // Each toast owns its own timer. The cleanup clears it if the toast is closed
-  // early (or removed by the limit), so we never dismiss something twice.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onDismiss(toast.id);
-    }, DISMISS_AFTER_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [toast.id, onDismiss]);
-
-  let cls = 'toast is-success';
-  let icon = '✓';
-  if (toast.kind === 'error') {
-    cls = 'toast is-error';
-    icon = '!';
-  }
-
-  return (
-    <div className={cls} role="status">
-      <span className="toast-icon">{icon}</span>
-      <p className="toast-msg">{toast.message}</p>
-      <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => { onDismiss(toast.id); }}>✕</button>
-    </div>
-  );
-}
-
-type ToastStackProps = {
-  toasts: ToastData[];
-  onDismiss: (id: number) => void;
-};
-
-export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
-  return (
-    <div className="toast-stack" aria-live="polite">
-      {toasts.map((t) => {
-        return <Toast key={t.id} toast={t} onDismiss={onDismiss} />;
-      })}
+      <div className="toast-stack" aria-live="polite">
+        {toasts.map((t) => {
+          return <Toast key={t.id} toast={t} onDismiss={dismiss} />;
+        })}
+      </div>
     </div>
   );
 }
@@ -488,8 +480,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .main { padding: 20px 16px; }
 }
 
-/* ---- Added: toasts ---- */
-.toast-stack { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; width: 340px; max-width: calc(100% - 40px); }
+/* Toast (components/Toast.tsx) */
 .toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--success); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: toast-in 0.18s ease-out; }
 .toast.is-error { border-left-color: var(--danger); }
 .toast-icon { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--bg); background: var(--success); }
@@ -498,3 +489,54 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 .toast-close { width: 24px; height: 24px; flex-shrink: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
 .toast-close:hover { background: var(--border); color: var(--text); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- Added: toasts ---- */
+/* CORE: the stack (each .toast is styled already) */
+.toast-stack { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; width: 340px; max-width: calc(100% - 40px); }
+@@@ solution src/components/Toast.tsx
+import React, { useEffect } from 'react';
+
+export type ToastKind = 'success' | 'error';
+
+export type ToastData = {
+  id: number;
+  kind: ToastKind;
+  message: string;
+};
+
+type ToastProps = {
+  toast: ToastData;
+  onDismiss: (id: number) => void;
+};
+
+const DISMISS_AFTER_MS = 3000;
+
+// One toast card (styles: .toast in styles.css). It only renders: it does not position
+// itself, keep a list, or time anything.
+export function Toast({ toast, onDismiss }: ToastProps) {
+  // CORE: each toast owns its own timer. The cleanup clears it if the toast is closed
+  // early (or removed by the limit), so we never dismiss something twice.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss(toast.id);
+    }, DISMISS_AFTER_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [toast.id, onDismiss]);
+
+  let cls = 'toast is-success';
+  let icon = '✓';
+  if (toast.kind === 'error') {
+    cls = 'toast is-error';
+    icon = '!';
+  }
+
+  return (
+    <div className={cls} role="status">
+      <span className="toast-icon">{icon}</span>
+      <p className="toast-msg">{toast.message}</p>
+      <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => { onDismiss(toast.id); }}>✕</button>
+    </div>
+  );
+}

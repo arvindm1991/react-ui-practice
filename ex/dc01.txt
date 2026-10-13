@@ -179,6 +179,17 @@ body { margin: 0; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
 .post-body p { margin: 0 0 6px; }
 .likes { font-weight: 700; }
 .meta { color: var(--muted); font-size: 13px; }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: add is-liked to the button. The heart uses currentColor, so this turns it red */
+.like-btn.is-liked { color: var(--like); }
+/* NEXT: the "pop" plays whenever is-liked is added */
+.like-btn.is-liked svg { animation: like-pop 0.25s ease-out; }
+@keyframes like-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { HeartIcon, CommentIcon, ShareIcon } from './components/Icons';
@@ -226,7 +237,7 @@ function PostHeader({ post }: { post: Post }) {
   );
 }
 
-// Change: the photo reports a double-click up. It doesn't know about "liked".
+// CHANGE: the photo reports a double-click up. It doesn't know about "liked".
 function PostPhoto({ onDoubleClick }: { onDoubleClick: () => void }) {
   return (
     <div className="photo" role="img" aria-label="Coastline at sunrise" onDoubleClick={() => { onDoubleClick(); }}>
@@ -235,6 +246,7 @@ function PostPhoto({ onDoubleClick }: { onDoubleClick: () => void }) {
   );
 }
 
+// CORE: LikeButton gets liked + onToggle as props
 type LikeButtonProps = {
   liked: boolean;
   onToggle: () => void;
@@ -242,12 +254,14 @@ type LikeButtonProps = {
 
 // The button is "dumb": it shows liked and reports clicks. PostCard owns the state.
 function LikeButton({ liked, onToggle }: LikeButtonProps) {
+  // CORE: class decided above the return (NEXT: the Like / Unlike label)
   let cls = 'icon-btn like-btn';
   let label = 'Like';
   if (liked) {
     cls = 'icon-btn like-btn is-liked';
     label = 'Unlike';
   }
+  // NEXT: aria-label + aria-pressed on the button. CORE: filled={liked}
   return (
     <button type="button" className={cls} aria-label={label} aria-pressed={liked} onClick={() => { onToggle(); }}>
       <HeartIcon filled={liked} />
@@ -256,21 +270,22 @@ function LikeButton({ liked, onToggle }: LikeButtonProps) {
 }
 
 function PostCard({ post }: { post: Post }) {
-  // liked lives here because the button, the count and the photo all need it.
+  // CORE: liked lives here because the button, the count and the photo all need it.
   const [liked, setLiked] = useState(false);
 
+  // CORE: toggle with the updater form
   function handleToggle() {
     setLiked((prev) => {
       return !prev;
     });
   }
 
-  // Double-click only ever likes. It never unlikes.
+  // CHANGE: double-click only ever likes. It never unlikes.
   function handlePhotoDoubleClick() {
     setLiked(true);
   }
 
-  // derived: never stored in state
+  // CORE: derived, never stored in state
   let likeCount = post.likes;
   if (liked) {
     likeCount = post.likes + 1;
@@ -344,8 +359,10 @@ body { margin: 0; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
 .likes { font-weight: 700; }
 .meta { color: var(--muted); font-size: 13px; }
 
-/* ---- Added: like button ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: add is-liked to the button. The heart uses currentColor, so this turns it red */
 .like-btn.is-liked { color: var(--like); }
+/* NEXT: the "pop" plays whenever is-liked is added */
 .like-btn.is-liked svg { animation: like-pop 0.25s ease-out; }
 @keyframes like-pop {
   0% { transform: scale(1); }

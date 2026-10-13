@@ -74,6 +74,30 @@ export function ProductCard({ product }: { product: Product }) {
 export function formatPrice(cents: number): string {
   return '$' + (cents / 100).toFixed(2);
 }
+@@@ shared src/components/Chip.tsx
+import React from 'react';
+
+type ChipProps = {
+  label: string;
+  count: number;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+};
+
+// A pill button with a small count bubble: "Pots (4)". Styles: .chip in styles.css.
+// Used by the Journal's tag filter too.
+export function Chip({ label, count, active, disabled, onClick }: ChipProps) {
+  let cls = 'chip';
+  if (active) {
+    cls = 'chip is-active';
+  }
+  return (
+    <button type="button" className={cls} aria-pressed={active} disabled={disabled} onClick={() => { onClick(); }}>
+      {label} <span className="chip-count">{count}</span>
+    </button>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProducts } from './api';
@@ -175,11 +199,20 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .shop { padding: 24px 16px; }
   .grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Chip (components/Chip.tsx) */
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.chip:hover:not(:disabled) { border-color: var(--primary); }
+.chip-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; text-align: center; }
+.chip.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip.is-active .chip-count { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.chip:disabled { opacity: 0.45; cursor: not-allowed; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getCategories, getProducts } from './api';
 import type { Category, Product } from './api';
 import { ProductCard } from './components/ProductCard';
+import { Chip } from './components/Chip';
 
 const ALL = 'all';
 
@@ -197,58 +230,7 @@ function Header() {
   );
 }
 
-type ChipProps = {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-};
-
-function Chip({ label, count, active, onClick }: ChipProps) {
-  let cls = 'chip';
-  if (active) {
-    cls = 'chip is-active';
-  }
-  return (
-    <button type="button" className={cls} aria-pressed={active} disabled={count === 0} onClick={() => { onClick(); }}>
-      {label} <span className="chip-count">{count}</span>
-    </button>
-  );
-}
-
-type CategoryChipsProps = {
-  categories: Category[];
-  products: Product[];
-  active: string;
-  onChange: (id: string) => void;
-};
-
-function CategoryChips({ categories, products, active, onChange }: CategoryChipsProps) {
-  // derived: the API has no counts, so count the products we already have.
-  function countFor(categoryId: string) {
-    return products.filter((p) => {
-      return p.categoryId === categoryId;
-    }).length;
-  }
-
-  return (
-    <div className="chips" role="group" aria-label="Filter by category">
-      <Chip label="All" count={products.length} active={active === ALL} onClick={() => { onChange(ALL); }} />
-      {categories.map((c) => {
-        return (
-          <Chip
-            key={c.id}
-            label={c.name}
-            count={countFor(c.id)}
-            active={active === c.id}
-            onClick={() => { onChange(c.id); }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
+// CORE: the grid becomes a plain component that just renders what it is given.
 function ProductGrid({ products }: { products: Product[] }) {
   return (
     <div className="grid">
@@ -259,7 +241,7 @@ function ProductGrid({ products }: { products: Product[] }) {
   );
 }
 
-// Products moved up here: the chips need them for their counts and the grid needs them to render.
+// CORE: products move up here. The chips need them for their counts and the grid needs them to render.
 function Catalog() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -268,7 +250,7 @@ function Catalog() {
 
   useEffect(() => {
     let cancelled = false;
-    // Two independent requests, wait for both.
+    // NEXT: two independent requests, one loading state: wait for both with Promise.all
     Promise.all([getProducts(), getCategories()]).then(([productData, categoryData]) => {
       if (cancelled) {
         return;
@@ -282,7 +264,14 @@ function Catalog() {
     };
   }, []);
 
-  // derived
+  // CORE: derived. The API has no counts, so count the products we already have.
+  function countFor(categoryId: string) {
+    return products.filter((p) => {
+      return p.categoryId === categoryId;
+    }).length;
+  }
+
+  // CORE: derived visible list
   let visible = products;
   if (activeCategory !== ALL) {
     visible = products.filter((p) => {
@@ -294,14 +283,25 @@ function Catalog() {
     return <p className="loading">Loading the greenhouse…</p>;
   }
 
+  // CORE: chips row (reuses components/Chip). NEXT: disabled when the count is 0
   return (
     <div>
-      <CategoryChips
-        categories={categories}
-        products={products}
-        active={activeCategory}
-        onChange={(id) => { setActiveCategory(id); }}
-      />
+      <div className="chips" role="group" aria-label="Filter by category">
+        <Chip label="All" count={products.length} active={activeCategory === ALL} onClick={() => { setActiveCategory(ALL); }} />
+        {categories.map((c) => {
+          const count = countFor(c.id);
+          return (
+            <Chip
+              key={c.id}
+              label={c.name}
+              count={count}
+              active={activeCategory === c.id}
+              disabled={count === 0}
+              onClick={() => { setActiveCategory(c.id); }}
+            />
+          );
+        })}
+      </div>
       <ProductGrid products={visible} />
     </div>
   );
@@ -357,11 +357,14 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ---- Added: category chips ---- */
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+/* Chip (components/Chip.tsx) */
 .chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
 .chip:hover:not(:disabled) { border-color: var(--primary); }
 .chip-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; text-align: center; }
 .chip.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .chip.is-active .chip-count { background: rgba(255, 255, 255, 0.2); color: #fff; }
 .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Added: category chips ---- */
+/* CORE: the row (the chip itself is styled already) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }

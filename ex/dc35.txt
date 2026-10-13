@@ -247,13 +247,13 @@ function SchoolHeader() {
   );
 }
 
+// STRETCH: the side panel for the clicked day
 type DayPanelProps = {
   dateKey: string;
   events: SchoolEvent[];
   onClose: () => void;
 };
 
-// Change: the side panel for the clicked day.
 function DayPanel({ dateKey, events, onClose }: DayPanelProps) {
   let body = <p className="muted">No events this day.</p>;
   if (events.length > 0) {
@@ -285,17 +285,19 @@ function DayPanel({ dateKey, events, onClose }: DayPanelProps) {
   );
 }
 
+// CHANGE: cap the chips per cell
 const MAX_CHIPS = 2;
 
 function SchoolCalendar({ today }: { today: Date }) {
-  // The visible month. Starts at "today" but moves independently of it.
+  // CORE: the visible month. Starts at "today" but moves independently of it.
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  // STRETCH: selected day
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Refetch whenever the visible month changes. The guard drops a slow
-  // response for a month you've already clicked away from.
+  // CORE: refetch whenever the visible month changes. The guard (already in the starter) drops a slow
+  // response for a month you've already clicked away from. NEXT: setLoading(true) for the indicator.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -311,16 +313,18 @@ function SchoolCalendar({ today }: { today: Date }) {
     };
   }, [view.year, view.month]);
 
+  // CORE: prev / next month
   function handleMonth(delta: number) {
     setView((prev) => {
       // new Date handles the year rollover (month 12 -> January next year).
       const d = new Date(prev.year, prev.month + delta, 1);
       return { year: d.getFullYear(), month: d.getMonth() };
     });
+    // STRETCH: changing month clears the selection
     setSelectedKey(null);
   }
 
-  // derived: the cells of the grid. null = blank cell before the 1st / after the last day.
+  // CORE: derived, the cells of the grid. null = blank cell before the 1st / after the last day.
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstWeekday(view.year, view.month); i++) {
     cells.push(null);
@@ -340,11 +344,13 @@ function SchoolCalendar({ today }: { today: Date }) {
     });
   }
 
+  // NEXT: loading indicator
   let status = null;
   if (loading) {
     status = <span className="loading-dot">Loading…</span>;
   }
 
+  // STRETCH: panel + two-column layout
   let panel = null;
   let layoutCls = 'cal-layout';
   if (selectedKey) {
@@ -352,6 +358,7 @@ function SchoolCalendar({ today }: { today: Date }) {
     panel = <DayPanel dateKey={selectedKey} events={eventsOn(selectedKey)} onClose={() => { setSelectedKey(null); }} />;
   }
 
+  // CORE: render the grid
   return (
     <section className="card">
       <div className="card-head">
@@ -377,13 +384,16 @@ function SchoolCalendar({ today }: { today: Date }) {
             if (key === todayKey) {
               cls = cls + ' is-today';
             }
+            // STRETCH: selected outline
             if (key === selectedKey) {
               cls = cls + ' is-selected';
             }
+            // CHANGE: "+N more"
             let more = null;
             if (dayEvents.length > MAX_CHIPS) {
               more = <span className="more">+{dayEvents.length - MAX_CHIPS} more</span>;
             }
+            // CORE (CHANGE: slice(0, MAX_CHIPS); STRETCH: onClick selects)
             return (
               <button key={key} type="button" className={cls} onClick={() => { setSelectedKey(key); }}>
                 <span className="day-num">{day}</span>
@@ -462,9 +472,13 @@ body { margin: 0; font-family: Nunito, 'Trebuchet MS', system-ui, sans-serif; fo
 .swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
 
 /* ---- Added: month grid + day panel ---- */
+/* NEXT */
 .loading-dot { margin-left: 12px; margin-right: auto; font-size: 12px; font-weight: 700; color: var(--muted); }
+/* CORE: grid */
 .cal-layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+/* STRETCH */
 .cal-layout.has-panel { grid-template-columns: 1fr 240px; }
+/* CORE */
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .cal-weekday { padding: 4px 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .cal-cell { min-height: 92px; padding: 6px; border-radius: 10px; }
@@ -473,9 +487,12 @@ body { margin: 0; font-family: Nunito, 'Trebuchet MS', system-ui, sans-serif; fo
 .cal-cell.is-day:hover { border-color: var(--primary); }
 .day-num { font-weight: 800; font-size: 13px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
 .cal-cell.is-today .day-num { background: var(--sun); }
+/* STRETCH */
 .cal-cell.is-selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); background: #FAFDF9; }
+/* CHANGE */
 .more { font-size: 11px; font-weight: 700; color: var(--muted); padding-left: 4px; }
 
+/* STRETCH: day panel */
 .day-panel { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: #FBFCFA; align-self: start; }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .panel-head h2 { margin: 0; font-size: 15px; font-weight: 800; }

@@ -127,22 +127,11 @@ export function ageFrom(isoDate: string): number {
   }
   return age;
 }
-@@@ starter src/App.tsx
-import React, { useEffect, useState } from 'react';
-import { getPatients } from './api';
-import type { PatientSummary } from './api';
-import { Avatar } from './components/Avatar';
+@@@ shared src/components/FlagDot.tsx
+import React from 'react';
+import type { PatientSummary } from '../api';
 
-function TopBar() {
-  return (
-    <header className="topbar">
-      <span className="logo">✚ Carepoint</span>
-      <span className="clinic">Livermore Family Clinic · Thu, Oct 8</span>
-    </header>
-  );
-}
-
-function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
+export function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
   if (flag === 'none') {
     return null;
   }
@@ -151,6 +140,35 @@ function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
     label = 'Urgent';
   }
   return <span className={'flag is-' + flag}>{label}</span>;
+}
+@@@ shared src/components/ChartSkeleton.tsx
+import React from 'react';
+
+// Shimmering placeholder for the chart pane (styles: .chart-loading / .sk in styles.css).
+export function ChartSkeleton() {
+  return (
+    <div className="chart-loading" aria-busy="true">
+      <div className="sk sk-head" />
+      <div className="sk sk-row" />
+      <div className="sk sk-row" />
+      <p className="loading-text">Loading chart…</p>
+    </div>
+  );
+}
+@@@ starter src/App.tsx
+import React, { useEffect, useState } from 'react';
+import { getPatients } from './api';
+import type { PatientSummary } from './api';
+import { Avatar } from './components/Avatar';
+import { FlagDot } from './components/FlagDot';
+
+function TopBar() {
+  return (
+    <header className="topbar">
+      <span className="logo">✚ Carepoint</span>
+      <span className="clinic">Livermore Family Clinic · Thu, Oct 8</span>
+    </header>
+  );
 }
 
 // TODO: clicking a row should select that patient.
@@ -272,12 +290,98 @@ body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe
 @media (max-width: 700px) {
   .panes { grid-template-columns: 1fr; padding: 12px; }
 }
+
+/* Patient chart + skeleton (components/PatientChart.tsx, ChartSkeleton.tsx) */
+.chart-pane { padding: 20px 24px; }
+.chart-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.chart-head > div { flex: 1; min-width: 0; }
+.chart-name { margin: 0; font-size: 22px; }
+.chart-meta { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+.vitals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+.vital { padding: 10px 12px; border-radius: 10px; background: #F5F8FB; display: flex; flex-direction: column; gap: 2px; }
+.vital span { font-size: 12px; color: var(--muted); }
+.vital b { font-size: 17px; }
+
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-section.wide { grid-column: 1 / -1; }
+.chart-section h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 13px; }
+.meds { list-style: none; margin: 0; padding: 0; }
+.meds li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.meds li span { color: var(--muted); }
+.chart-foot { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+
+.chart-loading { display: flex; flex-direction: column; gap: 12px; }
+.sk { border-radius: 8px; background: linear-gradient(90deg, #EDF2F7 25%, #F7FAFC 50%, #EDF2F7 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.sk-head { height: 52px; width: 60%; }
+.sk-row { height: 64px; }
+.loading-text { margin: 0; font-size: 13px; color: var(--muted); }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@@@ starter src/components/PatientChart.tsx
+import React from 'react';
+import type { PatientDetail } from '../api';
+import { Avatar } from './Avatar';
+import { FlagDot } from './FlagDot';
+
+function TagList({ items }: { items: string[] }) {
+  return (
+    <div className="tags">
+      {items.map((item) => {
+        return <span key={item} className="tag">{item}</span>;
+      })}
+    </div>
+  );
+}
+
+// Renders one patient's full chart. Built for the printable view; give it a loaded PatientDetail.
+export function PatientChart({ patient }: { patient: PatientDetail }) {
+  return (
+    <div className="chart">
+      <header className="chart-head">
+        <Avatar name={patient.name} size={52} />
+        <div>
+          <h2 className="chart-name">{patient.name}</h2>
+          <p className="chart-meta">DOB {patient.dob} · {patient.sex} · MRN {patient.mrn} · {patient.phone}</p>
+        </div>
+        <FlagDot flag={patient.flag} />
+      </header>
+      <div className="vitals">
+        <div className="vital"><span>Blood pressure</span><b>{patient.vitals.bp}</b></div>
+        <div className="vital"><span>Heart rate</span><b>{patient.vitals.hr} bpm</b></div>
+        <div className="vital"><span>Temperature</span><b>{patient.vitals.tempF} °F</b></div>
+      </div>
+      <div className="chart-grid">
+        <div className="chart-section">
+          <h3>Allergies</h3>
+          <TagList items={patient.allergies} />
+        </div>
+        <div className="chart-section">
+          <h3>Conditions</h3>
+          <TagList items={patient.conditions} />
+        </div>
+        <div className="chart-section wide">
+          <h3>Medications</h3>
+          <ul className="meds">
+            {patient.medications.map((m) => {
+              return <li key={m.name}><b>{m.name}</b><span>{m.dose}</span></li>;
+            })}
+          </ul>
+        </div>
+      </div>
+      <p className="chart-foot">Last visit {patient.lastVisit} with {patient.provider}</p>
+    </div>
+  );
+}
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getPatient, getPatients } from './api';
 import type { PatientDetail, PatientSummary } from './api';
 import { Avatar } from './components/Avatar';
-import { ageFrom } from './utils/age';
+import { FlagDot } from './components/FlagDot';
+import { ChartSkeleton } from './components/ChartSkeleton';
+import { PatientChart } from './components/PatientChart';
 
 function TopBar() {
   return (
@@ -288,17 +392,7 @@ function TopBar() {
   );
 }
 
-function FlagDot({ flag }: { flag: PatientSummary['flag'] }) {
-  if (flag === 'none') {
-    return null;
-  }
-  let label = 'Follow-up';
-  if (flag === 'urgent') {
-    label = 'Urgent';
-  }
-  return <span className={'flag is-' + flag}>{label}</span>;
-}
-
+// CORE: the list reports clicks up and highlights the selected row
 type PatientListProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -358,30 +452,7 @@ function PatientList({ selectedId, onSelect }: PatientListProps) {
   );
 }
 
-function TagList({ items, empty }: { items: string[]; empty: string }) {
-  if (items.length === 0) {
-    return <p className="none">{empty}</p>;
-  }
-  return (
-    <div className="tags">
-      {items.map((item) => {
-        return <span key={item} className="tag">{item}</span>;
-      })}
-    </div>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div className="chart-loading" aria-busy="true">
-      <div className="sk sk-head" />
-      <div className="sk sk-row" />
-      <div className="sk sk-row" />
-      <p className="loading-text">Loading chart…</p>
-    </div>
-  );
-}
-
+// CORE: fetch the selected patient's chart
 function ChartPanel({ patientId }: { patientId: string | null }) {
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -390,10 +461,10 @@ function ChartPanel({ patientId }: { patientId: string | null }) {
     if (!patientId) {
       return;
     }
+    // NEXT: the `cancelled` guard. A newer click already started another request: drop this stale answer.
     let cancelled = false;
     setLoading(true);
     getPatient(patientId).then((data) => {
-      // A newer click already started another request: drop this stale answer.
       if (cancelled) {
         return;
       }
@@ -416,7 +487,7 @@ function ChartPanel({ patientId }: { patientId: string | null }) {
     );
   }
 
-  // Show the skeleton while loading, so the previous patient's chart never sits under a new name.
+  // CORE: show the skeleton while loading, so the previous patient's chart never sits under a new name.
   if (loading || !patient) {
     return (
       <section className="chart-pane">
@@ -425,46 +496,16 @@ function ChartPanel({ patientId }: { patientId: string | null }) {
     );
   }
 
+  // CORE: the loaded chart (PatientChart already exists)
   return (
     <section className="chart-pane">
-      <header className="chart-head">
-        <Avatar name={patient.name} size={52} />
-        <div>
-          <h2 className="chart-name">{patient.name}</h2>
-          <p className="chart-meta">{ageFrom(patient.dob)} y · {patient.sex} · MRN {patient.mrn} · {patient.phone}</p>
-        </div>
-        <FlagDot flag={patient.flag} />
-      </header>
-      <div className="vitals">
-        <div className="vital"><span>Blood pressure</span><b>{patient.vitals.bp}</b></div>
-        <div className="vital"><span>Heart rate</span><b>{patient.vitals.hr} bpm</b></div>
-        <div className="vital"><span>Temperature</span><b>{patient.vitals.tempF} °F</b></div>
-      </div>
-      <div className="chart-grid">
-        <div className="chart-section">
-          <h3>Allergies</h3>
-          <TagList items={patient.allergies} empty="No known allergies" />
-        </div>
-        <div className="chart-section">
-          <h3>Conditions</h3>
-          <TagList items={patient.conditions} empty="None recorded" />
-        </div>
-        <div className="chart-section wide">
-          <h3>Medications</h3>
-          <ul className="meds">
-            {patient.medications.map((m) => {
-              return <li key={m.name}><b>{m.name}</b><span>{m.dose}</span></li>;
-            })}
-          </ul>
-        </div>
-      </div>
-      <p className="chart-foot">Last visit {patient.lastVisit} with {patient.provider}</p>
+      <PatientChart patient={patient} />
     </section>
   );
 }
 
 export default function App() {
-  // The list sets it, the chart reads it: so it lives in their parent. Store the id, not the patient.
+  // CORE: the list sets it, the chart reads it: so it lives in their parent. Store the id, not the patient.
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
@@ -524,9 +565,7 @@ body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe
   .panes { grid-template-columns: 1fr; padding: 12px; }
 }
 
-/* ---- Added: selection + patient chart ---- */
-.patient-row.is-selected { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
-
+/* Patient chart + skeleton (components/PatientChart.tsx, ChartSkeleton.tsx) */
 .chart-pane { padding: 20px 24px; }
 .chart-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
 .chart-head > div { flex: 1; min-width: 0; }
@@ -543,7 +582,6 @@ body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe
 .chart-section h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 13px; }
-.none { margin: 0; font-size: 14px; color: var(--muted); }
 .meds { list-style: none; margin: 0; padding: 0; }
 .meds li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .meds li span { color: var(--muted); }
@@ -555,3 +593,71 @@ body { margin: 0; font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe
 .sk-row { height: 64px; }
 .loading-text { margin: 0; font-size: 13px; color: var(--muted); }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ---- Added: selection + patient chart ---- */
+/* CORE */
+.patient-row.is-selected { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+/* NEXT */
+.none { margin: 0; font-size: 14px; color: var(--muted); }
+@@@ solution src/components/PatientChart.tsx
+import React from 'react';
+import type { PatientDetail } from '../api';
+import { Avatar } from './Avatar';
+import { FlagDot } from './FlagDot';
+import { ageFrom } from '../utils/age';
+
+// NEXT: an empty list gets a message instead of a blank area
+function TagList({ items, empty }: { items: string[]; empty: string }) {
+  if (items.length === 0) {
+    return <p className="none">{empty}</p>;
+  }
+  return (
+    <div className="tags">
+      {items.map((item) => {
+        return <span key={item} className="tag">{item}</span>;
+      })}
+    </div>
+  );
+}
+
+// Renders one patient's full chart. Built for the printable view; give it a loaded PatientDetail.
+export function PatientChart({ patient }: { patient: PatientDetail }) {
+  // NEXT: age, not the raw date of birth (reuse utils/age)
+  const age = ageFrom(patient.dob);
+  return (
+    <div className="chart">
+      <header className="chart-head">
+        <Avatar name={patient.name} size={52} />
+        <div>
+          <h2 className="chart-name">{patient.name}</h2>
+          <p className="chart-meta">{age} y · {patient.sex} · MRN {patient.mrn} · {patient.phone}</p>
+        </div>
+        <FlagDot flag={patient.flag} />
+      </header>
+      <div className="vitals">
+        <div className="vital"><span>Blood pressure</span><b>{patient.vitals.bp}</b></div>
+        <div className="vital"><span>Heart rate</span><b>{patient.vitals.hr} bpm</b></div>
+        <div className="vital"><span>Temperature</span><b>{patient.vitals.tempF} °F</b></div>
+      </div>
+      <div className="chart-grid">
+        <div className="chart-section">
+          <h3>Allergies</h3>
+          <TagList items={patient.allergies} empty="No known allergies" />
+        </div>
+        <div className="chart-section">
+          <h3>Conditions</h3>
+          <TagList items={patient.conditions} empty="None recorded" />
+        </div>
+        <div className="chart-section wide">
+          <h3>Medications</h3>
+          <ul className="meds">
+            {patient.medications.map((m) => {
+              return <li key={m.name}><b>{m.name}</b><span>{m.dose}</span></li>;
+            })}
+          </ul>
+        </div>
+      </div>
+      <p className="chart-foot">Last visit {patient.lastVisit} with {patient.provider}</p>
+    </div>
+  );
+}

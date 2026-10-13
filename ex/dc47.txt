@@ -237,9 +237,12 @@ import type { Comment, Thread } from './api';
 import { timeAgo } from './utils/time';
 import Avatar from './components/Avatar';
 
+// CHANGE: sort mode
 type SortMode = 'top' | 'new';
+// NEXT: votes map lives in App
 type Votes = Record<string, boolean>; // comment id -> I upvoted it
 
+// CORE: recursive count for "4 replies hidden"
 // Every reply below this comment, at any depth.
 function countDescendants(c: Comment): number {
   return c.replies.reduce((sum, r) => {
@@ -247,6 +250,7 @@ function countDescendants(c: Comment): number {
   }, 0);
 }
 
+// NEXT: shown score is derived
 // The score shown = server score + my (optimistic) vote. Derived, never stored.
 function displayScore(c: Comment, votes: Votes): number {
   if (votes[c.id]) {
@@ -255,6 +259,7 @@ function displayScore(c: Comment, votes: Votes): number {
   return c.score;
 }
 
+// CHANGE: sort a copy, by score or by time
 // Sort a copy. Never .sort() the array from state.
 function sortComments(list: Comment[], mode: SortMode, votes: Votes): Comment[] {
   return [...list].sort((a, b) => {
@@ -277,6 +282,7 @@ function PostHeader({ thread }: { thread: Thread }) {
   );
 }
 
+// CORE: recursive node (CHANGE: sort prop; NEXT: votes + onVote)
 type CommentNodeProps = {
   comment: Comment;
   sort: SortMode;
@@ -286,12 +292,15 @@ type CommentNodeProps = {
 
 // Recursive: a comment renders its replies with CommentNode.
 function CommentNode({ comment, sort, votes, onVote }: CommentNodeProps) {
+  // CORE: collapse is local to each node
   // Collapse state is local: it only affects this subtree.
   const [collapsed, setCollapsed] = useState(false);
 
+  // NEXT
   const voted = votes[comment.id] === true;
   const hiddenCount = countDescendants(comment);
 
+  // CORE: [–] / [+] and the hidden count
   let toggleLabel = '[–]';
   if (collapsed) {
     toggleLabel = '[+]';
@@ -309,10 +318,12 @@ function CommentNode({ comment, sort, votes, onVote }: CommentNodeProps) {
     }
     body = hiddenEl;
   } else {
+    // NEXT: voted state of the button
     let voteCls = 'vote-btn';
     if (voted) {
       voteCls = 'vote-btn is-voted';
     }
+    // CORE: recursion; replies indented with a thread line
     let replies = null;
     if (comment.replies.length > 0) {
       replies = (
@@ -356,8 +367,11 @@ function CommentNode({ comment, sort, votes, onVote }: CommentNodeProps) {
 export default function App() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [offline, setOffline] = useState(false);
+  // NEXT
   const [votes, setVotes] = useState<Votes>({});
+  // CHANGE
   const [sort, setSort] = useState<SortMode>('top');
+  // NEXT
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -373,6 +387,7 @@ export default function App() {
     };
   }, []);
 
+  // NEXT: optimistic vote + rollback
   // Optimistic: count the vote now, roll it back if the request fails.
   function handleVote(c: Comment) {
     setError('');
@@ -393,13 +408,16 @@ export default function App() {
     return <div className="app"><p className="loading">Loading discussion…</p></div>;
   }
 
+  // NEXT
   let errorEl = null;
   if (error) {
     errorEl = <div className="vote-error" role="alert">{error}</div>;
   }
 
+  // CHANGE
   const topLevel = sortComments(thread.comments, sort, votes);
 
+  // CORE: top level renders CommentNode (NEXT: {errorEl}; CHANGE: Sort by bar + sorted list)
   return (
     <div className="app">
       <nav className="topnav">
@@ -412,6 +430,7 @@ export default function App() {
       <PostHeader thread={thread} />
       {errorEl}
       <section className="comments">
+        {/* CHANGE: Sort by select */}
         <div className="comments-bar">
           <span className="comments-title">Comments</span>
           <label className="sort-label">
@@ -472,6 +491,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .reply-count { margin-left: 8px; }
 
 /* ---- Added: tree, collapse, votes, sort ---- */
+/* CORE: tree + collapse */
 .comment-head { margin-left: -4px; }
 .collapse-btn { padding: 0 4px; border: 0; background: none; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; cursor: pointer; }
 .collapse-btn:hover { color: var(--accent); }
@@ -479,8 +499,10 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .replies:hover { border-left-color: var(--thread); }
 .comment.is-collapsed .comment-author { color: var(--muted); }
 .hidden-count { display: inline-block; margin: 4px 0 0 30px; padding: 2px 8px; border-radius: 999px; background: var(--bg); font-size: 12px; color: var(--muted); }
+/* NEXT */
 .vote-btn.is-voted, .vote-btn:disabled.is-voted { background: var(--accent-soft); color: var(--accent); cursor: default; }
 .vote-error { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: #FDECEC; color: #B42318; font-size: 14px; }
+/* CHANGE */
 .comments-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px; border-bottom: 1px solid var(--line); }
 .comments-title { font-weight: 700; font-size: 15px; }
 .sort-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }

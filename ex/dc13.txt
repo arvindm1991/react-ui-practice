@@ -67,6 +67,22 @@ export function CourseCard({ course }: { course: Course }) {
     </article>
   );
 }
+@@@ shared src/components/SkeletonCard.tsx
+import React from 'react';
+
+// Grey shimmering placeholder the size of a CourseCard (styles: .skeleton-card / .sk in styles.css).
+export function SkeletonCard() {
+  return (
+    <div className="course-card skeleton-card" aria-hidden="true">
+      <div className="sk sk-cover" />
+      <div className="course-body">
+        <div className="sk sk-line" />
+        <div className="sk sk-line short" />
+        <div className="sk sk-bar" />
+      </div>
+    </div>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useState } from 'react';
 import type { CourseStatus } from './api';
@@ -195,11 +211,29 @@ body { margin: 0; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', s
 .course-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--muted); }
 .ghost-btn { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; }
 .ghost-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Loading skeletons + state panels (shared across Learnloop) */
+.sk { border-radius: 8px; background: linear-gradient(90deg, #F5EDDD 25%, #FBF5EA 50%, #F5EDDD 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+.sk-cover { height: 96px; border-radius: 0; }
+.sk-line { height: 14px; margin-bottom: 8px; }
+.sk-line.short { width: 55%; margin-bottom: 18px; }
+.sk-bar { height: 6px; border-radius: 999px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.state-panel { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 40px 24px; text-align: center; background: var(--surface); border: 1px dashed #E3D3B4; border-radius: var(--radius); }
+.state-panel.is-error { border: 1px solid #F5C6BF; background: #FFF5F3; }
+.state-panel.is-error h3 { color: var(--danger); }
+.state-icon { font-size: 32px; }
+.state-panel h3 { margin: 4px 0 0; font-size: 17px; }
+.state-panel p { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+.primary-btn { height: 38px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.primary-btn:hover { background: #E86A0C; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getCourses } from './api';
 import type { Course, CourseStatus } from './api';
 import { CourseCard } from './components/CourseCard';
+import { SkeletonCard } from './components/SkeletonCard';
 
 const TABS: { id: CourseStatus; label: string }[] = [
   { id: 'in-progress', label: 'In progress' },
@@ -250,32 +284,22 @@ function DevToolbar({ fail, onFailChange }: { fail: boolean; onFailChange: (v: b
   );
 }
 
-function SkeletonCard() {
-  return (
-    <div className="course-card skeleton-card" aria-hidden="true">
-      <div className="sk sk-cover" />
-      <div className="course-body">
-        <div className="sk sk-line" />
-        <div className="sk sk-line short" />
-        <div className="sk sk-bar" />
-      </div>
-    </div>
-  );
-}
-
 type CourseListProps = {
   status: CourseStatus;
   shouldFail: boolean;
 };
 
 function CourseList({ status, shouldFail }: CourseListProps) {
+  // CORE: the three pieces of request state
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Bumping this number re-runs the effect: that is the whole Retry button.
+  // NEXT: bumping this number re-runs the effect. That is the whole Retry button.
   const [attempt, setAttempt] = useState(0);
 
+  // CORE: load on mount and whenever the tab (or the failure switch) changes
   useEffect(() => {
+    // STRETCH: the `cancelled` guard (a newer request replaces this one, so ignore its answer)
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -295,17 +319,18 @@ function CourseList({ status, shouldFail }: CourseListProps) {
         setLoading(false);
       });
     return () => {
-      // A newer request (tab switch, retry) replaces this one: ignore its answer.
       cancelled = true;
     };
   }, [status, shouldFail, attempt]);
 
+  // NEXT: retry
   function handleRetry() {
     setAttempt((prev) => {
       return prev + 1;
     });
   }
 
+  // CORE: loading -> 3 skeletons (SkeletonCard already exists)
   if (loading) {
     return (
       <div className="course-grid" aria-busy="true">
@@ -316,6 +341,7 @@ function CourseList({ status, shouldFail }: CourseListProps) {
     );
   }
 
+  // CORE: error panel
   if (error) {
     return (
       <div className="state-panel is-error" role="alert">
@@ -327,6 +353,7 @@ function CourseList({ status, shouldFail }: CourseListProps) {
     );
   }
 
+  // NEXT: empty state
   if (courses.length === 0) {
     return (
       <div className="state-panel">
@@ -338,6 +365,7 @@ function CourseList({ status, shouldFail }: CourseListProps) {
     );
   }
 
+  // CORE: the list
   return (
     <div className="course-grid">
       {courses.map((c) => {
@@ -412,7 +440,7 @@ body { margin: 0; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', s
 .ghost-btn { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; }
 .ghost-btn:hover { border-color: var(--primary); color: var(--primary); }
 
-/* ---- Added: loading, error and empty states ---- */
+/* Loading skeletons + state panels (shared across Learnloop) */
 .sk { border-radius: 8px; background: linear-gradient(90deg, #F5EDDD 25%, #FBF5EA 50%, #F5EDDD 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
 .sk-cover { height: 96px; border-radius: 0; }
 .sk-line { height: 14px; margin-bottom: 8px; }

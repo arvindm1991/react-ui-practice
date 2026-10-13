@@ -130,6 +130,16 @@ body { margin: 0; font-family: 'Futura', 'Century Gothic', 'Avenir Next', system
   .layout { grid-template-columns: 1fr; }
   .hero { min-height: 220px; }
 }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: disabled buttons + <p class="max-note"> */
+.step-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.step-btn:disabled:hover { color: var(--ink); }
+.max-note { margin: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--warn); text-align: right; }
+/* STRETCH: extra rows: .summary-row.is-muted (fees) and .summary-row.is-total */
+.summary-row:first-of-type { margin-top: 8px; }
+.summary-row.is-muted { color: var(--muted); font-size: 14px; padding-top: 0; }
+.summary-row.is-total { border-top: 1px solid var(--line); font-weight: 800; font-size: 17px; }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { EVENT } from './data/event';
@@ -151,9 +161,10 @@ function EventHero({ event }: { event: GigEvent }) {
 }
 
 function TicketPanel({ event }: { event: GigEvent }) {
+  // CORE: one number in state
   const [qty, setQty] = useState(MIN_QTY);
 
-  // Clamp inside the updater so fast clicks can never go out of range.
+  // CORE: clamp inside the updater so fast clicks can never go out of range.
   function handleDecrease() {
     setQty((prev) => {
       return Math.max(MIN_QTY, prev - 1);
@@ -166,15 +177,18 @@ function TicketPanel({ event }: { event: GigEvent }) {
     });
   }
 
-  // derived: never stored in state
-  const atMin = qty === MIN_QTY;
-  const atMax = qty === MAX_QTY;
+  // CORE: derived, never stored in state (math in cents, format at the end)
   const subtotal = event.priceCents * qty;
+  const subtotalLabel = 'Subtotal (' + qty + ' × ' + formatPrice(event.priceCents) + ')';
+
+  // CHANGE: fees and total feed the button label (STRETCH: their own rows)
   const fees = event.feeCents * qty;
   const total = subtotal + fees;
-  const subtotalLabel = 'Subtotal (' + qty + ' × ' + formatPrice(event.priceCents) + ')';
   const checkoutLabel = 'Checkout · ' + formatPrice(total);
 
+  // NEXT: bounds for disabled + the max note (and aria-labels in the JSX)
+  const atMin = qty === MIN_QTY;
+  const atMax = qty === MAX_QTY;
   let maxNote = null;
   if (atMax) {
     maxNote = <p className="max-note">Max {MAX_QTY} tickets per order</p>;
@@ -276,10 +290,12 @@ body { margin: 0; font-family: 'Futura', 'Century Gothic', 'Avenir Next', system
   .hero { min-height: 220px; }
 }
 
-/* ---- Added: stepper states + totals ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: disabled buttons + <p class="max-note"> */
 .step-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 .step-btn:disabled:hover { color: var(--ink); }
 .max-note { margin: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--warn); text-align: right; }
+/* STRETCH: extra rows: .summary-row.is-muted (fees) and .summary-row.is-total */
 .summary-row:first-of-type { margin-top: 8px; }
 .summary-row.is-muted { color: var(--muted); font-size: 14px; padding-top: 0; }
 .summary-row.is-total { border-top: 1px solid var(--line); font-weight: 800; font-size: 17px; }

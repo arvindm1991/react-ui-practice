@@ -64,6 +64,17 @@ export function parseAmount(text: string): number | null {
   }
   return n;
 }
+
+// sumAmounts(["1,200", "50", "abc", ""]) -> 1250 (text that is not a number counts as 0)
+export function sumAmounts(texts: string[]): number {
+  return texts.reduce((sum, text) => {
+    const n = parseAmount(text);
+    if (n === null) {
+      return sum;
+    }
+    return sum + n;
+  }, 0);
+}
 @@@ shared src/utils/id.ts
 let counter = 0;
 // uid("row") -> "row-1712345678901-1"
@@ -74,8 +85,11 @@ export function uid(prefix: string): string {
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getBudget } from './api';
-import type { Budget } from './api';
-import { formatMoney } from './utils/money';
+import { formatMoney, parseAmount } from './utils/money';
+
+// Cells are stored as the text the user typed, so an invalid entry can stay
+// visible instead of being silently thrown away.
+type GridRow = { id: string; category: string; cells: string[] };
 
 function AppHeader({ name }: { name: string }) {
   return (
@@ -87,25 +101,36 @@ function AppHeader({ name }: { name: string }) {
   );
 }
 
-function BudgetTable({ budget }: { budget: Budget }) {
-  // TODO: editable cells, row totals, column totals
+type BudgetTableProps = {
+  months: string[];
+  rows: GridRow[];
+  onCellChange: (row: number, col: number, text: string) => void;
+};
+
+// TODO: make cells editable (onCellChange is ready), add totals
+function BudgetTable({ months, rows, onCellChange }: BudgetTableProps) {
   return (
     <table className="grid">
       <thead>
         <tr>
           <th className="col-category">Category</th>
-          {budget.months.map((m) => {
+          {months.map((m) => {
             return <th key={m} className="col-num">{m}</th>;
           })}
         </tr>
       </thead>
       <tbody>
-        {budget.rows.map((row) => {
+        {rows.map((row) => {
           return (
             <tr key={row.id}>
               <th scope="row" className="col-category">{row.category}</th>
-              {row.values.map((v, i) => {
-                return <td key={i} className="cell">{formatMoney(v)}</td>;
+              {row.cells.map((text, c) => {
+                const amount = parseAmount(text);
+                let shown = text;
+                if (amount !== null) {
+                  shown = formatMoney(amount);
+                }
+                return <td key={c} className="cell">{shown}</td>;
               })}
             </tr>
           );
@@ -116,7 +141,10 @@ function BudgetTable({ budget }: { budget: Budget }) {
 }
 
 export default function App() {
-  const [budget, setBudget] = useState<Budget | null>(null);
+  const [name, setName] = useState('');
+  const [months, setMonths] = useState<string[]>([]);
+  const [rows, setRows] = useState<GridRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,23 +152,46 @@ export default function App() {
       if (cancelled) {
         return;
       }
-      setBudget(data);
+      setName(data.name);
+      setMonths(data.months);
+      setRows(data.rows.map((r) => {
+        return { id: r.id, category: r.category, cells: r.values.map((v) => { return String(v); }) };
+      }));
+      setLoading(false);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  let body;
-  if (!budget) {
-    body = <p className="loading">Loading budget…</p>;
-  } else {
-    body = <BudgetTable budget={budget} />;
+  // Saves one cell's text. Immutable: copies the row and its cells array.
+  // Saves one cell's text. Immutable: copies the row and its cells array.
+  function handleCellChange(row: number, col: number, text: string) {
+    setRows((prev) => {
+      return prev.map((r, i) => {
+        if (i !== row) {
+          return r;
+        }
+        const cells = r.cells.map((t, j) => {
+          if (j === col) {
+            return text;
+          }
+          return t;
+        });
+        return { ...r, cells: cells };
+      });
+    });
   }
 
-  let name = '';
-  if (budget) {
-    name = budget.name;
+  let body;
+  if (loading) {
+    body = <p className="loading">Loading budget…</p>;
+  } else {
+    body = (
+      <div>
+        <BudgetTable months={months} rows={rows} onCellChange={handleCellChange} />
+      </div>
+    );
   }
 
   return (
@@ -188,12 +239,13 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getBudget } from './api';
-import { formatMoney, parseAmount } from './utils/money';
+import { formatMoney, parseAmount, sumAmounts } from './utils/money';
 import { uid } from './utils/id';
 
 // Cells are stored as the text the user typed, so an invalid entry can stay
-// visible (and highlighted) instead of being silently thrown away.
+// visible instead of being silently thrown away.
 type GridRow = { id: string; category: string; cells: string[] };
+// CORE: which cell is being edited
 type CellPos = { row: number; col: number };
 
 function AppHeader({ name }: { name: string }) {
@@ -206,25 +258,16 @@ function AppHeader({ name }: { name: string }) {
   );
 }
 
-// Sum of the valid numbers in a list of cell strings (invalid cells count as 0).
-function sumCells(cells: string[]): number {
-  return cells.reduce((sum, text) => {
-    const n = parseAmount(text);
-    if (n === null) {
-      return sum;
-    }
-    return sum + n;
-  }, 0);
-}
-
 type BudgetTableProps = {
   months: string[];
   rows: GridRow[];
   onCellChange: (row: number, col: number, text: string) => void;
+  // CHANGE: delete rows
   onDeleteRow: (id: string) => void;
 };
 
 function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTableProps) {
+  // CORE: one editing cell + its draft text
   const [editing, setEditing] = useState<CellPos | null>(null);
   const [draft, setDraft] = useState('');
 
@@ -233,6 +276,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
     setDraft(rows[row].cells[col]);
   }
 
+  // CORE: one commit path for Enter, Tab and blur
   // Save the draft into the grid, then either move to `next` or stop editing.
   function commit(next: CellPos | null) {
     if (editing) {
@@ -245,6 +289,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
     }
   }
 
+  // CORE: Enter saves + moves down, Escape cancels (NEXT: the Tab branch)
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!editing) {
       return;
@@ -257,6 +302,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
         next = { row: editing.row + 1, col: editing.col };
       }
       commit(next);
+    // NEXT: Tab / Shift+Tab with wrapping
     } else if (e.key === 'Tab') {
       e.preventDefault(); // keep focus inside the grid
       let row = editing.row;
@@ -284,6 +330,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
     }
   }
 
+  // CORE: blur saves
   function handleBlur() {
     // A blur caused by Enter/Tab moving to another cell has already committed.
     if (editing) {
@@ -291,9 +338,10 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
     }
   }
 
+  // NEXT: footer column totals + grand total (sumAmounts from utils/money)
   // derived: totals are computed every render, never stored
   const colTotals = months.map((m, col) => {
-    return sumCells(rows.map((r) => {
+    return sumAmounts(rows.map((r) => {
       return r.cells[col];
     }));
   });
@@ -301,6 +349,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
     return sum + t;
   }, 0);
 
+  // STRETCH: empty state for when every row is deleted
   let emptyRow = null;
   if (rows.length === 0) {
     emptyRow = (
@@ -318,6 +367,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
           {months.map((m) => {
             return <th key={m} className="col-num">{m}</th>;
           })}
+          {/* CORE: Total header; CHANGE: actions header */}
           <th className="col-num col-total">Total</th>
           <th className="col-actions"><span className="sr-only">Actions</span></th>
         </tr>
@@ -328,6 +378,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
             <tr key={row.id}>
               <th scope="row" className="col-category">{row.category}</th>
               {row.cells.map((text, c) => {
+                // CORE: input while editing, otherwise a focusable button
                 const isEditing = editing !== null && editing.row === r && editing.col === c;
                 if (isEditing) {
                   return (
@@ -344,6 +395,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
                     </td>
                   );
                 }
+                // NEXT: invalid text stays visible, highlighted
                 const amount = parseAmount(text);
                 let cls = 'cell';
                 let shown = text;
@@ -362,7 +414,8 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
                   </td>
                 );
               })}
-              <td className="cell cell-total">{formatMoney(sumCells(row.cells))}</td>
+              {/* CORE: row total; CHANGE: delete button */}
+              <td className="cell cell-total">{formatMoney(sumAmounts(row.cells))}</td>
               <td className="col-actions">
                 <button type="button" className="row-delete" aria-label={'Delete ' + row.category} onClick={() => { setEditing(null); onDeleteRow(row.id); }}>×</button>
               </td>
@@ -371,6 +424,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
         })}
         {emptyRow}
       </tbody>
+      {/* NEXT: footer totals */}
       <tfoot>
         <tr>
           <th scope="row" className="col-category">Total</th>
@@ -385,6 +439,7 @@ function BudgetTable({ months, rows, onCellChange, onDeleteRow }: BudgetTablePro
   );
 }
 
+// STRETCH: add a row
 function AddRowForm({ onAdd }: { onAdd: (name: string) => void }) {
   const [name, setName] = useState('');
 
@@ -429,6 +484,7 @@ export default function App() {
     };
   }, []);
 
+  // Saves one cell's text. Immutable: copies the row and its cells array.
   function handleCellChange(row: number, col: number, text: string) {
     setRows((prev) => {
       return prev.map((r, i) => {
@@ -446,12 +502,14 @@ export default function App() {
     });
   }
 
+  // STRETCH
   function handleAddRow(category: string) {
     setRows((prev) => {
       return [...prev, { id: uid('row'), category: category, cells: months.map(() => { return ''; }) }];
     });
   }
 
+  // CHANGE
   function handleDeleteRow(id: string) {
     setRows((prev) => {
       return prev.filter((r) => {
@@ -460,6 +518,7 @@ export default function App() {
     });
   }
 
+  // NEXT: count invalid cells for the warning
   // derived
   let invalidCount = 0;
   rows.forEach((r) => {
@@ -537,6 +596,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .cell { padding: 0 14px; text-align: right; font-family: var(--mono); font-size: 13px; }
 
 /* ---- Added: editable cells, totals, add/delete rows ---- */
+/* CORE: button / input cells */
 .cell:has(.cell-btn), .cell.is-editing { padding: 0; }
 .cell-btn { width: 100%; height: 40px; padding: 0 14px; border: 0; background: none; color: inherit; font: inherit; text-align: right; cursor: cell; }
 .cell-btn:hover { background: #F6FAF8; }
@@ -544,14 +604,18 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .cell.is-editing { box-shadow: inset 0 0 0 2px var(--brand); }
 .cell-input { width: 100%; height: 38px; padding: 0 12px; border: 0; background: var(--surface); font: inherit; text-align: right; }
 .cell-input:focus { outline: none; }
+/* NEXT */
 .cell.is-invalid { color: var(--danger); }
 .cell.is-invalid .cell-btn { background: var(--danger-soft); box-shadow: inset 0 0 0 1px var(--danger); }
+/* CORE: totals (tfoot rules NEXT) */
 .cell-total { background: #F8FAF9; font-weight: 600; }
 .cell-grand { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
 .grid tfoot th, .grid tfoot td { border-top: 2px solid var(--line-strong); background: #F8FAF9; font-weight: 700; }
+/* CHANGE */
 .col-actions { width: 40px; text-align: center; }
 .row-delete { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
 .row-delete:hover { background: var(--danger-soft); color: var(--danger); }
+/* STRETCH: empty row + add-row form; warning is NEXT */
 .empty { padding: 0 14px; text-align: center; color: var(--muted); }
 .sheet-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 14px; }
 .add-row { display: flex; gap: 8px; }

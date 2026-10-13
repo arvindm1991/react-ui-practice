@@ -3,8 +3,8 @@
   "kind": "drill",
   "level": 4,
   "order": 41,
-  "minutes": 35,
-  "changeAt": 24,
+  "minutes": 38,
+  "changeAt": 26,
   "title": "Retro board: undo / redo",
   "focus": "src/App.tsx",
   "summary": "A sticky-note retro board already adds, edits and deletes notes. Add an undo/redo history with buttons and Ctrl/Cmd+Z.",
@@ -15,9 +15,8 @@
    "useRef snapshot",
    "disabled states"
   ],
-  "brief": "<p><b>Pinboard</b> is a team retro board. <code>App.tsx</code> has <code>Header</code>, <code>Toolbar</code>, <code>NoteCard</code> and <code>App</code>. You can already add a note (in the picked color), type in it, and delete it. <code>getBoard()</code> in <code>api.ts</code> loads the notes after a random 0.3–0.9 s.</p><p>Product wants <b>undo and redo</b>. Read <code>components/IconButton.tsx</code> (use it for the new buttons) and <code>utils/id.ts</code> first.</p><p>The interesting decision is the <b>shape of the state</b>: right now it is one <code>notes</code> array. Undo needs the old versions too.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change:</b> cap history at 20 (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan out loud · 7–24 Core · 24–31 change + Next · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Every change to the notes becomes a snapshot. I'll replace <code>notes</code> with one state object <code>{ past, present, future }</code> so the three always change together. Add and delete call <code>commit(next)</code>: push <code>present</code> onto <code>past</code>, set the new present, clear <code>future</code>. Undo pops <code>past</code> into <code>present</code> and pushes the old present onto <code>future</code>; redo is the mirror. I'll write those as pure functions <code>(h) =&gt; newH</code> so I can pass them straight to <code>setHistory</code>, and the keydown effect doesn't need any dependencies.</p><p>Typing is the tricky part: one undo per keystroke would be awful. I'll update <code>present</code> without a history entry while typing, remember a snapshot on focus in a <code>useRef</code>, and on blur commit that snapshot to <code>past</code> if the notes changed. Can-undo / can-redo are derived from the array lengths.\"</p></div></details>",
+  "brief": "<p><b>Pinboard</b> is a team retro board. <code>App.tsx</code> has <code>Header</code>, <code>Toolbar</code>, <code>NoteCard</code> and <code>App</code>. You can already add a note (in the picked color), type in it, and delete it. <code>getBoard()</code> in <code>api.ts</code> loads the notes after a random 0.3–0.9 s.</p><p>Product wants <b>undo and redo</b>. Read <code>components/IconButton.tsx</code> (use it for the new buttons) and <code>utils/id.ts</code> first.</p><p>The interesting decision is the <b>shape of the state</b>: right now it is one <code>notes</code> array. Undo needs the old versions too.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> cap history at 20 (~26 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–26 Core · 26–30 change · 30–36 Next · 36–38 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Every change to the notes becomes a snapshot. I'll replace <code>notes</code> with one state object <code>{ past, present, future }</code> so the three always change together. Add and delete call <code>commit(next)</code>: push <code>present</code> onto <code>past</code>, set the new present, clear <code>future</code>. Undo pops <code>past</code> into <code>present</code> and pushes the old present onto <code>future</code>; redo is the mirror. I'll write those as pure functions <code>(h) =&gt; newH</code> so I can pass them straight to <code>setHistory</code>, and the keydown effect doesn't need any dependencies.</p><p>Typing is the tricky part: one undo per keystroke would be awful. I'll update <code>present</code> without a history entry while typing, remember a snapshot on focus in a <code>useRef</code>, and on blur commit that snapshot to <code>past</code> if the notes changed. Can-undo / can-redo are derived from the array lengths.\"</p></div></details>",
   "tiers": [
-   "Core",
    "Core",
    "Core",
    "Next",
@@ -25,10 +24,9 @@
   ],
   "requirements": [
    "Toolbar gets <b>Undo</b> and <b>Redo</b> buttons (use <code>IconButton</code>). Undo is disabled when there is nothing to undo, Redo when there is nothing to redo. Loading the board is <i>not</i> an undoable step",
-   "Adding and deleting a note can be undone and redone. A deleted note comes back <b>in the same position</b>. Doing a new action after an undo clears the redo stack",
+   "Adding and deleting a note can be undone and redone. A deleted note comes back <b>in the same position</b>. Doing a new action after an undo clears the redo stack. Typing still edits the text (it just doesn't create history entries yet)",
    "Editing a note's text is <b>one</b> undo step per edit (commit when the note loses focus), not one step per keystroke",
-   "<b>Ctrl/Cmd+Z</b> undoes and <b>Shift+Ctrl/Cmd+Z</b> redoes. While the cursor is in a note's textarea the shortcut is left to the browser (native text undo)",
-   "The keydown listener is added once in an effect and removed in the cleanup; no stale state (undo twice quickly must undo two steps)"
+   "<b>Ctrl/Cmd+Z</b> undoes and <b>Shift+Ctrl/Cmd+Z</b> redoes. While the cursor is in a note's textarea the shortcut is left to the browser (native text undo). The keydown listener is added once in an effect and removed in the cleanup; no stale state (undo twice quickly must undo two steps)"
   ],
   "change": {
    "title": "Cap the history at 20",
@@ -92,14 +90,48 @@
      "pill · pad 3 8 · 12px · tabular nums"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "slice() with negative numbers",
+    "syntax": "arr.slice(-n)   /   arr.slice(0, -1)",
+    "example": "[1, 2, 3, 4].slice(-2)    // [3, 4]  (last two)\n[1, 2, 3, 4].slice(0, -1) // [1, 2, 3]  (all but the last)",
+    "note": "Returns a <b>new</b> array (never mutates). Negative numbers count from the end. <code>.slice(-20)</code> is the whole \"cap at 20\" change.",
+    "search": "mdn array slice"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Last item: at(-1)",
+    "syntax": "arr[arr.length - 1]   /   arr.at(-1)",
+    "example": "const past = ['a', 'b', 'c'];\npast.at(-1)               // 'c'\npast[past.length - 1]     // 'c'",
+    "note": "Returns the item, or <b>undefined</b> for an empty array, so check the length first.",
+    "search": "mdn array at"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Add to the front with spread",
+    "syntax": "[item, ...arr]   /   [...arr, item]",
+    "example": "const future = ['b', 'c'];\n['a', ...future]          // ['a', 'b', 'c']",
+    "note": "Builds a new array; the original is untouched. Use it for the redo stack (newest first).",
+    "search": "mdn spread syntax array"
+   },
+   {
+    "cat": "React",
+    "name": "Pass a function to setState",
+    "syntax": "setHistory(undoHistory)   // same as setHistory((h) => undoHistory(h))",
+    "example": "function undoHistory(h: History): History { ... }\nsetHistory(undoHistory); // React calls it with the latest state",
+    "note": "React calls your function with the <b>current</b> state and stores what it returns, so a pure helper works from a button or a keydown listener without stale state.",
+    "search": "react useState updater function"
+   }
+  ]
  },
  "dc42": {
   "kind": "drill",
   "level": 4,
   "order": 42,
-  "minutes": 35,
-  "changeAt": 24,
+  "minutes": 30,
+  "changeAt": 20,
   "title": "Photo feed: infinite scroll",
   "focus": "src/App.tsx",
   "summary": "A dark photo feed only shows the first page. Load the next page automatically when the user nears the bottom, using IntersectionObserver.",
@@ -110,7 +142,7 @@
    "scroll container",
    "effect cleanup"
   ],
-  "brief": "<p><b>Aperture</b> is a photo community. <code>App.tsx</code> has <code>TopBar</code>, <code>Feed</code> and <code>App</code>; cards are rendered by <code>components/PhotoCard.tsx</code>, and <code>components/Spinner.tsx</code> is a loading row you should reuse. The feed scrolls inside its <b>own container</b> (<code>.feed-scroll</code>), not the window.</p><p><code>getPhotos(cursor)</code> returns <code>{ photos, nextCursor }</code> after 0.5–1.1 s. <code>nextCursor</code> is <code>null</code> on the last page (40 photos in total). It logs every request to the console, so you can see duplicate loads.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> \"Back to top\" button (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Feed</code>: <code>photos</code>, <code>nextCursor</code> (start at 0, <code>null</code> means done) and <code>loading</code>. I'll put an empty sentinel <code>div</code> after the last card and observe it with an <code>IntersectionObserver</code> whose <code>root</code> is the scroll container, not the viewport. When it intersects and nothing is in flight, I fetch the next page and append.</p><p>The observer callback is a closure, so for the in-flight guard I'll use a <code>useRef</code>; a state value would be stale inside it. The effect depends on <code>nextCursor</code>: each page recreates the observer, and if the sentinel is still visible it fires again, which fills tall screens. When <code>nextCursor</code> is <code>null</code> the effect just doesn't observe, and I show \"You're all caught up\". Cleanup disconnects.\"</p></div></details>",
+  "brief": "<p><b>Aperture</b> is a photo community. <code>App.tsx</code> has <code>TopBar</code>, <code>Feed</code> and <code>App</code>; cards are rendered by <code>components/PhotoCard.tsx</code>, and <code>components/Spinner.tsx</code> is a loading row you should reuse. The feed scrolls inside its <b>own container</b> (<code>.feed-scroll</code>), not the window.</p><p><code>getPhotos(cursor)</code> returns <code>{ photos, nextCursor }</code> after 0.5–1.1 s. <code>nextCursor</code> is <code>null</code> on the last page (40 photos in total). It logs every request to the console, so you can see duplicate loads.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> \"Back to top\" button (~20 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan · 5–20 Core · 20–26 change · 26–28 Next · 28–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Feed</code>: <code>photos</code>, <code>nextCursor</code> (start at 0, <code>null</code> means done) and <code>loading</code>. I'll put an empty sentinel <code>div</code> after the last card and observe it with an <code>IntersectionObserver</code> whose <code>root</code> is the scroll container, not the viewport. When it intersects and nothing is in flight, I fetch the next page and append.</p><p>The observer callback is a closure, so for the in-flight guard I'll use a <code>useRef</code>; a state value would be stale inside it. The effect depends on <code>nextCursor</code>: each page recreates the observer, and if the sentinel is still visible it fires again, which fills tall screens. When <code>nextCursor</code> is <code>null</code> the effect just doesn't observe, and I show \"You're all caught up\". Cleanup disconnects.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
@@ -184,17 +216,51 @@
      "absolute · bottom 20 · centered · h 36 · pill · 13/700 · shadow 0 6 20"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "DOM",
+    "name": "IntersectionObserver",
+    "syntax": "const io = new IntersectionObserver(callback, { root, rootMargin });\nio.observe(el);   io.disconnect();",
+    "example": "const io = new IntersectionObserver((entries) => {\n  if (entries[0].isIntersecting) { loadMore(); }\n}, { root: scrollEl, rootMargin: '0px 0px 300px 0px' });\nio.observe(sentinelEl);",
+    "note": "Calls you back when <code>el</code> enters / leaves <code>root</code> (default: the viewport, so pass the scroll container). <code>rootMargin</code> fires early. Always <code>disconnect()</code> in the effect cleanup.",
+    "search": "mdn intersectionobserver"
+   },
+   {
+    "cat": "React",
+    "name": "useRef as a mutable flag",
+    "syntax": "const inFlight = useRef(false);   inFlight.current = true;",
+    "example": "const inFlight = useRef(false);\nif (inFlight.current) { return; } // always the latest value\ninFlight.current = true;          // no re-render",
+    "note": "Changing <code>.current</code> does <b>not</b> re-render, and callbacks always read the latest value (state inside an old closure would be stale).",
+    "search": "react useRef mutable value"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Append a page",
+    "syntax": "setItems((prev) => [...prev, ...page])",
+    "example": "[1, 2, ...[3, 4]]   // [1, 2, 3, 4]",
+    "note": "Spread both arrays into a new one. Use the updater form so two quick loads never overwrite each other.",
+    "search": "mdn spread syntax"
+   },
+   {
+    "cat": "DOM",
+    "name": "Smooth scroll a container",
+    "syntax": "el.scrollTo({ top: 0, behavior: 'smooth' })",
+    "example": "scrollRef.current.scrollTop        // 1240 (px scrolled)\nscrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });",
+    "note": "<code>scrollTop</code> reads how far an element is scrolled; <code>scrollTo</code> moves it. Read it in <code>onScroll</code> with <code>e.currentTarget.scrollTop</code>.",
+    "search": "mdn element scrollTo"
+   }
+  ]
  },
  "dc43": {
   "kind": "drill",
   "level": 4,
   "order": 43,
-  "minutes": 35,
-  "changeAt": 24,
+  "minutes": 40,
+  "changeAt": 27,
   "title": "Playlist: drag to reorder",
   "focus": "src/App.tsx",
-  "summary": "Reorder a playlist with HTML5 drag and drop plus accessible Move up/down buttons, then save the order to the API.",
+  "summary": "Reorder a playlist with HTML5 drag and drop (plus accessible Move up/down buttons) and flag unsaved changes.",
   "skills": [
    "HTML5 drag and drop",
    "immutable move",
@@ -202,33 +268,35 @@
    "pending save state",
    "derived dirty state"
   ],
-  "brief": "<p><b>Sunday Slow Mornings</b> is a playlist page. <code>App.tsx</code> has <code>PlaylistHeader</code>, <code>TrackRow</code>, <code>TrackList</code> and <code>App</code>. <code>getPlaylist()</code> takes 0.4–1.0 s; <code>savePlaylistOrder(trackIds)</code> takes 0.6–1.2 s. <code>utils/time.ts</code> has <code>formatDuration</code> and <code>formatTotal</code>; <code>components/Cover.tsx</code> draws album art.</p><p>The tracks currently come straight from <code>playlist.tracks</code>. To reorder them you'll need your own copy in state.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> durations + \"Unsaved changes\" (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I'll keep <code>tracks</code> in state (copied from the API) and one pure helper <code>moveItem(list, from, to)</code> that both drag and drop and the buttons call, so there's one code path. For drag: <code>dragId</code> in state on <code>dragstart</code>; on <code>dragover</code> I <code>preventDefault</code> (or drop never fires) and work out <i>before / after</i> from the mouse Y against the row's midpoint, stored as <code>dropTarget</code> to draw the line. On drop, convert to an index, remembering that removing the dragged row shifts later indexes by one.</p><p>Buttons are the accessible path: \"Move X up / down\", disabled at the ends, plus a polite live region. Save sends the ids and shows \"Saving…\".</p></div></details>",
+  "brief": "<p><b>Sunday Slow Mornings</b> is a playlist page. <code>App.tsx</code> has <code>PlaylistHeader</code>, <code>TrackRow</code>, <code>TrackList</code> and <code>App</code>. <code>App</code> already keeps its own <code>tracks</code> copy in state and has a working <b>Save order</b> button (<code>savePlaylistOrder(trackIds)</code>, 0.6–1.2 s, shows \"Saving…\"). <code>getPlaylist()</code> takes 0.4–1.0 s.</p><p>Read <code>utils/array.ts</code> first: <code>moveItem(list, from, to)</code> is a pure helper that returns a reordered copy. <code>utils/time.ts</code> has <code>formatDuration</code> / <code>formatTotal</code>; <code>components/Cover.tsx</code> draws album art. Nothing can be reordered yet: that is your job.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> \"Unsaved changes\" indicator (~27 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–27 Core · 27–32 change · 32–38 Next · 38–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>tracks</code> is already state, and <code>moveItem</code> exists, so every reorder is <code>setTracks((prev) =&gt; moveItem(prev, from, to))</code> through one <code>handleMove</code>. For drag: <code>dragId</code> in state on <code>dragstart</code> (fades the row), and the hovered row as <code>dropTarget</code>. On <code>dragover</code> I <code>preventDefault</code>, or drop never fires. On drop I turn ids into indexes and call <code>handleMove</code>; <code>dragend</code> clears both, so a drop outside the list still resets.</p><p>Next: the before / after half from the mouse Y against the row's midpoint (and the index shift: removing the dragged row moves later rows up by one), then ▲ / ▼ buttons as the accessible path, through the same <code>handleMove</code>, with a polite live region.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Each row is <code>draggable</code>. Dragging a row over another shows a <b>drop indicator</b> line above or below it (depending on which half the pointer is over); dropping moves the track there. The dragged row is faded while dragging",
+   "Each row is <code>draggable</code> (with a <b>⋮⋮</b> handle). While dragging, the dragged row is faded (<code>.is-dragging</code>); the fade is cleared on drop <i>and</i> on <code>dragend</code> (dropped outside the list)",
+   "Dropping a row on another row moves the track to that row's position (reuse <code>moveItem</code> from <code>utils/array.ts</code>; never mutate). Track numbers always show the current position, and the existing <b>Save order</b> button saves the new order",
+   "A <b>drop indicator</b> line shows above or below the hovered row, depending on which half the pointer is over; dropping on the lower half places the track <i>after</i> that row",
    "Each row has <b>▲ / ▼</b> buttons with <code>aria-label=\"Move {title} up\"</code> / <code>\"… down\"</code>, disabled on the first / last row. A visually hidden <code>aria-live</code> region announces \"{title} moved to position 3 of 8\"",
-   "A <b>Save order</b> button sends the current ids with <code>savePlaylistOrder</code>. While saving it reads \"Saving…\" and is disabled. Track numbers always show the current position",
-   "Reorder logic lives in one pure helper used by both drag and drop and the buttons; state is never mutated"
+   "Running time: the header shows the total (<b>\"Arvind · 8 songs · 30 min\"</b>, <code>formatTotal</code>) and each row shows <b>\"starts 4:11\"</b>, both recalculated on every reorder. A <b>Discard</b> button restores the last saved order"
   ],
   "change": {
-   "title": "Running time + unsaved changes",
-   "html": "<p>\"People build the playlist for a timed event. And they leave without saving.\"</p><ul><li>The header shows the total: <b>\"Arvind · 8 songs · 30 min\"</b> (use <code>formatTotal</code>), and each row shows when it starts in the playlist: <b>\"starts 4:11\"</b>. Both recalculate on every reorder.</li><li>Show <b>\"● Unsaved changes\"</b> while the order differs from the last saved order, and <b>\"✓ All changes saved\"</b> otherwise. Save is disabled when nothing changed. A <b>Discard</b> button restores the saved order.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: keep <code>savedIds</code> (what the server has). \"Dirty\" is derived by comparing id lists. Moving a track and moving it back must be clean again.</p>"
+   "title": "Unsaved changes",
+   "html": "<p>\"People reorder the playlist and leave without saving.\"</p><ul><li>Show <b>\"● Unsaved changes\"</b> while the order differs from the last saved order, and <b>\"✓ All changes saved\"</b> otherwise.</li><li><b>Save order</b> is disabled when nothing changed. Moving a track and moving it back must be clean again.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: keep <code>savedIds</code> (what the server has), set on load and after a successful save. \"Dirty\" is derived by comparing id lists.</p>"
   },
   "hints": [
    "Search: \"mdn html drag and drop api\". You need <code>draggable</code>, <code>onDragStart</code>, <code>onDragOver</code> (call <code>e.preventDefault()</code>!), <code>onDrop</code> and <code>onDragEnd</code>.",
    "In <code>onDragStart</code> call <code>e.dataTransfer.setData(\"text/plain\", id)</code>; Firefox will not start a drag without data.",
-   "Before / after: <code>const rect = e.currentTarget.getBoundingClientRect(); const after = e.clientY &gt; rect.top + rect.height / 2;</code>",
-   "The helper: <code>const next = [...list]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next;</code>",
-   "Drop index: <code>let to = indexOf(target); if (after) to += 1; if (from &lt; to) to -= 1;</code> (removing the dragged row shifts everything after it).",
-   "Start times: build an array above the return with a running total in a <code>forEach</code>, then read <code>starts[i]</code> in the map. Dirty: <code>tracks.map((t) =&gt; t.id).join() !== savedIds.join()</code>."
+   "The rows need drag props, so render <code>TrackRow</code>s straight from <code>App</code> (or pass the handlers through <code>TrackList</code>). The move itself: <code>setTracks((prev) =&gt; { return moveItem(prev, from, to); });</code>",
+   "Drop index: <code>const from = tracks.findIndex((t) =&gt; t.id === dragId); let to = tracks.findIndex((t) =&gt; t.id === targetId);</code> then <code>handleMove(from, to)</code>.",
+   "Before / after (Next): <code>const rect = e.currentTarget.getBoundingClientRect(); const after = e.clientY &gt; rect.top + rect.height / 2;</code>. If after, <code>to += 1</code>; then <code>if (from &lt; to) to -= 1</code> (removing the dragged row shifts everything after it).",
+   "Dirty (change): <code>tracks.map((t) =&gt; t.id).join(\",\") !== savedIds.join(\",\")</code>, derived, never stored. Start times (Stretch): a running total in a <code>forEach</code> above the return, then <code>starts[i]</code> in the map."
   ],
   "rubric": [
-   "One pure move helper shared by drag and buttons",
+   "One move path (moveItem from utils) shared by drag and the buttons",
    "dragover preventDefault and the index-shift edge case handled",
    "Indicator state cleared on drop and on dragend (also when dropped outside)",
    "Buttons are a real keyboard / screen reader alternative (labels, disabled ends, live region)",
@@ -285,17 +353,59 @@
      "12px · #B3A6B8 · tabular nums"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Events",
+    "name": "HTML drag and drop events",
+    "syntax": "<li draggable={true} onDragStart={...} onDragOver={(e) => { e.preventDefault(); }} onDrop={...} onDragEnd={...}>",
+    "example": "onDragOver={(e) => { e.preventDefault(); }}  // without this, onDrop never fires",
+    "note": "The browser only allows a drop where <code>dragover</code> was <b>cancelled</b>. <code>dragend</code> fires on the dragged element even when the drop lands outside, so clean up there.",
+    "search": "mdn html drag and drop api"
+   },
+   {
+    "cat": "Events",
+    "name": "dataTransfer.setData()",
+    "syntax": "e.dataTransfer.setData('text/plain', id)",
+    "example": "function handleDragStart(e: React.DragEvent<HTMLLIElement>, id: string) {\n  e.dataTransfer.setData('text/plain', id); // Firefox needs this\n  setDragId(id);\n}",
+    "note": "Returns nothing. Firefox does not start a drag without some data; React state (<code>dragId</code>) is still the simplest place to keep what is being dragged.",
+    "search": "mdn datatransfer setdata"
+   },
+   {
+    "cat": "Arrays",
+    "name": "findIndex()",
+    "syntax": "arr.findIndex((x) => test)",
+    "example": "['a', 'b', 'c'].findIndex((x) => x === 'b')   // 1\n['a', 'b'].findIndex((x) => x === 'z')         // -1",
+    "note": "Returns the <b>index</b> of the first match, or <b>-1</b>. Use it to turn the dragged / target ids into positions.",
+    "search": "mdn array findIndex"
+   },
+   {
+    "cat": "Arrays",
+    "name": "splice() on a copy (how moveItem works)",
+    "syntax": "const next = [...list]; const [item] = next.splice(from, 1); next.splice(to, 0, item);",
+    "example": "const next = ['a', 'b', 'c'];\nconst [item] = next.splice(0, 1);  // item 'a', next ['b', 'c']\nnext.splice(2, 0, item);           // next ['b', 'c', 'a']",
+    "note": "<code>splice</code> <b>mutates</b> and returns the removed items, which is why <code>moveItem</code> copies first. Never splice an array from state.",
+    "search": "mdn array splice"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Compare two orders with join()",
+    "syntax": "a.join(',') !== b.join(',')",
+    "example": "['t1', 't2'].join(',') === ['t1', 't2'].join(',')   // true\n['t1', 't2'] === ['t1', 't2']                       // false (different arrays)",
+    "note": "<code>===</code> on arrays compares identity, not contents. Joining the ids into a string is a quick contents check for the \"unsaved\" flag.",
+    "search": "mdn array join"
+   }
+  ]
  },
  "dc44": {
   "kind": "drill",
   "level": 4,
   "order": 44,
-  "minutes": 35,
-  "changeAt": 24,
+  "minutes": 40,
+  "changeAt": 28,
   "title": "Command palette (⌘K)",
   "focus": "src/App.tsx",
-  "summary": "A deploy dashboard already has every action as data. Build the Ctrl/Cmd+K palette: fuzzy filter, arrow keys, Enter to run, Escape, focus restore.",
+  "summary": "A deploy dashboard already has every action as data. Build the Ctrl/Cmd+K palette: open / close, fuzzy filter, click to run; then arrow keys, ARIA and focus restore.",
   "skills": [
    "global shortcut",
    "fuzzy matching",
@@ -303,17 +413,17 @@
    "aria-activedescendant",
    "focus restoration"
   ],
-  "brief": "<p><b>Orbit</b> is a deploy dashboard. <code>App.tsx</code> has <code>Sidebar</code>, <code>TopBar</code> (with a \"Search or run a command… ⌘K\" button that does nothing yet), <code>DeploymentList</code> and <code>App</code>. Read <code>commands.ts</code> first: <code>buildCommands(actions)</code> already returns every action as <code>{ id, label, section, run }</code>, and <code>App</code> already builds the list. <code>components/Kbd.tsx</code> renders key caps.</p><p>Your job is the palette itself. Each command's <code>run()</code> changes something visible (page, theme, sidebar, a queued deployment, a toast).</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> section headers (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>paletteOpen</code>, because both the shortcut and the top-bar button open it, plus a <code>returnFocus</code> ref with the element that had focus. The palette is its own component, only rendered while open, so its <code>query</code> and <code>active</code> index reset on every open. The filtered list is derived. Focus stays in the input the whole time; Arrow keys change <code>active</code> (wrapping), Enter runs <code>results[active]</code>, Escape closes, and I wire <code>aria-activedescendant</code> so screen readers follow. When it closes, an effect puts focus back on the saved element.\"</p></div></details>",
+  "brief": "<p><b>Orbit</b> is a deploy dashboard. <code>App.tsx</code> has <code>Sidebar</code>, <code>TopBar</code> (with a \"Search or run a command… ⌘K\" button that does nothing yet), <code>DeploymentList</code> and <code>App</code>. Read <code>commands.ts</code> first: <code>buildCommands(actions)</code> already returns every action as <code>{ id, label, section, run }</code>, and <code>App</code> already builds the list.</p><p>The codebase also has <code>components/Modal.tsx</code> (backdrop + centered dialog, calls <code>onClose</code> on a backdrop click), <code>utils/fuzzy.ts</code> (<code>fuzzyMatch(text, query)</code>) and <code>components/Kbd.tsx</code> (key caps). Your job is the palette itself. Each command's <code>run()</code> changes something visible (page, theme, sidebar, a queued deployment, a toast).</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> section headers (~28 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–28 Core · 28–33 change · 33–38 Next · 38–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>paletteOpen</code>, because both the shortcut and the top-bar button open it. The palette is its own component inside <code>Modal</code>, only rendered while open, so its <code>query</code> resets on every open and <code>autoFocus</code> works each time. Results are derived with <code>fuzzyMatch</code>. The ⌘K listener lives in an effect with cleanup and <code>preventDefault</code>s the browser shortcut; Escape is handled on the input.</p><p>Next: an <code>active</code> index (reset to 0 when the query changes) that the arrows move with wrapping, Enter runs <code>results[active]</code>, <code>aria-activedescendant</code> so screen readers follow, and a <code>returnFocus</code> ref so an effect can put focus back when it closes.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
-   "<b>Ctrl/Cmd+K</b> anywhere (and clicking the top-bar search button) opens a centered palette over a dimmed backdrop with the input focused. Pressing it again, <b>Escape</b>, or clicking the backdrop closes it. The browser's own Ctrl+K is prevented",
-   "Typing filters commands <b>fuzzy-ish</b>: every typed letter must appear in order, case-insensitive, spaces ignored (\"rdp\" matches \"<b>R</b>e<b>d</b>eploy <b>p</b>roduction\"). Show \"No commands match\" when empty",
-   "↑ / ↓ move a highlighted item (wrapping at the ends, hover also highlights), <b>Enter</b> runs it and closes; clicking an item runs it too. The input has <code>role=\"combobox\"</code> + <code>aria-activedescendant</code>; items are <code>role=\"option\"</code> with <code>aria-selected</code>",
+   "<b>Ctrl/Cmd+K</b> anywhere (and clicking the top-bar search button) opens the palette in a <code>Modal</code> (centered over a dimmed backdrop) with the input focused. Pressing it again, <b>Escape</b>, or clicking the backdrop closes it. The browser's own Ctrl+K is prevented",
+   "Typing filters the commands with <code>fuzzyMatch</code> from <code>utils/fuzzy.ts</code> (\"rdp\" matches \"<b>R</b>e<b>d</b>eploy <b>p</b>roduction\"). Clicking a result runs it and closes the palette. Show \"No commands match\" when nothing matches",
+   "↑ / ↓ move a highlighted item (wrapping at the ends, hover also highlights), <b>Enter</b> runs it and closes. The input has <code>role=\"combobox\"</code> + <code>aria-activedescendant</code>; items are <code>role=\"option\"</code> with <code>aria-selected</code>",
    "When the palette closes, focus returns to the element that was focused before it opened (e.g. the sidebar link or the search button)"
   ],
   "change": {
@@ -322,15 +432,15 @@
   },
   "hints": [
    "Global shortcut: <code>document.addEventListener(\"keydown\", ...)</code> in an effect, with cleanup. <code>if ((e.metaKey || e.ctrlKey) &amp;&amp; e.key.toLowerCase() === \"k\") { e.preventDefault(); ... }</code>",
-   "Fuzzy match: walk the query letters, each time <code>pos = text.indexOf(ch, pos)</code>; if it is <code>-1</code> return false, else <code>pos += 1</code>.",
-   "Reset <code>active</code> to 0 in the input's onChange, so a shorter list never leaves the highlight out of range.",
-   "Arrows: <code>e.preventDefault()</code> (otherwise the cursor jumps), then <code>setActive((i) =&gt; (i + 1) % results.length)</code>. Search: \"aria-activedescendant combobox mdn\".",
-   "Focus restore: store <code>e.target</code> from the keydown (or the button from the click) in a ref when opening; <code>useEffect(() =&gt; { if (!open &amp;&amp; ref.current) { ref.current.focus(); } }, [open]);</code>",
-   "Grouping: <code>SECTIONS.forEach((s) =&gt; { commands.forEach((c) =&gt; { if (c.section === s &amp;&amp; fuzzyMatch(c.label, query)) results.push(c); }); });</code>"
+   "Reuse what exists: <code>&lt;Modal label=\"Command palette\" onClose={onClose}&gt;…&lt;/Modal&gt;</code> and <code>commands.filter((c) =&gt; { return fuzzyMatch(c.label, query); })</code>.",
+   "Render the palette only while open (<code>let palette = null; if (open) { palette = &lt;CommandPalette … /&gt;; }</code>): unmounting resets its state, and <code>autoFocus</code> focuses the input on every open.",
+   "Arrows (Next): <code>e.preventDefault()</code> (otherwise the cursor jumps), then <code>setActive((i) =&gt; (i + 1) % results.length)</code>. Reset <code>active</code> to 0 in the input's onChange. Search: \"aria-activedescendant combobox mdn\".",
+   "Focus restore (Next): store <code>e.target</code> from the keydown (or the button from the click) in a ref when opening; <code>useEffect(() =&gt; { if (!open &amp;&amp; ref.current) { ref.current.focus(); } }, [open]);</code>",
+   "Grouping (change): <code>SECTIONS.forEach((s) =&gt; { commands.forEach((c) =&gt; { if (c.section === s &amp;&amp; fuzzyMatch(c.label, query)) results.push(c); }); });</code>"
   ],
   "rubric": [
    "Open state in App; palette state local and reset by unmounting",
-   "Results derived; active index reset on query change",
+   "Results derived with the existing fuzzyMatch; Modal reused; active index reset on query change",
    "Keyboard handling with preventDefault where needed, wrapping",
    "ARIA: combobox input, listbox / option, aria-activedescendant",
    "Listener cleanup; no stale closure bugs on the toggle",
@@ -386,7 +496,41 @@
      "12px muted · Kbd caps"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Events",
+    "name": "Global keydown listener",
+    "syntax": "document.addEventListener('keydown', handleKey);\nreturn () => { document.removeEventListener('keydown', handleKey); };",
+    "example": "useEffect(() => {\n  function handleKey(e: KeyboardEvent) { ... }\n  document.addEventListener('keydown', handleKey);\n  return () => { document.removeEventListener('keydown', handleKey); };\n}, [paletteOpen]);",
+    "note": "Remove the <b>same function</b> you added, in the cleanup. If the handler reads state, list it in the deps so the listener is re-added with fresh values.",
+    "search": "mdn addEventListener keydown"
+   },
+   {
+    "cat": "Events",
+    "name": "Modifier keys + preventDefault",
+    "syntax": "(e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'",
+    "example": "// Cmd+K on Mac, Ctrl+K elsewhere\nif ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {\n  e.preventDefault(); // stops the browser's own Ctrl+K\n}",
+    "note": "<code>metaKey</code> is ⌘ on Mac, <code>ctrlKey</code> is Ctrl. <code>e.key</code> is uppercase when Shift is held, hence <code>toLowerCase()</code>.",
+    "search": "mdn KeyboardEvent metaKey"
+   },
+   {
+    "cat": "React",
+    "name": "autoFocus",
+    "syntax": "<input autoFocus ... />",
+    "example": "<input className=\"palette-input\" autoFocus value={query} onChange={...} />",
+    "note": "Focuses the input <b>when it mounts</b>. Combined with \"only render while open\", the input is focused on every open.",
+    "search": "react autofocus input"
+   },
+   {
+    "cat": "React",
+    "name": "Unmounting resets state",
+    "syntax": "let palette = null;\nif (open) { palette = <CommandPalette ... />; }",
+    "example": "// closed: <CommandPalette> unmounts, its useState('') is thrown away\n// opened again: it starts fresh with query ''",
+    "note": "A component's state lives only while it is rendered. Conditional rendering is the simplest \"reset on open\".",
+    "search": "react preserving and resetting state"
+   }
+  ]
  },
  "dc45": {
   "kind": "drill",
@@ -396,45 +540,47 @@
   "changeAt": 24,
   "title": "Budget grid: editable cells",
   "focus": "src/App.tsx",
-  "summary": "Turn a read-only budget table into a small spreadsheet: click to edit, Enter/Tab to move, derived row and column totals, invalid input highlighted.",
+  "summary": "Turn a read-only budget table into a small spreadsheet: click-to-edit cells with Enter / Escape / blur and a live Total column; then Tab navigation, column totals and deleting rows.",
   "skills": [
    "editing state (row, col)",
-   "keyboard navigation",
+   "keyboard handling",
    "derived totals",
    "storing raw input",
    "tables"
   ],
-  "brief": "<p><b>Ledgerly</b> shows a quarterly budget. <code>App.tsx</code> has <code>AppHeader</code>, <code>BudgetTable</code> and <code>App</code>; <code>getBudget()</code> takes 0.4–1.0 s. Read <code>utils/money.ts</code>: <code>formatMoney</code> and <code>parseAmount</code> (returns <code>null</code> for text that is not a number) are there for you. <code>utils/id.ts</code> has <code>uid</code>.</p><p>Right now the cells are plain text. Make it behave like a tiny spreadsheet.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> add / delete rows (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"I'll store each cell as the <b>text the user typed</b> (<code>cells: string[]</code>), not a number. That way an invalid entry like \"abc\" stays visible and highlighted instead of being lost. Totals are derived with <code>parseAmount</code>, skipping invalid cells. Editing state is <code>{ row, col } | null</code> plus a <code>draft</code> string; only one cell is an input at a time. Enter commits and moves down, Tab commits and moves right (wrapping to the next row), Shift+Tab goes back, Escape cancels, blur commits.\"</p></div></details>",
+  "brief": "<p><b>Ledgerly</b> shows a quarterly budget. <code>App.tsx</code> has <code>AppHeader</code>, <code>BudgetTable</code> and <code>App</code>; <code>getBudget()</code> takes 0.4–1.0 s. The data side is done: <code>App</code> stores each row as <code>GridRow</code> with the cells as <b>text</b> (so \"abc\" can be kept), and <code>handleCellChange(row, col, text)</code> is already passed to <code>BudgetTable</code> as <code>onCellChange</code>.</p><p>Read <code>utils/money.ts</code>: <code>formatMoney</code>, <code>parseAmount</code> (returns <code>null</code> for text that is not a number) and <code>sumAmounts</code> (adds up a list of cell texts, skipping invalid ones). Right now the cells are plain text. Make them editable like a tiny spreadsheet.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> delete rows (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–28 change · 28–33 Next · 33–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Editing is UI state, so it lives in <code>BudgetTable</code>: <code>editing: { row, col } | null</code> plus a <code>draft</code> string; only one cell is an input at a time, every other cell is a <code>&lt;button&gt;</code> (focusable for free). One <code>commit(next)</code> saves the draft through <code>onCellChange</code> and either starts editing <code>next</code> or stops: Enter commits and moves down, blur commits, Escape just drops the draft. The row Total is <code>sumAmounts(row.cells)</code> in the render: derived, never stored.</p><p>Next: Tab / Shift+Tab compute the next position with wrapping (and <code>preventDefault</code>, or the browser moves focus), and the footer column totals map over the months.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Clicking a cell turns it into a focused input with its current value. <b>Enter</b> saves and moves to the cell below (or stops editing on the last row). <b>Escape</b> cancels. Clicking elsewhere (blur) saves",
+   "Clicking a cell turns it into a focused input with its current value (only one cell edits at a time). <b>Enter</b> saves and moves to the cell below (or stops editing on the last row). <b>Escape</b> cancels. Clicking elsewhere (blur) saves. Save through the existing <code>onCellChange</code>",
+   "A <b>Total</b> column at the end of each row: <code>sumAmounts(row.cells)</code> formatted with <code>formatMoney</code>, derived (never stored), so it updates on every edit",
    "<b>Tab</b> saves and moves right, wrapping to the first month of the next row; <b>Shift+Tab</b> moves left. Focus never leaves the grid while tabbing between cells",
-   "A <b>Total</b> column (per row) and a footer row of <b>column totals</b> plus a grand total, all derived and formatted with <code>formatMoney</code>",
-   "Input that is not a number (e.g. \"abc\") is kept and shown in a <b>red-highlighted</b> cell (title \"Not a number\"), left out of totals, and a message says \"1 cell needs a number. They are left out of the totals.\" \"1,000\" and \"$50\" are valid"
+   "A footer row (<code>&lt;tfoot&gt;</code>) with the <b>column totals</b> and a grand total, all derived",
+   "Text that is not a number (e.g. \"abc\") is kept and shown in a <b>red-highlighted</b> cell (title \"Not a number\"), left out of totals, and a message says \"1 cell needs a number. They are left out of the totals.\" Plus a <b>+ Add row</b> form under the table (\"New category\", disabled when empty; new rows start empty = $0)"
   ],
   "change": {
-   "title": "Add and delete rows",
-   "html": "<p>\"Finance wants to add a category for insurance, and drop advertising.\"</p><ul><li>Under the table: a \"New category\" input and a <b>+ Add row</b> button (disabled when empty). The new row has empty cells (counted as $0).</li><li>Each row gets a <b>×</b> button (<code>aria-label=\"Delete {category}\"</code>) at the end. All totals update.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Watch out: if you store the editing position by index, deleting a row shifts indexes. Stop editing when a row is deleted.</p>"
+   "title": "Delete rows",
+   "html": "<p>\"Finance wants to drop advertising this quarter.\"</p><ul><li>Each row gets a <b>×</b> button at the end (<code>aria-label=\"Delete {category}\"</code>). All totals update.</li><li>Stop editing when a row is deleted, and show \"No categories. Add one below.\" if the table becomes empty.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Watch out: if you store the editing position by index, deleting a row shifts indexes. That is why you stop editing.</p>"
   },
   "hints": [
-   "Convert once on load: <code>cells: r.values.map((v) =&gt; String(v))</code>. Now \"abc\" can be stored.",
+   "Editing state in <code>BudgetTable</code>: <code>const [editing, setEditing] = useState&lt;CellPos | null&gt;(null);</code> and <code>const [draft, setDraft] = useState(\"\");</code>",
    "Render: <code>if (isEditing) return &lt;td&gt;&lt;input autoFocus ... /&gt;&lt;/td&gt;;</code> otherwise a <code>&lt;button&gt;</code> inside the <code>td</code> (keyboard-focusable for free).",
    "One commit function: <code>function commit(next: CellPos | null) { onCellChange(editing.row, editing.col, draft); if (next) startEdit(next.row, next.col); else setEditing(null); }</code>",
-   "Tab: <code>e.preventDefault()</code> first, or the browser moves focus to the next button. Search: \"mdn keydown Tab preventDefault\".",
-   "Totals: <code>cells.reduce((sum, t) =&gt; { const n = parseAmount(t); return n === null ? sum : sum + n; }, 0)</code> (written with an <code>if</code>, of course)."
+   "Totals: <code>sumAmounts(row.cells)</code> per row; per column (Next): <code>months.map((m, col) =&gt; sumAmounts(rows.map((r) =&gt; r.cells[col])))</code>.",
+   "Tab (Next): <code>e.preventDefault()</code> first, or the browser moves focus to the next button. Search: \"mdn keydown Tab preventDefault\"."
   ],
   "rubric": [
-   "Stored raw strings and explained why (invalid input stays visible)",
+   "Explained why cells are stored as raw strings (invalid input stays visible)",
    "Single editing position; draft separate from committed value",
-   "Enter / Tab / Shift+Tab / Escape / blur all behave as specified",
-   "Totals derived, invalid cells excluded",
-   "Immutable nested update of a single cell",
-   "Row add / delete with stable ids, editing cleared on delete",
+   "Enter / Escape / blur (and Tab / Shift+Tab) behave as specified",
+   "Totals derived with sumAmounts, invalid cells excluded",
+   "Reused onCellChange, formatMoney, sumAmounts instead of re-writing them",
+   "Row delete clears editing (index shift) and updates totals",
    "Accessible: real buttons and labelled inputs"
   ],
   "spec": {
@@ -490,7 +636,33 @@
      "input h 34 w 200 · button h 34 brand"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "State that can be null",
+    "syntax": "useState<CellPos | null>(null)",
+    "example": "type CellPos = { row: number; col: number };\nconst [editing, setEditing] = useState<CellPos | null>(null);\nconst isEditing = editing !== null && editing.row === r && editing.col === c;",
+    "note": "The union says \"a position, or nothing\". Check <code>!== null</code> before reading <code>.row</code>; TypeScript will remind you.",
+    "search": "typescript union null react useState"
+   },
+   {
+    "cat": "Events",
+    "name": "Enter / Escape / blur on an input",
+    "syntax": "onKeyDown={(e) => { if (e.key === 'Enter') { ... } }}   onBlur={() => { ... }}",
+    "example": "if (e.key === 'Enter') { e.preventDefault(); commit(nextCell); }\nelse if (e.key === 'Escape') { setEditing(null); } // draft thrown away",
+    "note": "<code>e.key</code> is the key name (<code>\"Enter\"</code>, <code>\"Escape\"</code>, <code>\"Tab\"</code>). <code>blur</code> fires when focus leaves, including clicks elsewhere.",
+    "search": "mdn KeyboardEvent key values"
+   },
+   {
+    "cat": "Arrays",
+    "name": "One column of a 2D grid",
+    "syntax": "rows.map((r) => r.cells[col])",
+    "example": "const rows = [{ cells: ['1', '2'] }, { cells: ['3', '4'] }];\nrows.map((r) => r.cells[1])   // ['2', '4']",
+    "note": "Returns a new array with one value per row. Feed it to <code>sumAmounts</code> for a column total (Next).",
+    "search": "mdn array map"
+   }
+  ]
  },
  "dc46": {
   "kind": "drill",
@@ -500,7 +672,7 @@
   "changeAt": 26,
   "title": "Theater seat picker",
   "focus": "src/App.tsx",
-  "summary": "Select up to 4 seats on a theater map, see a priced summary, book through the API, and recover when a seat gets taken mid-checkout.",
+  "summary": "Select seats on a theater map with a priced summary, then book through the API and recover when a seat gets taken mid-checkout.",
   "skills": [
    "selection with a limit",
    "derived totals",
@@ -508,29 +680,31 @@
    "refetch after failure",
    "roving tabindex"
   ],
-  "brief": "<p><b>Lumen Playhouse</b> sells seats for Hamlet. <code>App.tsx</code> has <code>ShowHeader</code>, <code>Legend</code>, <code>SeatGrid</code>, <code>Summary</code> and <code>App</code>. <code>getSeatMap()</code> (0.4–1.0 s) returns every seat with its tier, price and <code>taken</code> flag. <code>formatPrice</code> is in <code>utils/money.ts</code>.</p><p>Read <code>bookSeats</code> in <code>api.ts</code> carefully: it takes 0.8–1.4 s and <b>always rejects a booking that includes seat C5</b> (someone else grabbed it), which also marks C5 as taken on the server. That is how you test the failure path.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> keyboard-selectable seats (~26 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–8 plan · 8–26 Core · 26–34 change · 34–38 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>selected: string[]</code> (seat ids, in pick order), <code>booking</code>, and a message. The selected seat objects and the total are derived from the map. Toggle refuses taken seats and a 5th seat (with a notice). Book calls <code>bookSeats(selected)</code>: on success show a confirmation and clear the selection; on failure show the error. Either way, refetch the map. I'll do that with a <code>reloadKey</code> state the load effect depends on, so there is one loading code path, and after each load I drop selected seats that are now taken.\"</p></div></details>",
+  "brief": "<p><b>Lumen Playhouse</b> sells seats for Hamlet. <code>App.tsx</code> has <code>ShowHeader</code>, <code>Legend</code>, <code>SeatGrid</code>, <code>Summary</code> and <code>App</code>. <code>getSeatMap()</code> (0.4–1.0 s) returns every seat with its tier, price and <code>taken</code> flag. <code>formatPrice</code> is in <code>utils/money.ts</code>.</p><p>Read <code>bookSeats</code> in <code>api.ts</code> carefully: it takes 0.8–1.4 s and <b>always rejects a booking that includes seat C5</b> (someone else grabbed it), which also marks C5 as taken on the server. That is how you test the failure path.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> max 4 seats (~26 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–26 Core · 26–30 change · 30–36 Next · 36–38 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>App</code> owns <code>selected: string[]</code> (seat ids, in pick order). The selected seat objects and the total are derived from the map every render. Toggle refuses taken seats; the grid gets <code>selected</code> + <code>onToggle</code>, the summary gets the seat objects and uses the same toggle for ×.</p><p>Next: Book calls <code>bookSeats(selected)</code> with a <code>booking</code> flag. Success shows a confirmation and clears the selection; failure shows the error. Either way I refetch the map with a <code>reloadKey</code> state the load effect depends on (one loading path), and after each load I drop selected seats that are now taken.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Clicking an available seat selects it (gold, <code>aria-pressed=\"true\"</code>); clicking again deselects. Taken seats can't be selected. A 5th seat is refused with the notice \"You can select up to 4 seats.\"",
-   "The summary lists each selected seat (\"C4 · Standard · $65\" with a × remove button), the total by tier price, and the button reads <b>\"Book 2 seats · $160\"</b> (disabled with nothing selected)",
-   "Booking shows <b>\"Booking…\"</b> (disabled). Success: a banner \"Booked! Confirmation LMN-… · seats A5, A6\", selection cleared, and the refreshed map shows those seats taken",
-   "Failure (any booking with C5): an error banner with the API message, the map is refetched (C5 now taken) and C5 is removed from the selection while the other seats stay selected"
+   "Clicking an available seat selects it (gold, <code>aria-pressed=\"true\"</code>); clicking again deselects. Taken seats can't be selected. The legend gets a <b>Selected</b> swatch",
+   "The summary lists each selected seat in pick order (\"C4 · Standard · $65\" with a × remove button) and the <b>Total</b> by tier price, derived from the selected ids (not stored)",
+   "The book button reads <b>\"Book 2 seats · $160\"</b> (disabled with nothing selected) and <b>\"Booking…\"</b> (disabled) while pending. Success: a banner \"Booked! Confirmation LMN-… · seats A5, A6\", selection cleared, and the refreshed map shows those seats taken",
+   "Failure (any booking with C5): an error banner with the API message, the map is refetched (C5 now taken) and C5 is removed from the selection while the other seats stay selected",
+   "Keyboard: only <b>one</b> seat is in the Tab order (roving <code>tabIndex</code>); <b>arrow keys</b> move focus between seats (also across taken seats, stopping at the edges); <b>Enter / Space</b> toggle. Each seat has <code>aria-label=\"Row C, seat 5, Standard $65\"</code> (plus \", taken\") and taken seats use <code>aria-disabled</code> so they stay reachable"
   ],
   "change": {
-   "title": "Keyboard seat selection",
-   "html": "<p>\"Accessibility audit: the seat map is a wall of 60 tab stops.\"</p><ul><li>Only <b>one</b> seat is in the Tab order (roving <code>tabIndex</code>). <b>Arrow keys</b> move focus between seats (also across taken seats, stopping at the edges). <b>Enter / Space</b> toggle the focused seat.</li><li>Each seat has <code>aria-label=\"Row C, seat 5, Standard $65\"</code> (plus \", taken\") and taken seats use <code>aria-disabled</code> so they stay reachable.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Search: \"roving tabindex\", \"aria-disabled vs disabled\".</p>"
+   "title": "Max 4 seats",
+   "html": "<p>\"Box office rule: at most 4 seats per order.\"</p><ul><li>A 5th seat is refused with the notice <b>\"You can select up to 4 seats.\"</b> (deselecting a seat clears the notice).</li><li>The summary header shows the count: <b>\"Your seats 2 / 4\"</b>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">One guard with an early return in the toggle handler, plus one derived label.</p>"
   },
   "hints": [
    "Derived: <code>const selectedSeats = selected.map(id =&gt; map.seats.find(...))</code> and <code>total = selectedSeats.reduce(...)</code>. Don't store the total.",
-   "Refetch pattern: <code>const [reloadKey, setReloadKey] = useState(0);</code> and the load effect has <code>[reloadKey]</code> deps. Bump it in <code>.finally()</code>.",
-   "After the map loads: <code>setSelected((prev) =&gt; prev.filter((id) =&gt; seat is not taken))</code>.",
+   "Toggle: <code>if (selected.includes(seat.id)) { remove } else { add }</code>, with <code>prev.filter(...)</code> / <code>[...prev, seat.id]</code> in the updater. Change: put the 4-seat guard (and an early <code>return</code>) before the add.",
+   "Refetch pattern (Next): <code>const [reloadKey, setReloadKey] = useState(0);</code> and the load effect has <code>[reloadKey]</code> deps. Bump it in <code>.finally()</code>; after the map loads, <code>setSelected((prev) =&gt; prev.filter((id) =&gt; seat is not taken))</code>.",
    "Promise chain: <code>bookSeats(ids).then(...).catch((err: Error) =&gt; { setError(err.message); }).finally(() =&gt; { setBooking(false); ... });</code>",
-   "Roving tabindex: <code>focusId</code> state; <code>tabIndex={s.id === focusId ? 0 : -1}</code> (as an if above). Keep refs in <code>useRef&lt;Record&lt;string, HTMLButtonElement | null&gt;&gt;({})</code> and call <code>.focus()</code> on arrow keys.",
+   "Roving tabindex (Stretch): <code>focusId</code> state; <code>tabIndex={s.id === focusId ? 0 : -1}</code> (as an if above). Keep refs in <code>useRef&lt;Record&lt;string, HTMLButtonElement | null&gt;&gt;({})</code> and call <code>.focus()</code> on arrow keys. Search: \"roving tabindex\".",
    "A <code>&lt;button&gt;</code> already fires <code>onClick</code> on Enter and Space, so you only handle arrows."
   ],
   "rubric": [
@@ -599,14 +773,40 @@
      "h 44 · radius 10 · gold"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "Toggle an id in a list",
+    "syntax": "if (list.includes(id)) { list.filter((x) => x !== id) } else { [...list, id] }",
+    "example": "['A5', 'A6'].includes('A6')                 // true\n['A5', 'A6'].filter((x) => x !== 'A6')      // ['A5']\n[...['A5'], 'C4']                           // ['A5', 'C4']",
+    "note": "Both branches return a <b>new</b> array, so they work inside <code>setSelected((prev) =&gt; ...)</code>. Keeping ids (not seat objects) means the map stays the source of truth.",
+    "search": "mdn array includes"
+   },
+   {
+    "cat": "Arrays",
+    "name": "find() to look up by id",
+    "syntax": "list.find((x) => x.id === id)",
+    "example": "seats.find((s) => s.id === 'C4')   // { id: 'C4', tier: 'Standard', price: 65, ... }\nseats.find((s) => s.id === 'Z9')   // undefined",
+    "note": "Returns the first matching <b>item</b> or <b>undefined</b>; check it before use (<code>if (seat) { ... }</code>).",
+    "search": "mdn array find"
+   },
+   {
+    "cat": "DOM",
+    "name": "aria-pressed for toggle buttons",
+    "syntax": "<button aria-pressed={isSelected}>",
+    "example": "<button className={cls} aria-pressed={isSelected} onClick={() => { onToggle(s); }}>{s.number}</button>",
+    "note": "Tells screen readers the button is a toggle that is on / off. React renders <code>true</code>/<code>false</code> as the strings \"true\"/\"false\".",
+    "search": "mdn aria-pressed"
+   }
+  ]
  },
  "dc47": {
   "kind": "drill",
   "level": 4,
   "order": 47,
   "minutes": 35,
-  "changeAt": 24,
+  "changeAt": 23,
   "title": "Comment tree",
   "focus": "src/App.tsx",
   "summary": "Render a forum thread's nested replies at any depth with a recursive component, collapse subtrees, and upvote optimistically with rollback.",
@@ -617,11 +817,11 @@
    "optimistic update + rollback",
    "sorting a copy"
   ],
-  "brief": "<p><b>Threadline</b> is a discussion forum. <code>App.tsx</code> has <code>PostHeader</code>, <code>CommentItem</code> and <code>App</code>. <code>getThread()</code> (0.4–1.0 s) returns comments where each one has <code>replies: Comment[]</code>, nested to any depth. Only the top level renders today.</p><p><code>upvoteComment(id, shouldFail)</code> takes 0.4–0.9 s; the existing <b>\"Simulate offline\"</b> checkbox should be passed as <code>shouldFail</code>. Reuse <code>utils/time.ts</code> (<code>timeAgo</code>) and <code>components/Avatar.tsx</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> sort by Top / New (~24 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–24 Core · 24–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>CommentNode</code> renders one comment and then maps its <code>replies</code> to more <code>CommentNode</code>s: recursion handles any depth. Collapse is local state in each node, because it only affects that subtree. The hidden count is a recursive helper, <code>countDescendants</code>.</p><p>Votes I'll lift to <code>App</code> as a map <code>{ [id]: true }</code> instead of editing the nested tree: the shown score is <code>score + 1</code> if voted. Optimistic: set it immediately, call the API, and on failure delete the key and show an error. The map is passed down through the recursion.\"</p></div></details>",
+  "brief": "<p><b>Threadline</b> is a discussion forum. <code>App.tsx</code> has <code>PostHeader</code>, <code>CommentItem</code> and <code>App</code>. <code>getThread()</code> (0.4–1.0 s) returns comments where each one has <code>replies: Comment[]</code>, nested to any depth. Only the top level renders today.</p><p><code>upvoteComment(id, shouldFail)</code> takes 0.4–0.9 s; the existing <b>\"Simulate offline\"</b> checkbox should be passed as <code>shouldFail</code>. Reuse <code>utils/time.ts</code> (<code>timeAgo</code>) and <code>components/Avatar.tsx</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> sort by Top / New (~23 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–23 Core · 23–30 change · 30–35 Next (or talk).</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>CommentNode</code> renders one comment and then maps its <code>replies</code> to more <code>CommentNode</code>s: recursion handles any depth. Collapse is local state in each node, because it only affects that subtree. The hidden count is a recursive helper, <code>countDescendants</code>.</p><p>Votes I'll lift to <code>App</code> as a map <code>{ [id]: true }</code> instead of editing the nested tree: the shown score is <code>score + 1</code> if voted. Optimistic: set it immediately, call the API, and on failure delete the key and show an error. The map is passed down through the recursion.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
@@ -699,17 +899,51 @@
      "h 30 · radius 8"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "A recursive component",
+    "syntax": "function Node({ c }) { ... c.replies.map((r) => <Node key={r.id} c={r} />) ... }",
+    "example": "function CommentNode({ comment }: { comment: Comment }) {\n  return <div>{comment.replies.map((r) => { return <CommentNode key={r.id} comment={r} />; })}</div>;\n}",
+    "note": "A component may render itself. The recursion stops by itself when <code>replies</code> is empty. Each node gets its own state (collapse).",
+    "search": "react recursive component"
+   },
+   {
+    "cat": "Other",
+    "name": "Recursive function with reduce",
+    "syntax": "return list.reduce((sum, x) => sum + 1 + count(x), 0);",
+    "example": "function countDescendants(c: Comment): number {\n  return c.replies.reduce((sum, r) => { return sum + 1 + countDescendants(r); }, 0);\n}\n// 2 replies, one of them with 2 more  ->  4",
+    "note": "Returns a number. Each reply counts as 1 plus everything under it. No reply = the start value <code>0</code>.",
+    "search": "javascript recursion tree count"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Sort a copy with a comparator",
+    "syntax": "[...list].sort((a, b) => b.score - a.score)",
+    "example": "[3, 10, 1].sort()                        // [1, 10, 3]  (compares as strings!)\n[...nums].sort((a, b) => b - a)          // [10, 3, 1]  (highest first)",
+    "note": "<code>sort</code> <b>mutates</b> and returns the same array, so copy first. Comparator: negative puts <code>a</code> first, positive puts <code>b</code> first.",
+    "search": "mdn array sort compareFn"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "Narrow a select value with as",
+    "syntax": "setSort(e.target.value as SortMode)",
+    "example": "type SortMode = 'top' | 'new';\n<select value={sort} onChange={(e) => { setSort(e.target.value as SortMode); }}>",
+    "note": "<code>e.target.value</code> is typed <code>string</code>; <code>as</code> tells TypeScript it is one of your options (only safe because you wrote the &lt;option&gt; values).",
+    "search": "typescript type assertion as"
+   }
+  ]
  },
  "dc48": {
   "kind": "drill",
   "level": 4,
   "order": 48,
-  "minutes": 40,
-  "changeAt": 28,
+  "minutes": 38,
+  "changeAt": 26,
   "title": "Mini form builder",
   "focus": "src/App.tsx",
-  "summary": "Build a no-code form editor: add, edit, reorder and delete fields, with a live preview that renders a working form and validates required fields.",
+  "summary": "Build a no-code form editor: add fields and edit label / required with a live preview form; then validation, reordering and a JSON export.",
   "skills": [
    "list of editable objects",
    "partial updates",
@@ -717,18 +951,20 @@
    "form validation",
    "derived JSON"
   ],
-  "brief": "<p><b>Formcraft</b> is a form builder. <code>App.tsx</code> has <code>AddFieldPanel</code>, <code>FieldCard</code>, <code>PreviewPanel</code> and <code>App</code>; <code>getForm()</code> loads two fields after 0.3–0.8 s. The type buttons do nothing yet, the cards are read-only, and the preview is a placeholder.</p><p>Read <code>api.ts</code> for the <code>Field</code> type, <code>utils/fieldTypes.ts</code> (<code>FIELD_TYPES</code>, <code>typeInfo</code>, <code>isEmail</code>), <code>utils/id.ts</code> and <code>components/Toggle.tsx</code> (use it for \"Required\").</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> JSON export panel (~28 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–8 plan · 8–28 Core · 28–35 Next + change · 35–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The field definitions live in <code>App</code> as <code>Field[]</code>; the builder and the preview both read them. I'll have one <code>handleChange(id, patch)</code> that merges a <code>Partial&lt;Field&gt;</code>, so label, required and options all share it. Add creates a field with a <code>uid</code>; move and delete are small immutable helpers.</p><p>The preview is a separate component with its own <code>values</code> and <code>errors</code> keyed by field id; it switches on <code>field.type</code> to render an input, select or checkbox. Submit validates every field and shows errors under each one, or a success message.\"</p></div></details>",
+  "brief": "<p><b>Formcraft</b> is a form builder. <code>App.tsx</code> has <code>AddFieldPanel</code>, <code>FieldCard</code>, <code>PreviewPanel</code> and <code>App</code>; <code>getForm()</code> loads two fields after 0.3–0.8 s. The type buttons do nothing yet, the cards are read-only, and the preview is a placeholder.</p><p>Read <code>api.ts</code> for the <code>Field</code> type, <code>utils/fieldTypes.ts</code> (<code>FIELD_TYPES</code>, <code>typeInfo</code>, <code>isEmail</code>), <code>utils/id.ts</code>, <code>components/Toggle.tsx</code> (use it for \"Required\") and <code>components/PreviewField.tsx</code>: it renders <b>one</b> preview field of any type from <code>field</code>, <code>value</code>, <code>error</code> and <code>onChange(value)</code>, so you don't have to write the per-type form controls.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> JSON export panel (~26 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–4 read · 4–7 plan · 7–26 Core · 26–29 change · 29–36 Next · 36–38 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The field definitions live in <code>App</code> as <code>Field[]</code>; the builder and the preview both read them. One <code>handleChange(id, patch)</code> merges a <code>Partial&lt;Field&gt;</code>, so label, required (and later options) share it. Add creates a field with a <code>uid</code> and a default label from <code>typeInfo</code>.</p><p>The preview is its own component with <code>values</code> keyed by field id, rendering a <code>PreviewField</code> per field. Next: an <code>errors</code> object built on submit by a small <code>validateField</code>, passed to each <code>PreviewField</code>; then move / delete as small immutable helpers.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "The 4 type buttons add a field at the end (\"Untitled short text\", \"Untitled dropdown\", …; dropdowns start with \"Option 1\" and \"Option 2\"). Each builder card has a label input, a <b>Required</b> toggle (reuse <code>Toggle</code>), and a ✕ delete button",
-   "The live preview renders a real form from the fields: text and email inputs, a select (\"Choose…\" plus options), a checkbox. Labels are linked to inputs; required fields show a red *. Changes in the builder show up immediately",
-   "Submit validates: empty required fields show \"This field is required\" (unchecked required checkbox: \"Please check this box\"), invalid email \"Enter a valid email\". Errors clear as the user fixes the field; a valid submit shows \"✓ Submitted…\"",
-   "Fields can be reordered with ↑ / ↓ buttons (disabled at the ends); dropdown cards have an \"Options (one per line)\" textarea; blank lines are ignored in the preview"
+   "The 4 type buttons add a field at the end (\"Untitled short text\", \"Untitled dropdown\", …; dropdowns start with \"Option 1\" and \"Option 2\"). Each builder card has a <b>label input</b> and a <b>Required</b> toggle (reuse <code>Toggle</code>), both saved through one <code>handleChange(id, patch)</code>",
+   "The live preview renders a real form from the fields with <code>components/PreviewField.tsx</code> (it already draws text / email inputs, the select, the checkbox, linked labels and the red *). Preview values are controlled state keyed by field id; builder changes show up immediately",
+   "A <b>Submit</b> button validates: empty required fields show \"This field is required\" (unchecked required checkbox: \"Please check this box\"), invalid email \"Enter a valid email\" (pass the message to <code>PreviewField</code>'s <code>error</code>). Errors clear as the user fixes the field; a valid submit shows \"✓ Submitted…\"",
+   "Each card has <b>↑ / ↓</b> buttons (disabled at the ends) and a <b>✕</b> delete button (<code>aria-label=\"Delete {label}\"</code>)",
+   "Dropdown cards have an \"Options (one per line)\" textarea that updates the preview's options (PreviewField already ignores blank lines)"
   ],
   "change": {
    "title": "Export as JSON",
@@ -736,19 +972,19 @@
   },
   "hints": [
    "One update function: <code>function handleChange(id: string, patch: Partial&lt;Field&gt;) { setFields((prev) =&gt; prev.map((f) =&gt; f.id === id ? { ...f, ...patch } : f)); }</code> (write the ternary as an if).",
-   "Options textarea: <code>value={field.options.join(\"\\n\")}</code> and <code>onChange={(e) =&gt; { onChange(field.id, { options: e.target.value.split(\"\\n\") }); }}</code>.",
-   "Preview values: <code>useState&lt;Record&lt;string, string | boolean&gt;&gt;({})</code>; a checkbox stores a boolean, everything else a string.",
-   "Validate in submit: loop the fields, build an <code>errors</code> object, <code>setErrors(errors)</code>. Use <code>noValidate</code> on the form so the browser doesn't show its own bubbles. Search: \"mdn form novalidate\".",
-   "Accessibility: <code>&lt;label htmlFor={id}&gt;</code>, <code>aria-invalid</code> and <code>aria-describedby</code> pointing at the error text."
+   "Preview values: <code>useState&lt;Record&lt;string, string | boolean&gt;&gt;({})</code>; a checkbox stores a boolean, everything else a string. Update with <code>{ ...prev, [id]: value }</code>.",
+   "The preview loop: <code>&lt;PreviewField key={f.id} field={f} value={values[f.id]} error={errors[f.id]} onChange={(v) =&gt; { setValue(f.id, v); }} /&gt;</code>",
+   "Validate in submit (Next): loop the fields, build an <code>errors</code> object, <code>setErrors(errors)</code>. Use <code>noValidate</code> on the form so the browser doesn't show its own bubbles. Search: \"mdn form novalidate\".",
+   "Options textarea (Stretch): <code>value={field.options.join(\"\\n\")}</code> and <code>onChange={(e) =&gt; { onChange(field.id, { options: e.target.value.split(\"\\n\") }); }}</code>."
   ],
   "rubric": [
    "Single source of truth for field definitions shared by builder and preview",
    "Partial-update helper instead of one handler per property",
-   "Preview renders by type with linked labels",
+   "Reused PreviewField, Toggle, FIELD_TYPES and isEmail instead of re-writing them",
+   "Preview values keyed by field id (controlled)",
    "Validation computed on submit, errors keyed by id, cleared on edit",
    "Reorder / delete immutable, stable ids as keys",
-   "JSON panel derived from state",
-   "Reused Toggle, FIELD_TYPES and isEmail from the codebase"
+   "JSON panel derived from state"
   ],
   "spec": {
    "colors": [
@@ -803,17 +1039,43 @@
      "mono 12/1.5 · max-h 240 · radius 8"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "Partial<T> + spread merge",
+    "syntax": "function handleChange(id: string, patch: Partial<Field>) { ... { ...f, ...patch } ... }",
+    "example": "const f = { id: 'f1', label: 'Name', required: false };\n({ ...f, ...{ required: true } })   // { id: 'f1', label: 'Name', required: true }",
+    "note": "<code>Partial&lt;Field&gt;</code> = a Field where every key is optional. Later spreads win, so the patch overrides only the keys it has.",
+    "search": "typescript partial utility type"
+   },
+   {
+    "cat": "Objects",
+    "name": "Computed key update",
+    "syntax": "{ ...prev, [id]: value }",
+    "example": "const id = 'f2';\n({ ...{ f1: 'Ada' }, [id]: 'ada@x.co' })   // { f1: 'Ada', f2: 'ada@x.co' }",
+    "note": "<code>[id]</code> uses the <b>value</b> of the variable as the key. Pair it with <code>Record&lt;string, string | boolean&gt;</code> for \"one value per field id\".",
+    "search": "mdn computed property names"
+   },
+   {
+    "cat": "Other",
+    "name": "JSON.stringify pretty print",
+    "syntax": "JSON.stringify(value, null, 2)",
+    "example": "JSON.stringify({ name: 'Beta' }, null, 2)\n// '{\\n  \"name\": \"Beta\"\\n}'",
+    "note": "Returns a <b>string</b>. The <code>2</code> is the indent; <code>null</code> means \"no replacer\". Show it in a <code>&lt;pre&gt;</code> to keep the line breaks.",
+    "search": "mdn json stringify space"
+   }
+  ]
  },
  "dc49": {
   "kind": "drill",
   "level": 5,
   "order": 49,
   "minutes": 45,
-  "changeAt": 30,
+  "changeAt": 32,
   "title": "Accessible country combobox",
-  "focus": "src/App.tsx",
-  "summary": "Replace a native select with a fully accessible ARIA combobox: typing filters, full keyboard support, aria-activedescendant, clear button, then multi-select chips.",
+  "focus": "src/components/CountryCombobox.tsx",
+  "summary": "Rewrite a native select as an accessible ARIA combobox for a multi-select field: typing filters, click and keyboard selection, then aria-activedescendant polish and chip keyboard support.",
   "skills": [
    "WAI-ARIA combobox pattern",
    "aria-activedescendant",
@@ -821,32 +1083,30 @@
    "focus management",
    "chips / multi-select"
   ],
-  "brief": "<p><b>Passage</b> is a visa application. Step 2 asks \"Countries visited\". <code>App.tsx</code> has <code>Steps</code> and <code>App</code>, and uses <code>components/FormField.tsx</code> for labels and hints (read it: the label points at the control via <code>htmlFor</code>). <code>getCountries()</code> returns 40 countries after 0.4–1.0 s. Today it's a native <code>&lt;select&gt;</code> that is painful with 40 options.</p><p>Build a <code>CountryCombobox</code> component (new file in <code>components/</code>) following the WAI-ARIA combobox pattern. This is a staff-level accessibility exercise: the details are the point.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change:</b> multi-select with removable chips (~30 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–9 plan · 9–30 Core · 30–40 change · 40–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Focus never leaves the input. The component owns <code>query</code>, <code>open</code> and the <code>active</code> index; the filtered options are derived. The input gets <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code> pointing at the listbox id, and <code>aria-activedescendant</code> pointing at the active option's id; that's how a screen reader follows the highlight without moving focus. Options get <code>role=\"option\"</code> and <code>aria-selected</code>.</p><p>Keyboard in one <code>onKeyDown</code>: ↓/↑ open or move (clamped), Home/End jump, Enter selects, Escape closes (then clears), Tab closes and lets focus move. Options use <code>onMouseDown preventDefault</code> so clicking doesn't blur the input. The selected value is lifted to <code>App</code> via <code>onChange</code>, so the form can submit it. I'll scroll the active option into view in an effect.\"</p></div></details>",
+  "brief": "<p><b>Passage</b> is a visa application. Step 2 asks \"Countries visited\". <code>App.tsx</code> (<code>Steps</code>, <code>App</code>) is done: it loads 40 countries with <code>getCountries()</code> (0.4–1.0 s), keeps <code>visited: Country[]</code>, and Save shows \"Countries: Japan, France\". It renders <code>components/CountryCombobox.tsx</code> inside <code>components/FormField.tsx</code> (read it: the label points at the control via <code>htmlFor</code>, the hint has id <code>{id}-hint</code>).</p><p>Today <code>CountryCombobox</code> is a placeholder: a native <code>&lt;select&gt;</code> plus the selected countries as removable chips (<code>toggle</code>, <code>removeChip</code>, chip markup and CSS are there). <b>Rewrite it</b> following the WAI-ARIA combobox pattern, keeping its props. This is a staff-level accessibility exercise: the details are the point.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change:</b> chips from the keyboard (~32 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–8 plan · 8–32 Core · 32–36 change · 36–42 Next · 42–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Focus never leaves the input. The component owns <code>query</code>, <code>open</code> and the <code>active</code> index; the filtered options and a clamped <code>activeIndex</code> are derived. The input gets <code>role=\"combobox\"</code>, <code>aria-expanded</code> and <code>aria-controls</code> pointing at the listbox id; options get <code>role=\"option\"</code> and ids. Selection stays lifted in <code>App</code> through the existing <code>toggle</code> / <code>onChange</code>.</p><p>Keyboard in one <code>onKeyDown</code>: ↓/↑ open or move (clamped), Enter toggles (and <code>preventDefault</code> only then), Escape closes. Options use <code>onMouseDown preventDefault</code> so clicking doesn't blur the input. Next: <code>aria-activedescendant</code> so a screen reader follows the highlight, Home/End, Tab, and scrolling the active option into view in an effect.\"</p></div></details>",
   "tiers": [
-   "Core",
    "Core",
    "Core",
    "Next",
    "Next"
   ],
   "requirements": [
-   "A text input with <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code> (the listbox id), <code>aria-autocomplete=\"list\"</code>, linked to the \"Countries visited\" label and hint. The popup is a <code>role=\"listbox\"</code> with <code>role=\"option\"</code> children (flag + name) and unique ids. Disabled with \"Loading countries…\" until loaded",
-   "Typing filters options (case-insensitive \"contains\") and opens the list with the first option active; \"No countries match\" when empty. Clicking an option selects it (focus stays in the input)",
-   "Keyboard: <b>↓/↑</b> open the list or move the active option (clamped at the ends, scrolled into view), <b>Home/End</b> jump to first/last while open, <b>Enter</b> selects the active option (without submitting the form), <b>Escape</b> closes (a second Escape clears the text), <b>Tab</b> closes without selecting",
-   "<code>aria-activedescendant</code> always points at the highlighted option while open and is removed when closed; selected options have <code>aria-selected=\"true\"</code> and a ✓",
-   "A <b>✕ clear</b> button (<code>aria-label</code>) empties the value and returns focus to the input. Blur closes the list"
+   "Rewrite <code>CountryCombobox</code> as a text input with <code>role=\"combobox\"</code>, <code>aria-expanded</code>, <code>aria-controls</code> (the listbox id) and <code>aria-autocomplete=\"list\"</code>, keeping the <code>id</code> prop so the label and hint stay linked. The popup is a <code>role=\"listbox\"</code> with <code>role=\"option\"</code> children (flag + name) and unique ids. Disabled with \"Loading countries…\" until loaded. Blur closes the list",
+   "Typing filters options (case-insensitive \"contains\") and opens the list with the first option active. Clicking an option or pressing <b>Enter</b> toggles it as a chip (Enter must not submit the form); the text clears and the list stays open. <b>↓/↑</b> open the list or move the active option (clamped at the ends); <b>Escape</b> closes. Focus never leaves the input",
+   "<code>aria-activedescendant</code> points at the highlighted option while open and is removed when closed; selected options have <code>aria-selected=\"true\"</code> and a ✓; \"No countries match\" when empty; <b>Home/End</b> jump; <b>Tab</b> closes without selecting; a second <b>Escape</b> clears the text; the active option is scrolled into view",
+   "A <b>✕ clear</b> button (<code>aria-label=\"Clear all countries\"</code>) empties the selection and the text and returns focus to the input; clicking anywhere in the box around the chips focuses the input"
   ],
   "change": {
-   "title": "Multi-select with chips",
-   "html": "<p>\"Applicants usually visited several countries.\"</p><ul><li>Selecting adds the country as a <b>chip</b> inside the field (flag + name + × button with <code>aria-label=\"Remove France\"</code>); the text clears and the list stays open for the next pick. Selecting an already-selected country removes it.</li><li><b>Backspace</b> in the empty input removes the last chip. Removing a chip returns focus to the input. The listbox gets <code>aria-multiselectable=\"true\"</code> and a polite live region announces \"3 countries selected\".</li><li>Save shows all selected names: \"Countries: Japan, France\".</li></ul>"
+   "title": "Chips from the keyboard",
+   "html": "<p>\"Screen reader users can't tell what they picked, and keyboard users can't remove chips quickly.\"</p><ul><li><b>Backspace</b> in the empty input removes the last chip.</li><li>Removing a chip with its × button returns focus to the input (the button you clicked disappears).</li><li>The listbox gets <code>aria-multiselectable=\"true\"</code>, and a polite live region announces <b>\"3 countries selected\"</b>.</li></ul>"
   },
   "hints": [
    "Read the pattern first. Search: \"aria apg combobox list autocomplete\" (w3.org/WAI/ARIA/apg). Copy its attribute list, not its code.",
-   "Option ids must be unique on the page: <code>id={inputId + \"-opt-\" + c.code}</code>. Then <code>aria-activedescendant={activeId}</code> where <code>activeId</code> is <code>undefined</code> when closed.",
    "Keep the active index valid when the list shrinks: <code>const activeIndex = Math.min(active, options.length - 1);</code> and reset to 0 on every keystroke.",
    "Clicking an option blurs the input before the click fires. Fix: <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on each option.",
-   "Scroll into view: <code>useEffect(() =&gt; { listRef.current.children[activeIndex].scrollIntoView({ block: \"nearest\" }); }, [activeIndex, open]);</code> Search: \"mdn scrollIntoView block nearest\".",
-   "Enter: only <code>preventDefault()</code> when you actually select something; otherwise let Enter submit the form like any input."
+   "Enter: only <code>preventDefault()</code> when you actually select something; otherwise let Enter submit the form like any input.",
+   "Option ids must be unique on the page: <code>id={id + \"-opt-\" + c.code}</code>. Then (Next) <code>aria-activedescendant={activeId}</code> where <code>activeId</code> is <code>undefined</code> when closed.",
+   "Scroll into view (Next): <code>useEffect(() =&gt; { listRef.current.children[activeIndex].scrollIntoView({ block: \"nearest\" }); }, [activeIndex, open]);</code> Search: \"mdn scrollIntoView block nearest\"."
   ],
   "rubric": [
    "All ARIA attributes correct and wired by id (combobox, listbox, option, activedescendant, expanded)",
@@ -906,14 +1166,48 @@
      "24×24 circle · right 34"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "DOM",
+    "name": "aria-activedescendant",
+    "syntax": "<input role=\"combobox\" aria-activedescendant={activeOptionId} />",
+    "example": "<input role=\"combobox\" aria-controls=\"visited-listbox\" aria-activedescendant=\"visited-opt-JP\" />\n<li id=\"visited-opt-JP\" role=\"option\" aria-selected={false}>Japan</li>",
+    "note": "Points at the <b>id</b> of the highlighted option, so screen readers announce it while real focus stays in the input. Leave it <code>undefined</code> when the list is closed.",
+    "search": "aria apg combobox aria-activedescendant"
+   },
+   {
+    "cat": "Events",
+    "name": "mousedown preventDefault keeps focus",
+    "syntax": "onMouseDown={(e) => { e.preventDefault(); }}",
+    "example": "<li onMouseDown={(e) => { e.preventDefault(); }} onClick={() => { toggle(c); }}>",
+    "note": "A mouse press moves focus (blurring the input, which closes the list) <b>before</b> <code>click</code> fires. Cancelling <code>mousedown</code> keeps focus where it is; the click still happens.",
+    "search": "mdn mousedown preventDefault focus"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Clamp with Math.min / Math.max",
+    "syntax": "Math.min(i + 1, last)   /   Math.max(i - 1, 0)",
+    "example": "Math.min(5 + 1, 5)   // 5  (stays on the last option)\nMath.max(0 - 1, 0)   // 0  (stays on the first)",
+    "note": "Returns the smaller / larger number. Clamping (no wrap) is what the APG combobox does at the ends.",
+    "search": "mdn math min"
+   },
+   {
+    "cat": "React",
+    "name": "Focus an element through a ref",
+    "syntax": "const inputRef = useRef<HTMLInputElement>(null);   inputRef.current?.focus();",
+    "example": "const inputRef = useRef<HTMLInputElement>(null);\n<input ref={inputRef} ... />\nif (inputRef.current) { inputRef.current.focus(); }",
+    "note": "<code>.current</code> is the DOM node after render (<code>null</code> before). Use it when the focused element is about to disappear, like a removed chip's button.",
+    "search": "react useRef focus input"
+   }
+  ]
  },
  "dc50": {
   "kind": "drill",
   "level": 5,
   "order": 50,
   "minutes": 45,
-  "changeAt": 30,
+  "changeAt": 31,
   "title": "Virtualized log viewer",
   "focus": "src/App.tsx",
   "summary": "Render 10,000 log lines smoothly by drawing only the visible rows (plus overscan) from scrollTop math, with a sticky header, filters, and jump-to-line.",
@@ -924,22 +1218,24 @@
    "useMemo",
    "imperative scrolling"
   ],
-  "brief": "<p><b>Tracewell</b> is a log explorer. <code>getLogs()</code> returns <b>10,000</b> lines after 0.8–1.5 s. Rendering them all freezes the tab, so the starter only shows the first 200. <code>components/LogRow.tsx</code> renders one row and the header, and exports <code>ROW_HEIGHT</code> (26px: every row is exactly that tall). <code>formatNumber</code> is in <code>utils/format.ts</code>.</p><p>Build virtualization by hand (no libraries): keep the scroll container's full height, but only render the rows that are on screen.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change:</b> jump to line (~30 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–9 plan · 9–30 Core · 30–40 change · 40–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The scroller keeps its real height through a spacer <code>div</code> of <code>count × ROW_HEIGHT</code>, so the scrollbar is right. I track <code>scrollTop</code> from <code>onScroll</code> and the viewport height from a <code>ResizeObserver</code>. Then <code>start = floor(scrollTop / H) - overscan</code>, <code>end = ceil((scrollTop + viewport) / H) + overscan</code>, clamped, and I render only <code>slice(start, end)</code>, each absolutely positioned at <code>top: index × H</code>.</p><p>The header is <code>position: sticky</code> inside the scroller. Filtering is a <code>useMemo</code> over level + text, and virtualization runs on the filtered list, so it stays fast. When the filter changes I reset the scroll to the top.\"</p></div></details>",
+  "brief": "<p><b>Tracewell</b> is a log explorer. <code>getLogs()</code> returns <b>10,000</b> lines after 0.8–1.5 s. Rendering them all freezes the tab, so the starter only shows the first 200. <code>components/LogRow.tsx</code> renders one row and the header, and exports <code>ROW_HEIGHT</code> (26px: every row is exactly that tall). <code>formatNumber</code> is in <code>utils/format.ts</code>.</p><p>Build virtualization by hand (no libraries): keep the scroll container's full height, but only render the rows that are on screen.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change:</b> jump to line (~31 min).</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–5 read · 5–8 plan · 8–31 Core · 31–38 change · 38–42 Next · 42–45 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The scroller keeps its real height through a spacer <code>div</code> of <code>count × ROW_HEIGHT</code>, so the scrollbar is right. I track <code>scrollTop</code> from <code>onScroll</code> and the viewport height from a <code>ResizeObserver</code>. Then <code>start = floor(scrollTop / H) - overscan</code>, <code>end = ceil((scrollTop + viewport) / H) + overscan</code>, clamped, and I render only <code>slice(start, end)</code>, each absolutely positioned at <code>top: index × H</code>.</p><p>The header is <code>position: sticky</code> inside the scroller. Filtering is a <code>useMemo</code> over level + text, and virtualization runs on the filtered list, so it stays fast. When the filter changes I reset the scroll to the top.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
-   "All 10,000 lines are scrollable but only the visible rows plus an overscan of ~8 above and below are in the DOM (fewer than ~90 rows at any time). The scrollbar reflects the full list (spacer height = rows × 26px)",
-   "Rows are positioned from <code>scrollTop</code> math (not by rendering everything); scrolling fast never shows blank gaps. Viewport height is measured (and re-measured on resize)",
-   "The column header stays visible (<code>position: sticky</code>) while scrolling",
-   "A text filter (message or service) and level buttons (ALL / DEBUG / INFO / WARN / ERROR) filter the list, virtualization keeps working on the filtered rows, the scroll resets to the top, and \"1,234 / 10,000\" shows the match count"
+   "All 10,000 lines are scrollable but only the visible rows plus an overscan of ~8 above and below are in the DOM (fewer than ~90 rows at any time). The scrollbar reflects the full list (spacer height = rows × 26px), and the column header stays visible (keep <code>LogHeader</code> inside the scroller; its <code>position: sticky</code> is already in the CSS)",
+   "Rows are positioned from <code>scrollTop</code> math (start / end window, <code>top = index × 26</code>), not by rendering everything; scrolling fast never shows blank gaps. Viewport height is measured (and re-measured on resize)",
+   "A text filter (message or service) and level buttons (ALL / DEBUG / INFO / WARN / ERROR) filter the list (memoized), and virtualization keeps working on the filtered rows",
+   "Changing the filter resets the scroll to the top, and <b>\"1,234 / 10,000\"</b> shows the match count",
+   "Jump errors: \"Enter a line between 1 and 10,000\" for invalid input, and \"Line 42 is hidden by the current filter\" when the line is filtered out"
   ],
   "change": {
    "title": "Jump to line",
-   "html": "<p>\"Support pastes a line number from an alert and needs to see it.\"</p><ul><li>Add a <b>\"Line #\"</b> input and a <b>Go</b> button. Go scrolls so that line is in the middle of the viewport and highlights it (accent background + left bar).</li><li>Errors: \"Enter a line between 1 and 10,000\" for invalid input, and \"Line 42 is hidden by the current filter\" when the line is filtered out.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">The row may not be rendered yet, so you can't <code>scrollIntoView</code> it. Compute the scroll position from its index instead.</p>"
+   "html": "<p>\"Support pastes a line number from an alert and needs to see it.\"</p><ul><li>Add a <b>\"Line #\"</b> input and a <b>Go</b> button. Go scrolls so that line is in the middle of the viewport and highlights it (accent background + left bar).</li><li>For now, ignore input that is not a valid, visible line (the error messages are a Next item).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">The row may not be rendered yet, so you can't <code>scrollIntoView</code> it. Compute the scroll position from its index instead.</p>"
   },
   "hints": [
    "Structure: <code>&lt;div className=\"log-scroll\" ref onScroll&gt; &lt;LogHeader /&gt; &lt;div style={{ position: \"relative\", height: total }}&gt;{visible rows}&lt;/div&gt; &lt;/div&gt;</code>",
@@ -1011,6 +1307,48 @@
      "accent 18% bg · 3px left bar · 1.2s flash"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Numbers",
+    "name": "Window math: floor, ceil, clamp",
+    "syntax": "Math.max(0, Math.floor(scrollTop / H) - OVERSCAN)",
+    "example": "Math.floor(530 / 26)   // 20  (first row on screen)\nMath.ceil(1130 / 26)   // 44  (last row on screen, rounded up)\nMath.max(0, 20 - 8)    // 12  (never below 0)",
+    "note": "<code>floor</code> rounds down, <code>ceil</code> rounds up. Clamp <code>start</code> at 0 and <code>end</code> at <code>rows.length</code>, then <code>rows.slice(start, end)</code>.",
+    "search": "mdn math floor"
+   },
+   {
+    "cat": "DOM",
+    "name": "ResizeObserver",
+    "syntax": "const ro = new ResizeObserver(callback); ro.observe(el); ro.disconnect();",
+    "example": "const ro = new ResizeObserver(() => { setViewportHeight(el.clientHeight); });\nro.observe(el);\nreturn () => { ro.disconnect(); };",
+    "note": "Calls you back whenever the element's size changes (and once after <code>observe</code>). <code>clientHeight</code> is the visible height in px. Disconnect in the effect cleanup.",
+    "search": "mdn resizeobserver"
+   },
+   {
+    "cat": "React",
+    "name": "useMemo",
+    "syntax": "const value = useMemo(() => compute(), [deps]);",
+    "example": "const filtered = useMemo(() => {\n  return logs.filter((l) => l.level === level);\n}, [logs, level]); // recomputed only when these change",
+    "note": "Returns the cached result until a dependency changes. Use it for expensive derived data that would otherwise rerun on every scroll render.",
+    "search": "react useMemo"
+   },
+   {
+    "cat": "CSS",
+    "name": "Absolute rows in a relative spacer",
+    "syntax": ".spacer { position: relative; height: N px }  .row { position: absolute; left: 0; right: 0; top: ... }",
+    "example": "<div className=\"log-spacer\" style={{ height: rows.length * 26 }}>\n  <LogRow style={{ top: index * 26 }} ... />\n</div>",
+    "note": "The spacer gives the scrollbar the full height; each rendered row is placed at its real offset, so only ~40 elements exist.",
+    "search": "css position absolute relative parent"
+   },
+   {
+    "cat": "DOM",
+    "name": "Set scrollTop yourself",
+    "syntax": "scrollRef.current.scrollTop = top;",
+    "example": "const top = index * 26 - viewport / 2;\nscrollRef.current.scrollTop = Math.max(0, top); // jumps instantly",
+    "note": "Assigning <code>scrollTop</code> scrolls the element (this also fires <code>onScroll</code>). Math works even when the target row isn't rendered yet.",
+    "search": "mdn element scrollTop"
+   }
+  ]
  }
 }

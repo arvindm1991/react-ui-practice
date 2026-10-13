@@ -112,7 +112,9 @@ export function splitMentions(text: string): TextPart[] {
     });
 }
 @@@ starter src/components/CommentBox.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getUsers } from '../api';
+import type { User } from '../api';
 
 type CommentBoxProps = {
   onSubmit: (text: string) => void;
@@ -121,6 +123,21 @@ type CommentBoxProps = {
 // TODO: @mentions (type "@" + letters -> user dropdown -> insert "@Name ")
 export function CommentBox({ onSubmit }: CommentBoxProps) {
   const [text, setText] = useState('');
+  // The people you can mention. Loaded already, not shown anywhere yet.
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getUsers().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setUsers(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleSubmit() {
     if (text.trim() === '') {
@@ -304,7 +321,7 @@ type CommentBoxProps = {
   onSubmit: (text: string) => void;
 };
 
-// Where the "@fragment" being typed starts, and the letters after the "@".
+// CORE: where the "@fragment" being typed starts, and the letters after the "@".
 type Mention = { start: number; query: string };
 
 // Looks at the text BEFORE the caret: does it end in "@letters" (at the start or after a space)?
@@ -321,9 +338,13 @@ const MAX_SUGGESTIONS = 5;
 
 export function CommentBox({ onSubmit }: CommentBoxProps) {
   const [text, setText] = useState('');
+  // The people you can mention. Loaded already, not shown anywhere yet.
   const [users, setUsers] = useState<User[]>([]);
+  // CORE: the fragment being typed (null = no dropdown)
   const [mention, setMention] = useState<Mention | null>(null);
+  // NEXT: highlighted row
   const [activeIndex, setActiveIndex] = useState(0);
+  // CHANGE: to put the caret back
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -339,7 +360,7 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
     };
   }, []);
 
-  // derived: suggestions for the current fragment (any word of the name starts with it)
+  // CORE: derived suggestions for the current fragment (any word of the name starts with it)
   let suggestions: User[] = [];
   if (mention) {
     const q = mention.query.toLowerCase();
@@ -353,14 +374,17 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
   }
   const open = mention !== null && suggestions.length > 0;
 
+  // CORE: re-check the fragment on every change
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value;
     setText(value);
     // selectionStart = caret position right after this keystroke
     setMention(findMention(value, e.target.selectionStart));
+    // NEXT: highlight resets when the letters change
     setActiveIndex(0);
   }
 
+  // CORE: replace "@pa" with "@Paula Reyes "
   function insertMention(user: User) {
     if (!mention) {
       return;
@@ -371,7 +395,7 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
     const caret = before.length + inserted.length;
     setText(before + inserted + after);
     setMention(null);
-    // React re-renders the value, which would put the caret at the end.
+    // CHANGE: React re-renders the value, which would put the caret at the end.
     // Put it back right after the inserted name once the DOM has updated.
     requestAnimationFrame(() => {
       const el = inputRef.current;
@@ -382,10 +406,12 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
     });
   }
 
+  // CORE: Enter inserts instead of a newline. NEXT: arrows + Escape.
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (!open) {
       return;
     }
+    // NEXT
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex((prev) => {
@@ -400,14 +426,17 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
         return prev - 1;
       });
     } else if (e.key === 'Enter') {
+      // CORE (Core can insert suggestions[0]; keyboard nav, NEXT, uses activeIndex)
       e.preventDefault(); // no newline
       insertMention(suggestions[Math.min(activeIndex, suggestions.length - 1)]);
     } else if (e.key === 'Escape') {
+      // NEXT
       e.preventDefault();
       setMention(null);
     }
   }
 
+  // (starter code, plus closing the dropdown)
   function handleSubmit() {
     if (text.trim() === '') {
       return;
@@ -417,15 +446,18 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
     setMention(null);
   }
 
+  // CORE: dropdown
   let dropdown = null;
   if (open) {
     dropdown = (
       <ul className="mention-menu" role="listbox" aria-label="Mention someone">
         {suggestions.map((u, i) => {
+          // NEXT: highlighted row
           let cls = 'mention-option';
           if (i === activeIndex) {
             cls = 'mention-option is-active';
           }
+          // CORE (NEXT: aria-selected + onMouseEnter). onMouseDown preventDefault keeps focus, so blur doesn't eat the click.
           return (
             <li
               key={u.id}
@@ -446,6 +478,7 @@ export function CommentBox({ onSubmit }: CommentBoxProps) {
     );
   }
 
+  // CORE (CHANGE: ref. NEXT: onBlur)
   return (
     <div className="comment-box">
       <div className="textarea-wrap">
@@ -522,9 +555,13 @@ body { margin: 0; font-family: 'Inter Tight', Inter, system-ui, -apple-system, '
 .btn-primary:disabled { opacity: 0.5; cursor: default; }
 
 /* ---- Added: @mention dropdown ---- */
+/* CORE */
 .mention-menu { position: absolute; left: 12px; top: calc(100% - 6px); z-index: 10; width: 280px; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 14px 32px rgba(11, 43, 32, 0.16); }
 .mention-option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 7px; cursor: pointer; }
+/* NEXT */
 .mention-option.is-active { background: var(--primary-soft); }
+/* CORE */
 .mention-name { font-weight: 600; }
 .mention-role { margin-left: auto; font-size: 12px; color: var(--muted); }
+/* NEXT */
 .mention-option.is-active .mention-name { color: var(--primary-dark); }

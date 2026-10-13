@@ -3,11 +3,11 @@
   "kind": "drill",
   "level": 3,
   "order": 31,
-  "minutes": 25,
-  "changeAt": 16,
+  "minutes": 30,
+  "changeAt": 20,
   "title": "Notifications dropdown",
-  "focus": "src/App.tsx",
-  "summary": "A project-management app header. Make the bell show an unread badge and open a notifications dropdown that marks items read.",
+  "focus": "src/components/NotificationsMenu.tsx",
+  "summary": "A project-management app header. Make the bell show an unread badge and open a notifications dropdown, then mark items read.",
   "skills": [
    "load on mount",
    "derived count",
@@ -15,39 +15,40 @@
    "click outside",
    "grouping"
   ],
-  "brief": "<p>The header of <b>Tasklane</b>, a project board. <code>AppHeader</code> has the nav, search, a <code>BellButton</code> that does nothing yet, and the user's <code>Avatar</code>. The board below is static.</p><p>Read <code>api.ts</code>: <code>getNotifications()</code> (0.4–1s), <code>markRead(id)</code> and <code>markAllRead()</code> (0.3–0.7s each). Also read <code>utils/time.ts</code> (<code>timeAgo</code>, <code>isToday</code>, a fixed <code>NOW</code>) and <code>components/</code> (<code>Avatar</code>, <code>BellIcon</code>). Reuse them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~16 min):</b> Today / Earlier groups.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–20 Next + change · 20–25 polish and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The badge needs the unread count before the menu is ever opened, so I load notifications on mount, not on open. I'll make one <code>NotificationsMenu</code> component that owns <code>items</code>, <code>loading</code> and <code>open</code>, and replaces <code>BellButton</code>. Unread count is derived with <code>filter</code>, never stored. Clicking an item updates it locally first and calls <code>markRead</code> in the background (optimistic). For click-outside I put a ref on the wrapper (bell + menu) and listen for <code>mousedown</code> on <code>document</code> only while open, removing the listener in the cleanup.\"</p></div></details>",
+  "brief": "<p>The header of <b>Tasklane</b>, a project board. <code>AppHeader</code> renders <code>NotificationsMenu</code> (<code>components/NotificationsMenu.tsx</code>): a bell button that does nothing yet. The board below is static.</p><p>Read <code>api.ts</code>: <code>getNotifications()</code> (0.4–1s), <code>markRead(id)</code> and <code>markAllRead()</code> (0.3–0.7s each). <code>components/NotificationItem.tsx</code> already renders and styles one row (avatar, text, <code>timeAgo</code>, unread tint + dot): reuse it. <code>utils/time.ts</code> has <code>timeAgo</code>, <code>isToday</code> and a fixed <code>NOW</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change (~20 min):</b> Mark all as read.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–20 Core · 20–25 change · 25–30 Next, polish and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The badge needs the unread count before the menu is ever opened, so I load notifications on mount, not on open. I'll make one <code>NotificationsMenu</code> component that owns <code>items</code>, <code>loading</code> and <code>open</code>, and replaces <code>BellButton</code>. Unread count is derived with <code>filter</code>, never stored. Clicking an item updates it locally first and calls <code>markRead</code> in the background (optimistic). For click-outside I put a ref on the wrapper (bell + menu) and listen for <code>mousedown</code> on <code>document</code> only while open, removing the listener in the cleanup.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "After <code>getNotifications()</code> resolves, the bell shows a red badge with the unread count (<b>4</b>). The badge is not rendered when the count is 0",
-   "Clicking the bell toggles a 360px dropdown (title \"Notifications\") listing each notification: <code>Avatar</code>, <b>actor</b> + text, and <code>timeAgo</code> (\"18m ago\"). Unread rows have a tinted background and a blue dot. While still loading it says \"Loading notifications…\"",
-   "Clicking an unread notification marks it read immediately (dot and tint go, badge decrements) and calls <code>markRead(id)</code>",
-   "<b>Mark all as read</b> in the dropdown header marks every item read, removes the badge and calls <code>markAllRead()</code>. It is disabled when nothing is unread",
-   "Clicking anywhere outside the bell + dropdown closes it, and so does <b>Escape</b>. Clicking inside the dropdown does not close it"
+   "After <code>getNotifications()</code> resolves, the bell shows a red badge with the unread count (<b>4</b>), even before the menu is opened. The badge is not rendered when the count is 0",
+   "Clicking the bell toggles a 360px dropdown titled \"Notifications\" listing every notification with the existing <code>NotificationItem</code>. While still loading it says \"Loading notifications…\"",
+   "Clicking an unread notification marks it read immediately (dot and tint go, badge decrements) and calls <code>markRead(id)</code> in the background",
+   "Clicking anywhere outside the bell + dropdown closes it, and so does <b>Escape</b>. Clicking inside the dropdown does not close it",
+   "Group the list under two small uppercase headings, <b>Today</b> and <b>Earlier</b> (use <code>isToday(createdAt)</code>). A group with no items shows no heading"
   ],
   "change": {
-   "title": "Today / Earlier",
-   "html": "<p>\"The list is one long wall. Split it by day.\"</p><ul><li>Group the notifications under two small uppercase headings: <b>Today</b> and <b>Earlier</b> (use <code>isToday(createdAt)</code> from <code>utils/time.ts</code>).</li><li>A group with no items shows no heading. Order within each group stays newest first.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: two derived arrays, and a small <code>NotificationGroup</code> component that returns <code>null</code> when empty.</p>"
+   "title": "Mark all as read",
+   "html": "<p>\"Monday mornings people have 30 of these. Give them one button.\"</p><ul><li>A <b>Mark all as read</b> link in the dropdown header marks every item read, removes the badge and calls <code>markAllRead()</code>.</li><li>It is disabled when nothing is unread.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: the same <code>map</code> + spread as marking one, without the <code>if</code>.</p>"
   },
   "hints": [
-   "State placement: one component owns <code>items</code>, <code>loading</code> and <code>open</code>. The badge, the list and \"Mark all\" all read the same <code>items</code>.",
-   "Derived: <code>const unreadCount = items.filter((n) =&gt; { return !n.read; }).length;</code> Then <code>let badge = null; if (unreadCount &gt; 0) { badge = ...; }</code>",
+   "State placement: <code>NotificationsMenu</code> owns <code>items</code>, <code>loading</code> and <code>open</code>. The badge and the list both read the same <code>items</code>.",
+   "Load on mount, not on open: the badge needs the count before the menu is ever opened. <code>useEffect(() =&gt; { let cancelled = false; getNotifications().then(...); return () =&gt; { cancelled = true; }; }, []);</code>",
+   "Derived: <code>const unreadCount = items.filter((n) =&gt; { return !n.read; }).length;</code> Then <code>let badge = null; if (unreadCount &gt; 0) { badge = &lt;span className=\"bell-badge\"&gt;{unreadCount}&lt;/span&gt;; }</code>",
+   "Positioning: search <b>css position absolute relative parent</b>. <code>.notif-wrap { position: relative; }</code>, then the badge and the menu are <code>position: absolute</code> inside it.",
    "Marking one read without mutating: <code>setItems((prev) =&gt; { return prev.map((n) =&gt; { if (n.id === id) { return { ...n, read: true }; } return n; }); });</code> then call <code>markRead(id)</code>.",
-   "Click outside: search <b>mdn Node.contains</b> and <b>react click outside ref</b>. Put <code>useRef</code> on the wrapper that contains both the bell and the menu, otherwise clicking the bell closes and reopens it.",
-   "The effect shape: <code>useEffect(() =&gt; { if (!open) { return; } function handle(e: MouseEvent) { if (ref.current &amp;&amp; !ref.current.contains(e.target as Node)) { setOpen(false); } } document.addEventListener(\"mousedown\", handle); return () =&gt; { document.removeEventListener(\"mousedown\", handle); }; }, [open]);</code>"
+   "Click outside: search <b>mdn Node.contains</b>. Put a <code>useRef</code> on the wrapper that contains both the bell and the menu, and add a <code>mousedown</code> listener on <code>document</code> only while open (remove it in the cleanup)."
   ],
   "rubric": [
    "Loaded on mount so the badge is right before opening",
    "Unread count derived, not a second piece of state",
+   "Reused NotificationItem instead of re-building the row",
    "Optimistic read update with map + spread (no mutation)",
+   "Mark all disabled when nothing is unread",
    "Document listeners added only while open and removed in cleanup",
-   "Ref on the wrapper so the bell click doesn't fight the outside click",
-   "Reused Avatar, BellIcon, timeAgo and isToday",
    "Grouping done with derived arrays; empty group hidden"
   ],
   "spec": {
@@ -103,14 +104,48 @@
      "11/700 · uppercase · tracking .06em · pad 10 16 4"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "Count matches: filter().length",
+    "syntax": "arr.filter((x) => { return cond; }).length",
+    "example": "[{ read: false }, { read: true }].filter((n) => { return !n.read; }).length   // 1",
+    "note": "Returns a <b>number</b>. Derive counts like this on every render instead of keeping a second piece of state that can drift.",
+    "search": "mdn array filter"
+   },
+   {
+    "cat": "React",
+    "name": "Toggle with the updater form",
+    "syntax": "setOpen((prev) => { return !prev; })",
+    "example": "setOpen((prev) => { return !prev; });   // false -> true -> false",
+    "note": "The updater gets the <b>latest</b> value, so two quick clicks never read a stale <code>open</code>.",
+    "search": "react useState updater function"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Update every item immutably: map + spread",
+    "syntax": "prev.map((x) => { return { ...x, read: true }; })",
+    "example": "[{ id: 'a', read: false }].map((n) => { return { ...n, read: true }; })   // [{ id: 'a', read: true }]",
+    "note": "Returns a <b>new array of new objects</b>; the old state is untouched. Add an <code>if (x.id === id)</code> to change just one.",
+    "search": "mdn spread syntax object"
+   },
+   {
+    "cat": "CSS",
+    "name": "Badge / dropdown over a button",
+    "syntax": ".wrap { position: relative; }\n.badge { position: absolute; top: 3px; right: 2px; }",
+    "example": ".notif-menu { position: absolute; top: 44px; right: 0; width: 360px; }",
+    "note": "<code>absolute</code> positions against the nearest ancestor that is <b>not static</b>. Forget <code>position: relative</code> on the wrapper and it flies to the page corner.",
+    "search": "mdn css position absolute"
+   }
+  ]
  },
  "dc32": {
   "kind": "drill",
   "level": 3,
   "order": 32,
   "minutes": 30,
-  "changeAt": 19,
+  "changeAt": 20,
   "title": "Onboarding wizard",
   "focus": "src/App.tsx",
   "summary": "A fitness app sign-up. Turn the single Profile form into a 3-step wizard with validation, a step indicator and a final submit.",
@@ -121,40 +156,41 @@
    "async submit",
    "conditional rendering"
   ],
-  "brief": "<p>The sign-up screen of <b>Stride</b>. <code>OnboardingWizard</code> already holds the whole form in one <code>form</code> object and renders <code>ProfileStep</code>. The Continue button does nothing.</p><p>Read <code>components/Steps.tsx</code>: <code>ProfileStep</code> and <code>PreferencesStep</code> are done and take <code>values</code>, <code>errors</code> and <code>onChange</code>. <code>Field</code> already shows an error in red if you pass one. <code>utils/validate.ts</code> has <code>isValidEmail</code> and <code>isIntInRange</code>. <code>createAccount(data)</code> in <code>api.ts</code> takes 0.7–1.3s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> jump back from the indicator.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The form object already lives in the wizard, so going Back keeps the values for free as long as I don't unmount the state. I add <code>step</code> (0, 1, 2) and <code>errors</code>. A pure <code>validateStep(step, form)</code> returns an errors object; Continue only advances when it's empty. The body is an if/else on <code>step</code>. Submit sets <code>submitting</code>, calls <code>createAccount</code>, and when it resolves I store the account and render a success screen instead of the wizard. The indicator is a small component that gets <code>current</code>.\"</p></div></details>",
+  "brief": "<p>The sign-up screen of <b>Stride</b>. <code>OnboardingWizard</code> already holds the whole form in one <code>form</code> object and renders <code>ProfileStep</code>. The Continue button does nothing.</p><p>Read <code>components/Steps.tsx</code>: <code>ProfileStep</code>, <code>PreferencesStep</code> and <code>ReviewStep</code> are done (the first two take <code>values</code>, <code>errors</code> and <code>onChange</code>; <code>ReviewStep</code> takes <code>values</code>). <code>Field</code> already shows an error in red if you pass one. <code>utils/validate.ts</code> has <code>isValidEmail</code> and <code>isIntInRange</code>. <code>createAccount(data)</code> in <code>api.ts</code> takes 0.7–1.3s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3. <b>Change (~20 min):</b> errors clear as you fix them.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–20 Core · 20–23 change · 23–30 Next (submit) and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The form object already lives in the wizard, so going Back keeps the values for free as long as I don't unmount the state. I add <code>step</code> (0, 1, 2) and <code>errors</code>. A pure <code>validateStep(step, form)</code> returns an errors object; Continue only advances when it's empty. The body is an if/else on <code>step</code>, and the title comes from a <code>TITLES</code> array. Later, submit sets <code>submitting</code>, calls <code>createAccount</code>, and when it resolves I store the account and render a success screen instead of the wizard.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Three steps: <b>Profile</b> → <b>Preferences</b> (uses <code>PreferencesStep</code>) → <b>Review</b>. <b>Continue</b> moves forward, <b>Back</b> (hidden on step 1) moves back, and values typed earlier are still there",
+   "Three steps: <b>Profile</b> → <b>Preferences</b> (<code>PreferencesStep</code>) → <b>Review</b> (<code>ReviewStep</code>). The eyebrow reads \"Step 2 of 3\" and the title changes per step. <b>Continue</b> moves forward, <b>Back</b> (hidden on step 1) moves back, and values typed earlier are still there",
    "<b>Continue</b> validates the current step first. Profile: name required (\"Enter your name\"), valid email (\"Enter a valid email\"), age 13–99 (\"Age must be between 13 and 99\"). Preferences: a goal (\"Pick a goal\"). Errors show under the fields and the step does not change",
-   "Review lists Name, Email, Age, Goal (label, not id), Workouts (\"3 days a week\") and Units. <b>Create my plan</b> calls <code>createAccount(form)</code>, shows \"Creating…\" and is disabled while waiting, then shows \"You're all set, {name}!\" with the returned plan name",
-   "A step indicator above the title: three labelled steps, current one highlighted, completed ones show ✓. The eyebrow reads \"Step 2 of 3\"",
-   "Fixing a field clears its error right away (no need to press Continue again to see it go)"
+   "On Review the button reads <b>Create my plan</b>: it calls <code>createAccount(form)</code>, shows \"Creating…\" and is disabled while waiting, then shows \"You're all set, {name}!\" with the returned plan name",
+   "Review lists Goal by its label (\"Build strength\"), Workouts as \"3 days a week\" and Units as Metric/Imperial (check that <code>ReviewStep</code> gets the right values)",
+   "A step indicator above the eyebrow: three labelled steps, current one highlighted, completed ones show ✓. Completed steps are buttons that jump back to that step (values kept); the current and future steps are disabled"
   ],
   "change": {
-   "title": "Jump back from the indicator",
-   "html": "<p>\"On Review people want to fix their email without pressing Back twice.\"</p><ul><li>Completed steps in the indicator are clickable and jump straight to that step (values kept).</li><li>The current step and future steps are not clickable (you can't skip validation by jumping forward).</li></ul>"
+   "title": "Errors clear as you fix them",
+   "html": "<p>\"Support says people think the form is broken: the red message stays after they've fixed the field.\"</p><ul><li>Typing in (or picking) a field clears <b>that field's</b> error right away. Other errors stay until Continue.</li><li>Going <b>Back</b> clears the errors of the step you leave.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one more <code>setErrors</code> with the updater form inside <code>handleChange</code>.</p>"
   },
   "hints": [
    "New state next to <code>form</code>: <code>const [step, setStep] = useState(0);</code> and <code>const [errors, setErrors] = useState&lt;StepErrors&gt;({});</code>",
    "Write validation as a plain function outside the component: <code>function validateStep(step: number, form: OnboardingData): StepErrors</code>. It's easy to test and the component stays short.",
    "\"Is the errors object empty?\" Search: <b>mdn Object.keys</b>. <code>if (Object.keys(found).length &gt; 0) { setErrors(found); return; }</code>",
    "Pick the body above the return: <code>let body; if (step === 0) { body = &lt;ProfileStep ... /&gt;; } else if (step === 1) { ... } else { body = &lt;ReviewStep values={form} /&gt;; }</code>",
-   "Change: render each indicator step as a <code>&lt;button disabled={i &gt;= current}&gt;</code> and call <code>onJump(i)</code>. Disabled buttons ignore clicks, so the guard is in the markup."
+   "Change: clear one key with a computed property name: <code>setErrors((prev) =&gt; { return { ...prev, [field]: undefined }; });</code> Search: <b>mdn computed property names</b>.",
+   "Stretch indicator: render each step as a <code>&lt;button disabled={i &gt;= current}&gt;</code> and call <code>onJump(i)</code>. Disabled buttons ignore clicks, so the guard is in the markup."
   ],
   "rubric": [
    "Single form object kept in the wizard (Back keeps values)",
    "Validation is a pure function, run on Continue",
    "Errors passed to the existing Field via the step components",
+   "Reused ReviewStep, isValidEmail / isIntInRange",
+   "Error cleared per field with a computed key (no mutation)",
    "Submit shows a pending state and can't double-submit",
-   "Success screen driven by the API result",
-   "Indicator derived from step; forward jumps impossible",
-   "Reused isValidEmail / isIntInRange / GOALS"
+   "Indicator derived from step; forward jumps impossible"
   ],
   "spec": {
    "colors": [
@@ -205,53 +241,91 @@
      "64px circle · --primary · ✓ 30px"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Objects",
+    "name": "Is an object empty? Object.keys().length",
+    "syntax": "Object.keys(obj).length === 0",
+    "example": "Object.keys({ name: 'Enter your name' }).length   // 1\nObject.keys({}).length                           // 0",
+    "note": "Returns an <b>array of the keys</b>. <code>{}</code> is truthy, so <code>if (errors)</code> can't tell you it's empty; check the key count.",
+    "search": "mdn object keys"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "Partial<Record<K, V>>",
+    "syntax": "type StepErrors = Partial<Record<keyof OnboardingData, string>>;",
+    "example": "const errors: StepErrors = { email: 'Enter a valid email' };   // other keys may be missing",
+    "note": "<code>Record&lt;K, V&gt;</code> = an object with every key K; <code>Partial</code> makes each key optional. Good for \"errors by field\".",
+    "search": "typescript partial record utility types"
+   },
+   {
+    "cat": "Objects",
+    "name": "Computed property name",
+    "syntax": "{ ...prev, [field]: value }",
+    "example": "const field = 'email';\n({ ...{ name: 'x' }, [field]: undefined })   // { name: 'x', email: undefined }",
+    "note": "The <b>value of the variable</b> becomes the key. Use it to update or clear one field without a switch per field.",
+    "search": "mdn computed property names"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Lookup by index",
+    "syntax": "const TITLES = ['A', 'B', 'C'];\nTITLES[step]",
+    "example": "['Tell us about you', 'What are you training for?', 'Check your details'][1]   // 'What are you training for?'",
+    "note": "Arrays are 0-based: the 1st step is <code>[0]</code>. Show \"Step \" + (step + 1) to humans.",
+    "search": "mdn array index access"
+   }
+  ]
  },
  "dc33": {
   "kind": "drill",
   "level": 3,
   "order": 33,
-  "minutes": 25,
-  "changeAt": 16,
+  "minutes": 30,
+  "changeAt": 20,
   "title": "Poll with live results",
   "focus": "src/App.tsx",
-  "summary": "A gaming-community post with a poll. Vote optimistically, animate result bars with percentages, and allow changing your vote.",
+  "summary": "A gaming-community post with a poll. Vote optimistically and show result bars with percentages, then animate them.",
   "skills": [
    "optimistic update",
    "derived percentages",
    "CSS width transition",
    "server reconciliation"
   ],
-  "brief": "<p>A post in <b>Guildhall</b>, a dark-themed gaming community. <code>PollWidget</code> already loads the poll with <code>getPoll()</code> and renders the four options as buttons that do nothing.</p><p>Read <code>api.ts</code>: <code>vote(optionId)</code> takes 0.6–1.2s and returns the whole updated <code>Poll</code> (it moves your vote if you already voted). <code>utils/poll.ts</code> has <code>percent</code> and <code>formatVotes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~16 min):</b> Change vote.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–21 change · 21–25 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>poll</code> stays the single source of truth; <code>myVote</code> is in it. Results show when <code>myVote !== null</code>. On click I update <code>poll</code> locally first (+1 on the chosen option, set <code>myVote</code>) so the bars move instantly, then call <code>vote</code> and replace <code>poll</code> with the server's copy. Total and percentages are derived. For the animation I render the bar span always, with width 0% before voting, and CSS <code>transition: width</code> does the rest.\"</p></div></details>",
+  "brief": "<p>A post in <b>Guildhall</b>, a dark-themed gaming community. <code>PollWidget</code> already loads the poll with <code>getPoll()</code> and renders the four options as buttons that do nothing.</p><p>Read <code>api.ts</code>: <code>vote(optionId)</code> takes 0.6–1.2s and returns the whole updated <code>Poll</code> (it moves your vote if you already voted). <code>utils/poll.ts</code> has <code>percent</code> and <code>formatVotes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change (~20 min):</b> animate + \"Saving your vote…\".</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–20 Core · 20–24 change · 24–30 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>poll</code> stays the single source of truth; <code>myVote</code> is in it. Results show when <code>myVote !== null</code>. On click I update <code>poll</code> locally first (+1 on the chosen option, set <code>myVote</code>) so the bars move instantly, then call <code>vote</code> and replace <code>poll</code> with the server's copy. Total and percentages are derived. I render the bar span in both states (width 0% before voting), so a CSS <code>transition: width</code> can animate it later.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Core",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
    "Clicking an option votes for it <b>immediately</b> (optimistic): the options switch to results without waiting for the API, and <code>vote(optionId)</code> is called. When it resolves, the poll is replaced with the server's data",
-   "Results: each option shows a filled bar behind the label whose width is its percentage, and the percentage on the right (\"10%\"). Under the list: \"101 votes · Closes in 2 days\". Your option has a ✓ and a stronger gradient bar",
+   "Results: each option shows a filled bar behind the label whose width is its percentage, and the percentage on the right (\"10%\"). Under the list: \"101 votes · Closes in 2 days\"",
    "After voting, the options are disabled: you cannot vote twice",
-   "Bars <b>animate</b> from 0 to their width (about 0.6s). While the vote is saving, the meta line says \"Saving your vote…\""
+   "Your option has a ✓ next to the label and a stronger gradient bar",
+   "<b>Change vote</b> link in the meta line (disabled while saving): hides the results and makes the options clickable again (\"Pick a new option\" + <b>Cancel</b>). Picking a different option moves the vote optimistically (−1 old, +1 new; total stays 101) and calls <code>vote</code>; picking the same option just returns to the results"
   ],
   "change": {
-   "title": "Change vote",
-   "html": "<p>\"People misclick. Let them change their vote.\"</p><ul><li>A <b>Change vote</b> link in the results meta line (disabled while saving). It hides the results and makes the options clickable again (\"Pick a new option\" + <b>Cancel</b>).</li><li>Picking a different option moves the vote optimistically (−1 old, +1 new; total stays 101) and calls <code>vote</code> again. Picking the same option just returns to the results.</li></ul>"
+   "title": "Make it feel alive",
+   "html": "<p>\"The results just snap in. Design wants motion, and people double-check whether the vote went through.\"</p><ul><li>Bars <b>animate</b> from 0 to their width over about 0.6s.</li><li>While the vote is saving, the meta line says <b>\"Saving your vote…\"</b> instead of \"Closes in 2 days\", and the options stay disabled.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: a transition only runs if the same element changes width.</p>"
   },
   "hints": [
    "Derived: <code>const total = poll.options.reduce((sum, o) =&gt; { return sum + o.votes; }, 0);</code> and <code>const showResults = poll.myVote !== null;</code>",
    "Optimistic update without mutation: <code>setPoll((prev) =&gt; { ... return { ...prev, myVote: optionId, options: prev.options.map((o) =&gt; { ... return { ...o, votes }; }) }; });</code>",
-   "Animation: search <b>mdn css transition width</b>. A transition only runs if the <i>same element</i> changes width, so render the bar span in both states (width 0% before voting).",
-   "Can't vote twice: <code>disabled={showResults || saving}</code> on the option button.",
-   "Change: one boolean <code>changing</code>. <code>showResults = poll.myVote !== null &amp;&amp; !changing</code>. In the optimistic update also subtract 1 from <code>prev.myVote</code>'s option."
+   "Bar width: an inline style object, <code>style={{ width: pct + '%' }}</code>, on a span that is <code>position: absolute</code> behind the label.",
+   "Can't vote twice: <code>disabled={showResults}</code> on the option button.",
+   "Change: search <b>mdn css transition width</b>. Render the bar span in both states (width 0% before voting) and add <code>transition: width 0.6s</code>. A <code>saving</code> boolean set before <code>vote()</code> and cleared in <code>.then</code> drives the text.",
+   "Stretch: one boolean <code>changing</code>. <code>showResults = poll.myVote !== null &amp;&amp; !changing</code>. In the optimistic update also subtract 1 from <code>prev.myVote</code>'s option."
   ],
   "rubric": [
    "UI updates before the API resolves (optimistic)",
    "Server response replaces the local guess",
    "Total and percentages derived; percent() reused",
-   "Bars animate via a persistent element + CSS transition",
    "No double voting (disabled while showing results / saving)",
+   "Bars animate via a persistent element + CSS transition",
+   "Saving state shown without blocking the optimistic UI",
    "Change vote moves the count, total unchanged"
   ],
   "spec": {
@@ -303,14 +377,48 @@
      "12 · muted · link 12/700 --primary"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "Sum with reduce",
+    "syntax": "arr.reduce((sum, x) => { return sum + x.votes; }, 0)",
+    "example": "[{ votes: 42 }, { votes: 9 }].reduce((sum, o) => { return sum + o.votes; }, 0)   // 51",
+    "note": "Returns the <b>accumulated value</b>. Always pass the start value (<code>0</code>), or an empty array throws.",
+    "search": "mdn array reduce"
+   },
+   {
+    "cat": "React",
+    "name": "Inline style object",
+    "syntax": "style={{ width: pct + '%' }}",
+    "example": "<span className=\"poll-bar\" style={{ width: '42%' }} />",
+    "note": "Double braces: outer = JSX expression, inner = a JS object. Keys are camelCase (<code>backgroundColor</code>); numbers mean px.",
+    "search": "react inline style"
+   },
+   {
+    "cat": "CSS",
+    "name": "Animate a width change",
+    "syntax": ".bar { transition: width 0.6s ease; }",
+    "example": ".poll-bar { width: 0; transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }",
+    "note": "Only animates when the <b>same element</b> changes its width. If the element is newly mounted, there is nothing to animate from.",
+    "search": "mdn css transition"
+   },
+   {
+    "cat": "Promises & async",
+    "name": "Fire, then reconcile",
+    "syntax": "apiCall(arg).then((fresh) => { setState(fresh); });",
+    "example": "vote(optionId).then((fresh) => { setPoll(fresh); setSaving(false); });",
+    "note": "Update the UI first (your guess), then <b>replace</b> it with what the server returns, since others may have voted meanwhile.",
+    "search": "optimistic ui update react"
+   }
+  ]
  },
  "dc34": {
   "kind": "drill",
   "level": 3,
   "order": 34,
-  "minutes": 25,
-  "changeAt": 16,
+  "minutes": 30,
+  "changeAt": 20,
   "title": "Inline rename",
   "focus": "src/App.tsx",
   "summary": "A deploy dashboard's project list. Double-click a name to edit it in place, Enter saves through the API, Escape cancels.",
@@ -321,41 +429,42 @@
    "async save",
    "lifting state"
   ],
-  "brief": "<p>The Projects page of <b>Deployd</b>, a hosting dashboard. <code>ProjectList</code> loads projects with <code>getProjects()</code> and renders a <code>ProjectRow</code> each. Each row has an <b>Edit</b> button that does nothing.</p><p>Read <code>api.ts</code>: <code>renameProject(id, name)</code> takes 0.5–1s, returns the updated project, and <b>throws</b> if another project already has that name. <code>StatusDot</code> and <code>formatAgo</code> already exist.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next and Stretch. <b>Change (~16 min):</b> one row at a time.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–15 Core · 15–21 change · 21–25 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Editing needs a <b>draft</b> separate from the saved name so Escape can throw it away. I'll keep <code>editingId</code>, <code>draft</code>, <code>error</code> and <code>saving</code> in <code>ProjectList</code>, because the list owns <code>projects</code> and has to replace the renamed one. The row becomes presentational: it gets <code>isEditing</code> and callbacks. The input uses <code>autoFocus</code> and an <code>onKeyDown</code> for Enter and Escape. Save trims, rejects empty, calls the API, then maps the updated project into the list.\"</p></div></details>",
+  "brief": "<p>The Projects page of <b>Deployd</b>, a hosting dashboard. <code>ProjectList</code> loads projects with <code>getProjects()</code> and renders a <code>ProjectRow</code> each. Each row has an <b>Edit</b> button that does nothing.</p><p>Read <code>api.ts</code>: <code>renameProject(id, name)</code> takes 0.5–1s, returns the updated project, and <b>throws</b> if another project already has that name. Read <code>components/NameInput.tsx</code>: a styled inline input that <b>focuses itself and selects its text</b> when it mounts, and shows an <code>error</code> if you pass one. <code>StatusDot</code> and <code>formatAgo</code> already exist.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change (~20 min):</b> show API errors.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–5 plan out loud · 5–20 Core · 20–24 change · 24–30 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Editing needs a <b>draft</b> separate from the saved name so Escape can throw it away. Only one row should be open, so the list keeps <code>editingId</code> and each row gets <code>isEditing</code>; the row keeps its own <code>draft</code>. Edit copies the name into the draft. Enter/Escape are an <code>onKeyDown</code> passed to <code>NameInput</code>. Save trims, calls the API, and hands the updated project up so the list can <code>map</code> it in and clear <code>editingId</code>.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Core",
    "Next",
+   "Next",
    "Stretch"
   ],
   "requirements": [
-   "Double-clicking a project name, or clicking <b>Edit</b>, replaces the name with a focused input holding the current name (text selected). The actions become <b>Cancel</b> and <b>Save</b>",
-   "<b>Enter</b> (or Save) calls <code>renameProject(id, name.trim())</code>. While waiting the input is disabled and Save reads \"Saving…\". On success the row shows the new name and leaves edit mode",
+   "Double-clicking a project name, or clicking <b>Edit</b>, replaces the name with <code>NameInput</code> holding the current name. The actions become <b>Cancel</b> and <b>Save</b>",
+   "<b>Enter</b> (or Save) calls <code>renameProject(id, name.trim())</code>. On success the row shows the new name and leaves edit mode",
    "<b>Escape</b> (or Cancel) leaves edit mode and the old name is shown, with no API call",
-   "An empty (or whitespace-only) name is not saved: the input gets a red border and \"Name can't be empty\" appears under it; you stay in edit mode. Saving an unchanged name just closes the editor",
-   "If the API rejects (e.g. renaming \"Docs\" to \"marketing site\"), stay in edit mode and show the error message from the API under the input"
+   "While saving, the input and buttons are disabled and Save reads \"Saving…\". The row being edited has a light tint",
+   "An empty (or whitespace-only) name is not saved: <code>NameInput</code> shows \"Name can't be empty\" and you stay in edit mode; typing clears it. Saving an unchanged name just closes the editor",
+   "Only one row can be in edit mode (opening another discards the first draft), and while a save is in progress the other rows' <b>Edit</b> buttons are disabled"
   ],
   "change": {
-   "title": "Only one row at a time",
-   "html": "<p>\"QA opened three editors at once and lost track of which one they saved.\"</p><ul><li>Only one row can be in edit mode. Starting to edit another row closes the first one (its draft is discarded).</li><li>While a save is in progress, the other rows' <b>Edit</b> buttons are disabled.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">If you put <code>isEditing</code> state inside each row, this is where you lift it to the list as a single <code>editingId</code>.</p>"
+   "title": "Show API errors",
+   "html": "<p>\"QA renamed Docs to 'marketing site' and the row just… stayed there, spinning back to Save. No message.\"</p><ul><li>If <code>renameProject</code> rejects, stay in edit mode, re-enable the input and show the API's error message under it (e.g. <i>A project named \"Marketing site\" already exists</i>).</li><li>Starting a new edit clears an old error.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>.catch((err: Error) =&gt; { ... err.message ... })</code> and <code>NameInput</code>'s <code>error</code> prop.</p>"
   },
   "hints": [
    "Keep a <code>draft</code> string separate from <code>project.name</code>. Copy the name into it when editing starts; Escape just leaves edit mode.",
-   "Keys: <code>function handleKeyDown(e: React.KeyboardEvent&lt;HTMLInputElement&gt;) { if (e.key === \"Enter\") { onSave(); } if (e.key === \"Escape\") { onCancel(); } }</code>. Search: <b>mdn KeyboardEvent key</b>.",
-   "Focus: the input only exists while editing, so <code>autoFocus</code> works. Select all with <code>onFocus={(e) =&gt; { e.target.select(); }}</code>.",
-   "Replace the saved project: <code>setProjects((prev) =&gt; { return prev.map((p) =&gt; { if (p.id === updated.id) { return updated; } return p; }); });</code>",
-   "Errors from the API: <code>renameProject(id, name).then(...).catch((err: Error) =&gt; { setSaving(false); setError(err.message); });</code>",
-   "Change: one <code>editingId: string | null</code> in the list; each row gets <code>isEditing={p.id === editingId}</code>. One id can only match one row."
+   "One open row: <code>const [editingId, setEditingId] = useState&lt;string | null&gt;(null);</code> in the list, and <code>isEditing={p.id === editingId}</code> on each row. One id can only match one row.",
+   "Keys: <code>function handleKeyDown(e: React.KeyboardEvent&lt;HTMLInputElement&gt;) { if (e.key === \"Enter\") { handleSave(); } if (e.key === \"Escape\") { onStopEdit(); } }</code>. Search: <b>mdn KeyboardEvent key</b>.",
+   "Replace the saved project in the list: <code>setProjects((prev) =&gt; { return prev.map((p) =&gt; { if (p.id === updated.id) { return updated; } return p; }); });</code>",
+   "Change: <code>renameProject(id, name).then(...).catch((err: Error) =&gt; { setSaving(false); setError(err.message); });</code> Search: <b>mdn promise catch</b>."
   ],
   "rubric": [
    "Draft separate from saved value; Escape discards it",
    "Enter/Escape handled on the input",
-   "Empty name blocked with a visible message",
-   "Saving state disables input and buttons",
+   "Reused NameInput (focus/select and error display come for free)",
+   "List updated immutably with the server's project",
    "API error caught and shown; stays in edit mode",
-   "Single editingId in the list enforces one editor",
-   "List updated immutably with the server's project"
+   "Saving state disables input and buttons",
+   "Single editingId in the list enforces one editor"
   ],
   "spec": {
    "colors": [
@@ -398,14 +507,40 @@
      "min-h 64 · pad 10 16"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Events",
+    "name": "Enter / Escape on an input",
+    "syntax": "onKeyDown={(e) => { if (e.key === 'Enter') { save(); } }}",
+    "example": "function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {\n  if (e.key === 'Escape') { cancel(); }\n}",
+    "note": "<code>e.key</code> is a <b>string</b> like <code>\"Enter\"</code>, <code>\"Escape\"</code>, <code>\"ArrowDown\"</code>. Use <code>onKeyDown</code>, not the deprecated <code>onKeyPress</code>.",
+    "search": "mdn keyboardevent key values"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Replace one item by id",
+    "syntax": "prev.map((x) => { if (x.id === updated.id) { return updated; } return x; })",
+    "example": "[{ id: 'a', name: 'Docs' }].map((p) => { if (p.id === 'a') { return { id: 'a', name: 'Docs v2' }; } return p; })   // [{ id: 'a', name: 'Docs v2' }]",
+    "note": "Returns a <b>new array</b> the same length; only the matching item is swapped.",
+    "search": "react update item in array state"
+   },
+   {
+    "cat": "Promises & async",
+    "name": "Handle a rejected promise",
+    "syntax": "promise.then((v) => { ... }).catch((err: Error) => { ... err.message ... })",
+    "example": "renameProject('prj_2', 'marketing site').catch((err: Error) => { setError(err.message); });   // 'A project named \"Marketing site\" already exists'",
+    "note": "When the async function <b>throws</b>, <code>.then</code> is skipped and <code>.catch</code> gets the Error. Reset any \"saving\" flag in both branches.",
+    "search": "mdn promise catch"
+   }
+  ]
  },
  "dc35": {
   "kind": "drill",
   "level": 3,
   "order": 35,
   "minutes": 30,
-  "changeAt": 19,
+  "changeAt": 20,
   "title": "School month calendar",
   "focus": "src/App.tsx",
   "summary": "A school family portal. Replace the agenda list with a 7-column month grid with events, prev/next month, and a day panel.",
@@ -416,31 +551,32 @@
    "derived cells",
    "selection state"
   ],
-  "brief": "<p>The family portal of <b>Maple Grove Elementary</b>. <code>SchoolCalendar</code> gets a fixed <code>today</code> prop (Sept 15, 2026; never use <code>Date.now</code>) and shows this month's events from <code>getEvents(year, month)</code> as a flat list. The ‹ › buttons do nothing.</p><p>Read <code>utils/date.ts</code>: <code>daysInMonth</code>, <code>firstWeekday</code>, <code>toKey</code>, <code>formatLongDate</code>, <code>WEEKDAYS</code>, <code>MONTH_NAMES</code>. Months are 0-based like <code>Date</code>. <code>EventChip</code> renders one event. <code>getEvents</code> takes 0.4–0.9s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> day side panel.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The visible month is state, <code>{ year, month }</code>, starting from <code>today</code>. The effect refetches when it changes, with the cancelled guard so a slow response for the old month can't land. The cells are derived: N blanks for the first weekday, then days 1..N, then blanks to fill the last row. Events are matched to cells by <code>toKey</code>. Prev/next use <code>new Date(year, month ± 1, 1)</code> so December → January rolls the year for me.\"</p></div></details>",
+  "brief": "<p>The family portal of <b>Maple Grove Elementary</b>. <code>SchoolCalendar</code> gets a fixed <code>today</code> prop (Sept 15, 2026; never use <code>Date.now</code>) and shows this month's events from <code>getEvents(year, month)</code> as a flat list. The ‹ › buttons do nothing.</p><p>Read <code>utils/date.ts</code>: <code>daysInMonth</code>, <code>firstWeekday</code>, <code>toKey</code>, <code>formatLongDate</code>, <code>WEEKDAYS</code>, <code>MONTH_NAMES</code>. Months are 0-based like <code>Date</code>. <code>EventChip</code> renders one event. <code>getEvents</code> takes 0.4–0.9s.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4. <b>Change (~20 min):</b> cap the chips.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–20 Core · 20–24 change · 24–30 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The visible month is state, <code>{ year, month }</code>, starting from <code>today</code>. The effect refetches when it changes; the starter's cancelled guard already stops a slow response for the old month from landing. The cells are derived: N blanks for the first weekday, then days 1..N, then blanks to fill the last row. Events are matched to cells by <code>toKey</code>. Prev/next use <code>new Date(year, month ± 1, 1)</code> so December → January rolls the year for me.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Core",
    "Next",
-   "Next"
+   "Stretch"
   ],
   "requirements": [
-   "A 7-column grid with Sun–Sat headings. September 2026 starts on a Tuesday, so the 1st is in the third column; blank cells fill before the 1st and after the last day so every row has 7",
-   "Each day cell shows the day number and up to 2 <code>EventChip</code>s for that date. If there are more, show \"+1 more\" (Sept 15 has 3 events). Today (the <code>today</code> prop) has a yellow circle on its number",
+   "The agenda list is replaced by a 7-column grid with Sun–Sat headings (the <code>Legend</code> stays under it). September 2026 starts on a Tuesday, so the 1st is in the third column; blank cells fill before the 1st and after the last day so every row has 7",
+   "Each day cell shows the day number and an <code>EventChip</code> for every event on that date. Today (the <code>today</code> prop) has a yellow circle on its number",
    "‹ and › change the month (title \"October 2026\") and fetch that month's events. Going back from January goes to December of the previous year",
    "While a month is loading, show a small \"Loading…\" next to the title. A slow response for a month you already left must not overwrite the current one",
-   "The agenda list is gone; the <code>Legend</code> stays under the grid"
+   "Clicking a day selects it (green outline) and opens a panel to the right titled with <code>formatLongDate</code> (\"Tuesday, September 15\") listing that day's events with their time, or \"All day\". A day without events says \"No events this day.\" A ✕ closes it; changing month clears the selection"
   ],
   "change": {
-   "title": "Day side panel",
-   "html": "<p>\"Parents need to see the times.\"</p><ul><li>Clicking a day selects it (green outline) and opens a panel to the right of the grid titled with <code>formatLongDate</code> (\"Tuesday, September 15\") listing that day's events with their time, or \"All day\".</li><li>A day without events says \"No events this day.\" A ✕ closes the panel. Changing month clears the selection.</li></ul>"
+   "title": "Cap the chips",
+   "html": "<p>\"Sept 15 is a mess: three chips and the row is twice as tall as the others.\"</p><ul><li>Show at most <b>2</b> chips per day.</li><li>If there are more, show a muted <b>\"+1 more\"</b> (the count of hidden events) under them. Sept 15 has 3 events.</li></ul>"
   },
   "hints": [
    "State: <code>const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });</code> and use <code>[view.year, view.month]</code> as the effect dependencies.",
    "Cells: <code>const cells: (number | null)[] = [];</code> push <code>null</code> <code>firstWeekday(...)</code> times, then 1..<code>daysInMonth(...)</code>, then <code>null</code> while <code>cells.length % 7 !== 0</code>.",
    "Month arithmetic: search <b>mdn Date constructor month overflow</b>. <code>new Date(2026, 12, 1)</code> is January 2027.",
    "CSS: <code>display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));</code>. The <code>minmax(0, …)</code> stops long chips from stretching a column.",
-   "Change: store <code>selectedKey</code> (the \"YYYY-MM-DD\" string), not a Date or the events. The panel's events are <code>events.filter((e) =&gt; { return e.date === selectedKey; })</code>."
+   "Change: <code>dayEvents.slice(0, 2)</code> for the chips, and <code>dayEvents.length - 2</code> for \"+N more\" when it is above 0.",
+   "Stretch: store <code>selectedKey</code> (the \"YYYY-MM-DD\" string), not a Date or the events. The panel's events are <code>events.filter((e) =&gt; { return e.date === selectedKey; })</code>."
   ],
   "rubric": [
    "Visible month in state, separate from today",
@@ -448,8 +584,8 @@
    "Cells derived (blanks + days + trailing blanks)",
    "Year rollover handled by Date, not by hand",
    "Reused date utils and EventChip",
-   "Selection stored as a key; panel derived from events",
-   "Grid uses CSS grid with minmax(0,1fr)"
+   "Grid uses CSS grid with minmax(0,1fr)",
+   "Chips capped with slice; hidden count derived"
   ],
   "spec": {
    "colors": [
@@ -496,14 +632,48 @@
      "240 wide · radius 12 · pad 14 · title 15/800"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Dates",
+    "name": "Month overflow in new Date",
+    "syntax": "new Date(year, month + delta, 1)",
+    "example": "new Date(2026, 12, 1)   // Jan 1 2027  (month 12 rolls into next year)\nnew Date(2026, -1, 1)   // Dec 1 2025",
+    "note": "Months are <b>0-based</b> (0 = January). Out-of-range months roll over, so read back <code>getFullYear()</code> / <code>getMonth()</code> instead of doing the math yourself.",
+    "search": "mdn date constructor"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Remainder %",
+    "syntax": "n % 7",
+    "example": "35 % 7   // 0  (full rows)\n33 % 7   // 5  (needs 2 more blanks)",
+    "note": "Returns what is <b>left over</b> after dividing. <code>while (cells.length % 7 !== 0)</code> pads the last row.",
+    "search": "mdn remainder operator"
+   },
+   {
+    "cat": "CSS",
+    "name": "Fixed column grid",
+    "syntax": "display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));",
+    "example": ".cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }",
+    "note": "Seven equal columns. Plain <code>1fr</code> has a min of \"content size\", so one long chip would widen its column; <code>minmax(0, 1fr)</code> doesn't.",
+    "search": "mdn css grid repeat minmax"
+   },
+   {
+    "cat": "Arrays",
+    "name": "First N items: slice",
+    "syntax": "arr.slice(0, n)",
+    "example": "['a', 'b', 'c'].slice(0, 2)   // ['a', 'b']",
+    "note": "Returns a <b>new array</b> (end index not included) and never mutates. Safe when the array is shorter than n.",
+    "search": "mdn array slice"
+   }
+  ]
  },
  "dc36": {
   "kind": "drill",
   "level": 3,
   "order": 36,
   "minutes": 30,
-  "changeAt": 19,
+  "changeAt": 20,
   "title": "Chat: optimistic send",
   "focus": "src/App.tsx",
   "summary": "A travel-concierge chat. Send messages optimistically with Sending… / Failed · Retry states, auto-scroll, and day separators.",
@@ -514,16 +684,16 @@
    "useRef scroll",
    "grouping while rendering"
   ],
-  "brief": "<p>The concierge chat of <b>Wayfarer</b>. <code>ChatThread</code> loads the conversation with <code>getMessages()</code> and renders <code>MessageBubble</code>s. The composer is a controlled input, but sending does nothing.</p><p>Read <code>api.ts</code>: <code>sendMessage(text)</code> takes 0.6–1.1s and returns the saved <code>Message</code> with a real id. To simulate a flaky network, a message containing <b>\"fail\"</b> throws the first time it's sent and succeeds on retry. <code>utils/time.ts</code> has <code>formatTime</code>, <code>dayLabel</code> and a fixed <code>NOW_ISO</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~19 min):</b> date separators.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–19 Core · 19–26 change · 26–30 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Each message in state gets a <code>status</code>: sent, sending or failed. On submit I append a message with a temporary id and status sending, clear the input, and call the API. Success swaps the temp message for the server's one (matched by temp id); failure flips its status to failed. Retry sets it back to sending and calls the same <code>deliver</code> function. Auto-scroll is an effect on <code>messages.length</code> that sets <code>scrollTop = scrollHeight</code> on a ref to the scroll container.\"</p></div></details>",
+  "brief": "<p>The concierge chat of <b>Wayfarer</b>. <code>ChatThread</code> loads the conversation with <code>getMessages()</code> and renders <code>MessageBubble</code>s. The composer is a controlled input, but sending does nothing.</p><p>Read <code>api.ts</code>: <code>sendMessage(text)</code> takes 0.6–1.1s and returns the saved <code>Message</code> with a real id. To simulate a flaky network, a message containing <b>\"fail\"</b> throws the first time it's sent and succeeds on retry. <code>utils/time.ts</code> has <code>formatTime</code>, <code>dayLabel</code> and a fixed <code>NOW_ISO</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change (~20 min):</b> date separators.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–20 Core · 20–25 change · 25–30 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Each message in state gets a <code>status</code>: sent, sending or failed. On submit I append a message with a temporary id and status sending, clear the input, and call the API. Success swaps the temp message for the server's one (matched by temp id); failure flips its status to failed. Retry sets it back to sending and calls the same <code>deliver</code> function. Auto-scroll is an effect on <code>messages.length</code> that sets <code>scrollTop = scrollHeight</code> on a ref to the scroll container.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
-   "Submitting the composer (Enter or <b>Send</b>) adds your message to the bottom <b>immediately</b>, faded, with \"Sending…\" under it, and clears the input. Empty messages are ignored and Send is disabled while empty",
-   "When <code>sendMessage</code> resolves, the message becomes normal and shows its time (\"3:01 PM\")",
+   "Submitting the composer (Enter or <b>Send</b>) adds your message to the bottom <b>immediately</b>, faded, with \"Sending…\" under it, and clears the input. Empty or whitespace-only messages are ignored and Send is disabled while empty",
+   "When <code>sendMessage</code> resolves, the temporary message is replaced by the server's (real id) and shows its time (\"3:01 PM\")",
    "If it throws, the bubble turns red and shows \"Failed · <b>Retry</b>\". Retry sets it back to \"Sending…\" and sends the same text again (it succeeds the second time)",
    "The thread scrolls to the bottom after the first load and whenever a message is added"
   ],
@@ -536,7 +706,7 @@
    "Form submit: <code>&lt;form onSubmit={handleSubmit}&gt;</code> and <code>e.preventDefault()</code> first. Search: <b>mdn preventDefault form submit</b>.",
    "Temp id: <code>const tempId = \"temp-\" + Date.now();</code> Pass it to the API callback so you know which message to replace, even if two sends overlap.",
    "Auto-scroll: <code>useEffect(() =&gt; { const el = listRef.current; if (el) { el.scrollTop = el.scrollHeight; } }, [messages.length]);</code> Search: <b>mdn scrollHeight</b>.",
-   "Change: <code>const rows: React.ReactNode[] = []; let lastDay = \"\"; messages.forEach((m) =&gt; { const day = dayLabel(m.sentAt); if (day !== lastDay) { rows.push(...); lastDay = day; } rows.push(&lt;MessageBubble ... /&gt;); });</code>"
+   "Change: build the rows above the return. <code>const rows: React.ReactNode[] = []; let lastDay = \"\"; messages.forEach((m) =&gt; { const day = dayLabel(m.sentAt); if (day !== lastDay) { rows.push(...); lastDay = day; } rows.push(&lt;MessageBubble ... /&gt;); });</code>"
   ],
   "rubric": [
    "Optimistic insert with a temp id",
@@ -591,17 +761,59 @@
      "h 42 · pill input + pill button"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "Extend a type with &",
+    "syntax": "type ChatMessage = Message & { status: 'sent' | 'sending' | 'failed' };",
+    "example": "const m: ChatMessage = { id: 'temp-1', author: 'me', text: 'Hi', sentAt: NOW_ISO, status: 'sending' };",
+    "note": "An <b>intersection</b>: every field of <code>Message</code> plus <code>status</code>. Keeps UI-only fields out of the API type.",
+    "search": "typescript intersection types"
+   },
+   {
+    "cat": "Events",
+    "name": "Form submit without reload",
+    "syntax": "<form onSubmit={handleSubmit}> … function handleSubmit(e) { e.preventDefault(); }",
+    "example": "function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n  e.preventDefault();   // stop the page reload\n}",
+    "note": "A <code>&lt;button type=\"submit\"&gt;</code> and pressing <b>Enter</b> in the input both fire <code>onSubmit</code>; without <code>preventDefault</code> the page reloads.",
+    "search": "mdn event preventDefault form submit"
+   },
+   {
+    "cat": "Other",
+    "name": "Temporary id: Date.now()",
+    "syntax": "const tempId = 'temp-' + Date.now();",
+    "example": "'temp-' + Date.now()   // 'temp-1760108460123'",
+    "note": "<code>Date.now()</code> returns <b>milliseconds since 1970</b> as a number. Good enough for a short-lived client id you swap for the server's.",
+    "search": "mdn date now"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Append immutably",
+    "syntax": "setItems((prev) => { return [...prev, item]; });",
+    "example": "[...[1, 2], 3]   // [1, 2, 3]",
+    "note": "Spread copies the old items into a <b>new array</b>. <code>push</code> would mutate state and React may not re-render.",
+    "search": "mdn spread syntax array"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Build a list with forEach + \"previous\" variable",
+    "syntax": "let last = '';\narr.forEach((x) => { if (x.day !== last) { rows.push(sep); last = x.day; } rows.push(row); });",
+    "example": "let last = ''; ['Thu', 'Thu', 'Today'].forEach((d) => { if (d !== last) { console.log('sep', d); last = d; } });   // sep Thu, sep Today",
+    "note": "<code>forEach</code> returns <b>undefined</b>; you collect into your own array. Use it when one input item can produce 0, 1 or 2 output rows.",
+    "search": "mdn array foreach"
+   }
+  ]
  },
  "dc37": {
   "kind": "drill",
   "level": 4,
   "order": 37,
-  "minutes": 35,
-  "changeAt": 23,
+  "minutes": 40,
+  "changeAt": 26,
   "title": "City autocomplete",
   "focus": "src/components/CityInput.tsx",
-  "summary": "A flight search \"To\" field. Suggestions from an API as you type, full keyboard and mouse support, match highlighting, and recent searches.",
+  "summary": "A flight search \"To\" field. Suggestions from an API as you type, click to pick, keyboard support, then match highlighting.",
   "skills": [
    "combobox",
    "race conditions",
@@ -610,39 +822,39 @@
    "blur vs click",
    "highlighting"
   ],
-  "brief": "<p>The search hero of <b>skyhop</b>. <code>SearchPanel</code> renders a <code>CityInput</code> for \"To\", which is just a controlled input right now.</p><p>Read <code>api.ts</code>: <code>searchCities(query)</code> takes 0.25–0.7s, so responses can arrive <b>out of order</b> while typing. <code>getRecentSearches()</code> takes 0.2–0.5s. <code>utils/format.ts</code> has <code>formatCity</code> (\"Lisbon, Portugal\").</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> recent searches.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"All state lives in <code>CityInput</code>: <code>query</code>, <code>results</code>, <code>loading</code>, <code>open</code>, <code>activeIndex</code>. An effect on <code>query</code> calls the API with a cancelled flag, which also fixes out-of-order responses. <code>activeIndex</code> is the one thing both keyboard and mouse change; Enter picks <code>results[activeIndex]</code>. Selecting fills the input with <code>formatCity</code> and closes. Closing on blur would kill the click on an option, so options use <code>onMouseDown</code> + <code>preventDefault</code>.\"</p></div></details>",
+  "brief": "<p>The search hero of <b>skyhop</b>. <code>SearchPanel</code> renders a <code>CityInput</code> for \"To\", which is just a controlled input right now.</p><p>Read <code>api.ts</code>: <code>searchCities(query)</code> takes 0.25–0.7s, so responses can arrive <b>out of order</b> while typing. <code>getRecentSearches()</code> takes 0.2–0.5s. <code>utils/format.ts</code> has <code>formatCity</code> (\"Lisbon, Portugal\").</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change (~26 min):</b> highlight the match.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–26 Core · 26–31 change · 31–40 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"All state lives in <code>CityInput</code>: <code>query</code>, <code>results</code>, <code>loading</code>, <code>open</code>. An effect on <code>query</code> calls the API with a cancelled flag, which also fixes out-of-order responses. Selecting fills the input with <code>formatCity</code> and closes. Closing on blur would kill the click on an option, so options use <code>onMouseDown</code> + <code>preventDefault</code>. For the keyboard I add one <code>activeIndex</code> that both arrows and hover change; Enter picks <code>results[activeIndex]</code>.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Typing shows a dropdown under the field with up to 6 suggestions from <code>searchCities</code>: pin icon, \"City, Country\" and the airport code. While the first results load: \"Searching…\"; no matches: <code>No cities match \"xyz\"</code>. Stale responses never overwrite newer ones",
-   "The typed part of each suggestion is highlighted (bold, primary color) with a <code>&lt;mark&gt;</code>, e.g. typing \"lo\" highlights \"Lo\" in \"London\" and \"lo\" in \"Barcelona\"",
-   "Clicking a suggestion fills the input with \"City, Country\", closes the dropdown and shows the code as a small badge next to the input",
-   "<b>ArrowDown/ArrowUp</b> move a highlighted row (wrapping around), <b>Enter</b> selects it (without submitting the form), <b>Escape</b> closes. Hovering a row highlights it too: there is only ever one highlighted row",
-   "Blurring the input closes the dropdown, but clicking a suggestion still works. The input has <code>role=\"combobox\"</code>, <code>aria-expanded</code> and <code>aria-activedescendant</code>"
+   "Typing opens a dropdown under the field with up to 6 suggestions from <code>searchCities</code>: pin icon, \"City, Country\" and the airport code. Stale responses never overwrite newer ones (type \"l\", \"lo\", \"lon\" fast)",
+   "Clicking a suggestion fills the input with \"City, Country\" and closes the dropdown. Blurring the input closes it too, but clicking a suggestion still works",
+   "While the first results load: \"Searching…\"; no matches: <code>No cities match \"xyz\"</code>. After picking, the airport code shows as a small badge next to the input",
+   "<b>ArrowDown/ArrowUp</b> move a highlighted row (wrapping), <b>Enter</b> selects it (without submitting the form), <b>Escape</b> closes. Hovering highlights too: only one row is ever highlighted. The input has <code>role=\"combobox\"</code>, <code>aria-expanded</code> and <code>aria-activedescendant</code>",
+   "Recent searches: when the input is focused and <b>empty</b>, show a \"Recent searches\" heading and the cities from <code>getRecentSearches()</code> (clock icon). Keyboard and mouse work the same; selecting any city moves it to the top of recents (no duplicates, max 5)"
   ],
   "change": {
-   "title": "Recent searches",
-   "html": "<p>\"Most people fly to the same few places.\"</p><ul><li>When the input is focused and <b>empty</b>, show a \"Recent searches\" heading and the cities from <code>getRecentSearches()</code> (clock icon instead of the pin).</li><li>Keyboard and mouse work on that list the same way. Selecting any city (from search or recents) moves it to the top of recents (no duplicates, max 5).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one derived <code>options</code> array (recents when the query is empty, otherwise results) means the keyboard code doesn't change at all.</p>"
+   "title": "Highlight the match",
+   "html": "<p>\"With 6 similar names it's hard to see why each one matched.\"</p><ul><li>Wrap the typed part of each suggestion in a <code>&lt;mark&gt;</code> styled bold and primary-colored, no yellow background.</li><li>Case-insensitive: typing \"lo\" highlights \"Lo\" in \"London\" and \"lo\" in \"Barcelona\". No <code>dangerouslySetInnerHTML</code>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: a tiny <code>Highlight</code> component that splits the label into before / match / after.</p>"
   },
   "hints": [
    "Effect: <code>useEffect(() =&gt; { if (query.trim() === \"\") { setResults([]); return; } let cancelled = false; searchCities(query).then((data) =&gt; { if (cancelled) { return; } setResults(data); }); return () =&gt; { cancelled = true; }; }, [query]);</code> The cleanup of the old query runs before the new one starts.",
-   "Highlight: search <b>mdn String indexOf</b>. Split the label into before / match / after with <code>slice</code>, and wrap the middle in <code>&lt;mark&gt;</code>.",
-   "Keys: <code>e.preventDefault()</code> on ArrowUp/Down (stops the caret jumping) and on Enter (stops the form submitting). Wrap with <code>(prev + 1) % options.length</code>.",
    "Blur fires before click. Search: <b>react onBlur before onClick dropdown</b>. Fix: <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on each option keeps focus in the input.",
-   "Reset <code>activeIndex</code> to -1 whenever the query changes, otherwise it can point past the end of a shorter list.",
-   "Change: <code>let options = results; if (query.trim() === \"\") { options = recent; }</code> and update recents with <code>[city, ...prev.filter(...)].slice(0, 5)</code>."
+   "The dropdown is <code>position: absolute</code> under the field; <code>.city-field</code> is already <code>position: relative</code>.",
+   "Keys: <code>e.preventDefault()</code> on ArrowUp/Down (stops the caret jumping) and on Enter (stops the form submitting). Wrap with <code>(prev + 1) % results.length</code>. Reset <code>activeIndex</code> to -1 whenever the query changes.",
+   "Change: search <b>mdn String indexOf</b>. <code>const start = text.toLowerCase().indexOf(q);</code> then <code>text.slice(0, start)</code>, <code>&lt;mark&gt;{text.slice(start, end)}&lt;/mark&gt;</code>, <code>text.slice(end)</code>.",
+   "Stretch: <code>let options = results; if (query.trim() === \"\") { options = recent; }</code> and update recents with <code>[city, ...prev.filter(...)].slice(0, 5)</code>."
   ],
   "rubric": [
    "Out-of-order responses handled (cancelled flag in the effect)",
+   "Blur/click race solved with mousedown preventDefault",
    "Single activeIndex shared by keyboard and mouse",
    "preventDefault on arrows and Enter",
-   "Blur/click race solved with mousedown preventDefault",
-   "Highlight without dangerouslySetInnerHTML",
+   "Highlight without dangerouslySetInnerHTML, case-insensitive",
    "Basic combobox ARIA",
    "Recents reuse the same options pipeline"
   ],
@@ -695,17 +907,51 @@
      "11/800 · uppercase · muted"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "Ignore stale responses (effect cleanup)",
+    "syntax": "useEffect(() => { let cancelled = false; api(q).then((d) => { if (!cancelled) { set(d); } }); return () => { cancelled = true; }; }, [q]);",
+    "example": "// type 'l' then 'lo': the 'l' effect's cleanup runs first, so its late response is dropped",
+    "note": "React runs the <b>cleanup of the previous effect</b> before running the next one, so each request knows if it is out of date.",
+    "search": "react useeffect cleanup race condition"
+   },
+   {
+    "cat": "Events",
+    "name": "Keep focus while clicking: mousedown + preventDefault",
+    "syntax": "onMouseDown={(e) => { e.preventDefault(); }}",
+    "example": "<li onMouseDown={(e) => { e.preventDefault(); }} onClick={() => { choose(city); }}>",
+    "note": "Event order is <b>mousedown → blur → mouseup → click</b>. Preventing mousedown's default stops the input from losing focus, so your onBlur doesn't close the list first.",
+    "search": "mdn mousedown preventDefault focus"
+   },
+   {
+    "cat": "Strings",
+    "name": "Find a substring: indexOf",
+    "syntax": "text.toLowerCase().indexOf(q)",
+    "example": "'Barcelona'.toLowerCase().indexOf('lo')   // 4\n'Paris'.indexOf('lo')                     // -1 (not found)",
+    "note": "Returns the <b>index of the first match</b>, or <b>-1</b>. Lowercase both sides for a case-insensitive search, but slice the original text so the casing is kept.",
+    "search": "mdn string indexOf"
+   },
+   {
+    "cat": "Strings",
+    "name": "Cut a string: slice(start, end)",
+    "syntax": "text.slice(0, start) / text.slice(start, end) / text.slice(end)",
+    "example": "'Barcelona'.slice(0, 4)   // 'Barc'\n'Barcelona'.slice(4, 6)   // 'el'\n'Barcelona'.slice(6)      // 'ona'",
+    "note": "End index is <b>not included</b>; omit it to go to the end. Three slices give before / match / after.",
+    "search": "mdn string slice"
+   }
+  ]
  },
  "dc38": {
   "kind": "drill",
   "level": 4,
   "order": 38,
-  "minutes": 35,
-  "changeAt": 23,
+  "minutes": 40,
+  "changeAt": 27,
   "title": "File explorer tree",
   "focus": "src/App.tsx",
-  "summary": "An in-browser IDE. Build a recursive, expandable file tree, a preview pane that loads file contents, and a breadcrumb.",
+  "summary": "An in-browser IDE. Build a recursive, expandable file tree, open files in the preview, then add folder file counts.",
   "skills": [
    "recursive component",
    "Set in state",
@@ -713,41 +959,40 @@
    "fetch on selection",
    "breadcrumb path"
   ],
-  "brief": "<p>The editor of <b>Codebox</b>, a dark IDE. <code>Explorer</code> loads the nested tree with <code>getTree()</code> but only lists the top level; folders don't open. <code>Preview</code> just says \"Select a file to preview it\".</p><p>Read <code>api.ts</code>: folders have <code>children</code>; <code>getFile(id)</code> takes 0.3–0.8s. <code>components/CodeView.tsx</code> renders code with line numbers; <code>utils/files.ts</code> has <code>fileIcon</code> and <code>formatBytes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> Collapse all + file counts.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>TreeNode</code> component renders one row and, if it's an open folder, maps its children to <code>TreeNode</code> again with <code>depth + 1</code>. Expanded folders are one <code>Set</code> of ids in <code>Explorer</code>, not state in each node, so they survive re-renders and can be cleared at once. The selected file is needed by both the explorer (highlight) and the preview (load), so it lives in <code>App</code>. Each node passes its path down, so on select I already have the breadcrumb.\"</p></div></details>",
+  "brief": "<p>The editor of <b>Codebox</b>, a dark IDE. <code>Explorer</code> loads the nested tree with <code>getTree()</code> but only lists the top level; folders don't open. <code>Preview</code> is already done: give it a <code>fileId</code> and it loads the file with <code>getFile</code> (0.3–0.8s, stale-safe) and shows it in <code>CodeView</code>. Right now it always gets <code>null</code>.</p><p>Read <code>api.ts</code> (folders have <code>children</code>) and <code>components/TreeRow.tsx</code>: one styled row that takes <code>depth</code> (indent), <code>isOpen</code> (chevron), <code>isSelected</code> and an <code>extra</code> slot on the right. It does not render children: that's your job. <code>utils/files.ts</code> has <code>fileIcon</code> and <code>formatBytes</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change (~27 min):</b> folder file counts.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–27 Core · 27–32 change · 32–40 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"A <code>TreeNode</code> component renders one <code>TreeRow</code> and, if it's an open folder, maps its children to <code>TreeNode</code> again with <code>depth + 1</code>. Expanded folders are one <code>Set</code> of ids in <code>Explorer</code>, not state in each node, so they survive re-renders and can be cleared at once. The selected file is needed by both the explorer (highlight) and the preview (load), so it lives in <code>App</code>. Each node can pass its path down, so on select I already have the breadcrumb.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Folders show a ▸ chevron (rotated ▾ when open) and toggle open/closed on click; files show their <code>fileIcon</code> badge. Children are indented 14px per level, to any depth (<code>src/utils/api/client.ts</code> is 3 levels deep). <code>src</code> starts open",
-   "Clicking a file highlights it (tinted row + purple left edge) and the preview loads it with <code>getFile</code>: \"Loading…\" then <code>CodeView</code>. Clicking another file quickly never shows the first file's content",
-   "The preview header shows a breadcrumb: <b>codebox-web › src › components › Button.tsx</b> (last part bold), and the size on the right with <code>formatBytes</code>",
-   "Collapsing a folder that contains the selected file keeps the file selected and previewed",
-   "The tree has <code>role=\"tree\"</code>, folders' items have <code>aria-expanded</code>"
+   "Folders toggle open/closed on click (<code>TreeRow</code> rotates the chevron when <code>isOpen</code>). Children are indented one level deeper (<code>depth + 1</code>), to any depth (<code>src/utils/api/client.ts</code> is 3 levels deep). <code>src</code> starts open",
+   "Clicking a file highlights it (<code>isSelected</code>) and the <code>Preview</code> loads it (\"Loading…\" then the code). Clicking another file quickly never shows the first file's content. Collapsing a folder that contains the selected file keeps it selected and previewed",
+   "The preview header shows a breadcrumb: <b>codebox-web › src › components › Button.tsx</b> (last part bold), with the size still on the right",
+   "A <b>Collapse all</b> button in the Explorer header closes every folder (disabled when nothing is open)",
+   "The tree has <code>role=\"tree\"</code>; each item is <code>role=\"treeitem\"</code> and folders have <code>aria-expanded</code>"
   ],
   "change": {
-   "title": "Collapse all + file counts",
-   "html": "<p>\"The tree gets long. Give me a reset, and tell me how big folders are.\"</p><ul><li>A <b>Collapse all</b> button in the Explorer header closes every folder (disabled when nothing is open).</li><li>Each folder shows a small muted pill on the right with the number of <b>files</b> inside it, counting all nested folders (<code>src</code> shows 9).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">If you kept <code>open</code> state inside each <code>TreeNode</code>, this is the moment you have to lift it.</p>"
+   "title": "Folder file counts",
+   "html": "<p>\"Tell me how big folders are before I open them.\"</p><ul><li>Each folder shows a small muted pill on the right with the number of <b>files</b> inside it, counting all nested folders (<code>src</code> shows 9, <code>components</code> shows 3).</li><li>Files show no pill. Pass it through <code>TreeRow</code>'s <code>extra</code> prop.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: the count is recursive too, as a plain function.</p>"
   },
   "hints": [
    "Recursive component: <code>function TreeNode({ node, depth, ... }) { ... children = node.children.map((child) =&gt; { return &lt;TreeNode key={child.id} node={child} depth={depth + 1} ... /&gt;; }) }</code>. Search: <b>react recursive component tree</b>.",
-   "Indent with an inline style: <code>style={{ paddingLeft: 10 + depth * 14 }}</code>.",
-   "Set in state: never <code>.add</code> on the current set. <code>setExpanded((prev) =&gt; { const next = new Set(prev); ...; return next; })</code>. Search: <b>mdn Set</b>.",
+   "Set in state: never <code>.add</code> on the current set. <code>setExpanded((prev) =&gt; { const next = new Set(prev); if (next.has(id)) { next.delete(id); } else { next.add(id); } return next; })</code>. Search: <b>mdn Set</b>.",
+   "Lift the selection: <code>App</code> holds <code>selectedId</code>, passes it to <code>Explorer</code> (for <code>isSelected</code>) and <code>&lt;Preview fileId={selectedId} /&gt;</code>.",
    "Breadcrumb: pass <code>parentPath</code> down. Each node computes <code>const path = [...parentPath, node.name];</code> and sends it up with <code>onSelect({ id, path })</code>.",
-   "Preview fetch: <code>useEffect</code> on the selected id with the <code>cancelled</code> guard, so a slow first file can't overwrite the second.",
-   "Change: <code>function countFiles(node: FileNode): number { if (node.type === \"file\") { return 1; } ... sum countFiles(child) ... }</code>. Collapse all is <code>setExpanded(new Set())</code>."
+   "Change: <code>function countFiles(node: FileNode): number { if (node.type === \"file\") { return 1; } let total = 0; (node.children || []).forEach((c) =&gt; { total = total + countFiles(c); }); return total; }</code>"
   ],
   "rubric": [
-   "Recursive TreeNode with depth-based indent",
+   "Recursive TreeNode passing depth + 1",
    "Expanded state as one immutable Set at the top",
    "Selection lifted to App (explorer + preview both need it)",
+   "Reused TreeRow, Preview, CodeView, formatBytes",
    "Path built while recursing, not searched afterwards",
-   "File fetch guarded against stale responses",
    "Recursive count as a pure function",
-   "Reused CodeView, fileIcon, formatBytes"
+   "Collapse all is a single setExpanded(new Set())"
   ],
   "spec": {
    "colors": [
@@ -778,14 +1023,6 @@
    ],
    "notes": [
     [
-     "Row",
-     "h 26 · gap 6 · indent 10 + 14 × depth"
-    ],
-    [
-     "Chevron",
-     "11px · rotate 90° when open · .12s"
-    ],
-    [
      "Count pill",
      "10/700 · pad 0 6 · bg white 6%"
     ],
@@ -796,19 +1033,57 @@
     [
      "Header button",
      "10/700 · uppercase · muted"
+    ],
+    [
+     "Row (TreeRow)",
+     "h 26 · gap 6 · indent 10 + 14 × depth (given)"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "Recursive component",
+    "syntax": "function TreeNode({ node, depth }) { ... node.children.map((c) => { return <TreeNode key={c.id} node={c} depth={depth + 1} />; }) }",
+    "example": "// src (depth 0) -> components (depth 1) -> Button.tsx (depth 2)",
+    "note": "A component may render <b>itself</b>. The recursion stops naturally at files and at closed folders (nothing to map).",
+    "search": "react recursive component"
+   },
+   {
+    "cat": "Map & Set",
+    "name": "Set in state: copy, then add/delete",
+    "syntax": "const next = new Set(prev); next.add(id); return next;",
+    "example": "const s = new Set(['src']);\ns.has('src')   // true\nnew Set(s).size   // 1 (a copy)",
+    "note": "<code>.add</code>/<code>.delete</code> <b>mutate</b> the Set. Copy with <code>new Set(prev)</code> first, or React sees the same object and skips the re-render.",
+    "search": "mdn set"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Default for a missing array: || []",
+    "syntax": "(node.children || []).map(...)",
+    "example": "(undefined || []).length   // 0",
+    "note": "Files have no <code>children</code>; <code>|| []</code> gives an empty array so <code>.map</code>/<code>.forEach</code> don't crash.",
+    "search": "mdn logical or default value"
+   },
+   {
+    "cat": "Other",
+    "name": "Recursive function",
+    "syntax": "function count(n) { if (leaf) { return 1; } let t = 0; n.children.forEach((c) => { t = t + count(c); }); return t; }",
+    "example": "countFiles({ type: 'folder', children: [{ type: 'file' }, { type: 'folder', children: [{ type: 'file' }] }] })   // 2",
+    "note": "Every recursive function needs a <b>base case</b> (a file returns 1) and a step that calls itself on smaller pieces.",
+    "search": "recursion javascript tree count"
+   }
+  ]
  },
  "dc39": {
   "kind": "drill",
   "level": 4,
   "order": 39,
   "minutes": 40,
-  "changeAt": 26,
+  "changeAt": 27,
   "title": "Employee directory table",
   "focus": "src/App.tsx",
-  "summary": "An HR directory. Combine search, a department filter, sortable columns and pagination, then add column visibility toggles.",
+  "summary": "An HR directory. Combine search, a department filter and sortable columns, then paginate and handle the empty state.",
   "skills": [
    "derived pipeline",
    "sort without mutating",
@@ -816,41 +1091,41 @@
    "reset page on filter",
    "config-driven columns"
   ],
-  "brief": "<p>The Directory page of <b>Peoplebase</b>. <code>EmployeeTable</code> loads all 28 employees with <code>getEmployees()</code> (0.5–1.1s) and renders every one in a plain table.</p><p>Read <code>components/</code>: <code>Pagination</code> (Prev / \"Page 2 of 4\" / Next) and <code>DeptBadge</code> already exist. <code>DEPARTMENTS</code> is exported from <code>api.ts</code>. <code>formatDate</code> is in <code>utils/format.ts</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~26 min):</b> column toggles.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–7 plan out loud · 7–26 Core + Next · 26–35 change · 35–40 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The only state is the inputs: <code>query</code>, <code>dept</code>, <code>sortKey</code>, <code>sortDir</code>, <code>page</code>. Everything else is a pipeline computed on each render: filter by query, filter by department, copy and sort, then slice the page. Every handler that changes a filter also sets page back to 1, because page 3 of the old list might not exist. I'll describe the columns in one array so the header and cells are both maps over it, which also makes the sort buttons uniform.\"</p></div></details>",
+  "brief": "<p>The Directory page of <b>Peoplebase</b>. <code>EmployeeTable</code> loads all 28 employees with <code>getEmployees()</code> (0.5–1.1s) and renders every one. The columns are already driven by one <code>COLUMNS</code> config: the header maps over it, and <code>EmployeeRow</code> renders the cells with <code>renderCell</code>.</p><p>Read <code>components/</code>: <code>Pagination</code> (Prev / \"Page 2 of 4\" / Next) and <code>DeptBadge</code> already exist. <code>DEPARTMENTS</code> is exported from <code>api.ts</code>. The stylesheet already has <code>.toolbar</code>, <code>.search</code>, <code>.select</code>, <code>.btn</code>, <code>.btn-link</code>, <code>.table-foot</code> and <code>.range</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. <b>Change (~27 min):</b> clear filters + empty state.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–7 plan out loud · 7–27 Core · 27–33 change · 33–40 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The only state is the inputs: <code>query</code>, <code>dept</code>, <code>sortKey</code>, <code>sortDir</code>, later <code>page</code>. Everything else is a pipeline computed on each render: filter by query, filter by department, copy and sort, then slice the page. Every handler that changes a filter also sets page back to 1, because page 3 of the old list might not exist. The header is already a map over <code>COLUMNS</code>, so each <code>&lt;th&gt;</code> just becomes a sort button.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
    "A toolbar above the table: a search input (\"Search name or title\", case-insensitive on name OR title) and a department select (\"All departments\" + each department). Both apply together",
    "Every column header is a button that sorts by it: first click ascending ▲, second descending ▼; other headers show a muted ↕. Default: Name ascending. Start date sorts by date",
    "8 rows per page with the existing <code>Pagination</code> component, and \"Showing 9–16 of 28\" on the left of the footer. Changing the search, department or sort goes back to page 1",
-   "When filters are active, a <b>Clear filters</b> button resets search and department (and the page). With no matches the table shows one row: \"No employees match your filters.\"",
-   "Sorted headers have <code>aria-sort</code> (\"ascending\" / \"descending\")"
+   "Sorted headers have <code>aria-sort</code> (\"ascending\" / \"descending\")",
+   "A <b>Columns</b> button at the right of the toolbar opens a menu of checkboxes (Title, Department, Location, Start date; Name always shown). Unchecking hides that column's header and cells"
   ],
   "change": {
-   "title": "Column visibility",
-   "html": "<p>\"Managers only care about name, title and start date.\"</p><ul><li>A <b>Columns</b> button at the right of the toolbar opens a small menu of checkboxes: Title, Department, Location, Start date (all on by default). Name is always shown.</li><li>Unchecking hides that column's header and cells. The empty-state row still spans all visible columns.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: a native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code> gives you open/close for free.</p>"
+   "title": "Clear filters + empty state",
+   "html": "<p>\"Someone searched 'zz', got an empty table and thought the page was broken.\"</p><ul><li>With no matches the table shows one row spanning all columns: <b>\"No employees match your filters.\"</b></li><li>When the search or department is set, a <b>Clear filters</b> button appears in the toolbar; it resets both (and the page).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>colSpan</code> on a single <code>&lt;td&gt;</code>.</p>"
   },
   "hints": [
-   "Write the pipeline as consts after the loading check: <code>filtered</code> → <code>sorted</code> → <code>pageRows</code>. None of these go in state.",
-   "Sorting: <code>[...filtered].sort((a, b) =&gt; { return a[sortKey].localeCompare(b[sortKey]); })</code>. ISO dates (\"2019-03-04\") sort correctly as strings. Search: <b>mdn localeCompare</b>.",
-   "Paging: <code>const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE)); const start = (page - 1) * PAGE_SIZE; const pageRows = sorted.slice(start, start + PAGE_SIZE);</code>",
-   "Reset to page 1 inside the handlers (<code>handleQuery</code>, <code>handleDept</code>, <code>handleSort</code>), not in an effect.",
-   "Columns as data: <code>const COLUMNS = [{ key: \"name\", label: \"Name\" }, ...];</code> then <code>COLUMNS.map</code> for headers and a <code>renderCell(employee, key)</code> helper for cells.",
-   "Change: <code>visible: Record&lt;ColumnKey, boolean&gt;</code>, toggled with <code>{ ...prev, [key]: !prev[key] }</code>, and <code>const visibleColumns = COLUMNS.filter(...)</code>."
+   "Write the pipeline as consts after the loading check: <code>filtered</code> → <code>sorted</code> → (later) <code>pageRows</code>. None of these go in state.",
+   "Filter: <code>const q = query.trim().toLowerCase();</code> then <code>(q === \"\" || e.name.toLowerCase().includes(q) || e.title.toLowerCase().includes(q)) &amp;&amp; (dept === \"\" || e.department === dept)</code>.",
+   "Sorting: <code>[...filtered].sort((a, b) =&gt; { return a[sortKey].localeCompare(b[sortKey]); })</code>, negate the result for descending. ISO dates (\"2019-03-04\") sort correctly as strings. Search: <b>mdn localeCompare</b>.",
+   "Paging: <code>const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE)); const start = (page - 1) * PAGE_SIZE; const pageRows = sorted.slice(start, start + PAGE_SIZE);</code> Reset to page 1 inside the handlers, not in an effect.",
+   "Change: <code>&lt;td className=\"table-empty\" colSpan={COLUMNS.length}&gt;</code>. Search: <b>mdn td colspan</b>.",
+   "Stretch: <code>visible: Record&lt;ColumnKey, boolean&gt;</code>, toggled with <code>{ ...prev, [key]: !prev[key] }</code>, and <code>const visibleColumns = COLUMNS.filter(...)</code>. A native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code> gives open/close for free."
   ],
   "rubric": [
    "Only inputs in state; the pipeline is derived",
    "Copied before sorting",
+   "Reused COLUMNS/EmployeeRow, Pagination, DeptBadge, DEPARTMENTS",
    "Page reset in the filter/sort handlers",
    "Correct page math and range text",
-   "Reused Pagination, DeptBadge, formatDate, DEPARTMENTS",
-   "Columns driven by one config array",
-   "Empty state with correct colSpan"
+   "Empty state with correct colSpan",
+   "Column visibility filters the same config array"
   ],
   "spec": {
    "colors": [
@@ -901,14 +1176,48 @@
      "min-w 180 · top 42 · right 0 · radius 8"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "Sort a copy",
+    "syntax": "[...arr].sort((a, b) => { return compare; })",
+    "example": "[...['b', 'a']].sort((a, b) => { return a.localeCompare(b); })   // ['a', 'b']",
+    "note": "<code>sort()</code> <b>mutates</b> the array in place (and returns it). Copy first so you never reorder state. The callback returns negative / 0 / positive.",
+    "search": "mdn array sort"
+   },
+   {
+    "cat": "Strings",
+    "name": "Compare strings: localeCompare",
+    "syntax": "a.localeCompare(b)",
+    "example": "'Ana'.localeCompare('Ben')   // -1\n'2019-03-04'.localeCompare('2021-01-10')   // -1 (ISO dates sort as text)",
+    "note": "Returns <b>-1, 0 or 1</b>, exactly what <code>sort</code> wants. For descending, return <code>-result</code>.",
+    "search": "mdn string localeCompare"
+   },
+   {
+    "cat": "Events",
+    "name": "Controlled <select>",
+    "syntax": "<select value={dept} onChange={(e) => { setDept(e.target.value); }}>",
+    "example": "<select value={dept} onChange={(e) => { handleDept(e.target.value); }}>\n  <option value=\"\">All departments</option>\n</select>",
+    "note": "<code>e.target.value</code> is the chosen option's <code>value</code> (a <b>string</b>). An empty-string value works well as \"all\".",
+    "search": "react controlled select"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Round up: Math.ceil",
+    "syntax": "Math.ceil(total / perPage)",
+    "example": "Math.ceil(28 / 8)   // 4\nMath.max(1, Math.ceil(0 / 8))   // 1 (never \"Page 1 of 0\")",
+    "note": "Returns the <b>next whole number up</b>. Wrap it in <code>Math.max(1, …)</code> so an empty result still has one page.",
+    "search": "mdn math ceil"
+   }
+  ]
  },
  "dc40": {
   "kind": "drill",
   "level": 4,
   "order": 40,
-  "minutes": 35,
-  "changeAt": 23,
+  "minutes": 40,
+  "changeAt": 26,
   "title": "@mentions in comments",
   "focus": "src/components/CommentBox.tsx",
   "summary": "An expense-approval thread. Typing \"@\" + letters in the comment box opens a filtered people dropdown that inserts \"@Name \".",
@@ -919,7 +1228,7 @@
    "restoring caret",
    "keyboard navigation"
   ],
-  "brief": "<p>An expense report in <b>Ledgerly</b>. The right column shows the discussion (<code>CommentList</code>, which already highlights <code>@First Last</code> mentions) and a <code>CommentBox</code> textarea whose <b>Comment</b> button works.</p><p>Read <code>api.ts</code>: <code>getUsers()</code> takes 0.4–0.9s and returns the six people you can mention. <code>components/Avatar.tsx</code> takes a name and color.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next. <b>Change (~23 min):</b> keyboard navigation.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–23 Core + Next · 23–31 change · 31–35 talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>CommentBox</code> loads users on mount. On every change I look at the text <i>before the caret</i> (<code>selectionStart</code>): if it ends with <code>@letters</code> at the start or after a space, I store <code>{ start, query }</code>, otherwise null. Suggestions are derived from that. Inserting replaces <code>text.slice(start, start + 1 + query.length)</code> with <code>@Name </code>. Because the value changes, React moves the caret to the end, so I put it back with <code>setSelectionRange</code> after the update.\"</p></div></details>",
+  "brief": "<p>An expense report in <b>Ledgerly</b>. The right column shows the discussion (<code>CommentList</code>, which already highlights <code>@First Last</code> mentions) and a <code>CommentBox</code> textarea whose <b>Comment</b> button works.</p><p><code>CommentBox</code> already loads the six people you can mention with <code>getUsers()</code> (0.4–0.9s) into <code>users</code>, but shows them nowhere yet. <code>components/Avatar.tsx</code> takes a name and color.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4–5. <b>Change (~26 min):</b> keep the caret after the name.</div><p style=\"font-size:13px\"><b>Timeline:</b> 0–3 read · 3–6 plan out loud · 6–26 Core · 26–31 change · 31–40 Next and talk.</p><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"On every change I look at the text <i>before the caret</i> (<code>selectionStart</code>): if it ends with <code>@letters</code> at the start or after a space, I store <code>{ start, query }</code>, otherwise null. Suggestions are derived from that and <code>users</code>. Inserting replaces <code>text.slice(start, start + 1 + query.length)</code> with <code>@Name </code>. Options use <code>onMouseDown</code> + <code>preventDefault</code> so the textarea keeps focus. Later: because the value changes, React moves the caret to the end, so I put it back with <code>setSelectionRange</code> after the update.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
@@ -931,28 +1240,28 @@
    "Typing \"@\" followed by letters (at the start or after a space) opens a dropdown under the textarea with up to 5 people whose first or last name starts with those letters (case-insensitive): avatar, name, role. \"@p\" shows Priya Shah, Paula Reyes and Peter Nguyen; \"@pa\" only Paula",
    "Clicking a person replaces the typed \"@pa\" with \"@Paula Reyes \" (with a trailing space) and closes the dropdown. Text before and after is kept",
    "Pressing <b>Enter</b> while the dropdown is open inserts the first person instead of a newline",
-   "After inserting, focus stays in the textarea and the caret is right after the inserted name (also when inserting in the middle of the text)",
+   "<b>ArrowDown/ArrowUp</b> move a highlighted row (wrapping); hovering highlights too; <b>Enter</b> inserts the highlighted person; <b>Escape</b> closes without changing the text. The highlight resets to the first row when the letters change",
    "The dropdown closes when the fragment no longer matches (e.g. you type a space), when nobody matches, and on blur. An email like \"a@b\" does not open it"
   ],
   "change": {
-   "title": "Keyboard navigation",
-   "html": "<p>\"Our power users never touch the mouse.\"</p><ul><li><b>ArrowDown/ArrowUp</b> move a highlighted row in the dropdown (wrapping around); hovering highlights too.</li><li><b>Enter</b> inserts the highlighted person, <b>Escape</b> closes the dropdown without changing the text. The highlight resets to the first row when the typed letters change.</li></ul>"
+   "title": "Keep the caret after the name",
+   "html": "<p>\"I inserted @Paula in the middle of my sentence and my cursor jumped to the end.\"</p><ul><li>After inserting, focus stays in the textarea and the caret sits <b>right after the inserted name</b> (after its trailing space), also when inserting in the middle of the text.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: React writes the new value during the render, which moves the caret; fix it after that with a ref.</p>"
   },
   "hints": [
    "Caret position: search <b>mdn HTMLTextAreaElement selectionStart</b>. In <code>onChange</code>, <code>e.target.selectionStart</code> is where the caret is right after that keystroke.",
    "Detect the fragment with a regex on the text before the caret: <code>/(^|\\s)@([a-zA-Z]*)$/.exec(value.slice(0, caret))</code>. Group 2 is the query; <code>start = caret - query.length - 1</code>.",
    "Insert: <code>text.slice(0, start) + \"@\" + user.name + \" \" + text.slice(start + 1 + query.length)</code>.",
-   "Restoring the caret: the DOM value updates after the render, so wait one frame: <code>requestAnimationFrame(() =&gt; { el.focus(); el.setSelectionRange(pos, pos); });</code> with a <code>useRef</code> on the textarea. Search: <b>mdn setSelectionRange</b>.",
    "Clicking an option blurs the textarea first. Use <code>onMouseDown={(e) =&gt; { e.preventDefault(); }}</code> on options so the click still lands.",
-   "Change: <code>activeIndex</code> state, reset to 0 in <code>handleChange</code>; in <code>onKeyDown</code> only act when the dropdown is open, and <code>preventDefault</code> for arrows, Enter and Escape."
+   "Change: the DOM value updates after the render, so wait one frame: <code>requestAnimationFrame(() =&gt; { el.focus(); el.setSelectionRange(pos, pos); });</code> with a <code>useRef</code> on the textarea. Search: <b>mdn setSelectionRange</b>.",
+   "Next: <code>activeIndex</code> state, reset to 0 in <code>handleChange</code>; in <code>onKeyDown</code> only act when the dropdown is open, and <code>preventDefault</code> for arrows, Enter and Escape."
   ],
   "rubric": [
    "Detection based on text before the caret, not the whole text",
    "Mention state is {start, query}; suggestions derived",
    "Correct splice keeps the surrounding text",
-   "Caret restored after the controlled value changes",
    "Enter inserts instead of newline only while open",
    "Blur/click race handled",
+   "Caret restored after the controlled value changes",
    "Keyboard index wraps and resets on query change"
   ],
   "spec": {
@@ -1000,6 +1309,48 @@
      "0 14 32 rgba(11,43,32,.16)"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "DOM",
+    "name": "Caret position: selectionStart",
+    "syntax": "e.target.selectionStart",
+    "example": "// textarea value 'Thanks @pa|' (caret at |)\ne.target.selectionStart   // 10",
+    "note": "Returns the <b>index of the caret</b> in the text (a number). Read it in <code>onChange</code> to look only at what was typed before the caret.",
+    "search": "mdn htmltextareaelement selectionStart"
+   },
+   {
+    "cat": "Regex",
+    "name": "RegExp.exec() with groups",
+    "syntax": "/(^|\\s)@([a-zA-Z]*)$/.exec(str)",
+    "example": "/(^|\\s)@([a-zA-Z]*)$/.exec('Thanks @pa')   // match[2] === 'pa'\n/(^|\\s)@([a-zA-Z]*)$/.exec('a@b')          // null",
+    "note": "Returns <b>null</b> or an array: <code>[0]</code> is the whole match, <code>[1]</code>, <code>[2]</code>… the parenthesised groups. <code>$</code> anchors to the end (the caret).",
+    "search": "mdn regexp exec"
+   },
+   {
+    "cat": "Strings",
+    "name": "Replace a range: slice + concat",
+    "syntax": "text.slice(0, start) + inserted + text.slice(end)",
+    "example": "const t = 'Hi @pa ok';\nt.slice(0, 3) + '@Paula Reyes ' + t.slice(6)   // 'Hi @Paula Reyes  ok'",
+    "note": "Strings are immutable: build a <b>new string</b> from the part before and the part after.",
+    "search": "mdn string slice"
+   },
+   {
+    "cat": "DOM",
+    "name": "Put the caret back: setSelectionRange",
+    "syntax": "el.focus(); el.setSelectionRange(pos, pos);",
+    "example": "requestAnimationFrame(() => { ref.current.focus(); ref.current.setSelectionRange(16, 16); });",
+    "note": "Same start and end = a caret, no selection. Run it <b>after</b> React has written the new value (next frame), or React moves the caret again.",
+    "search": "mdn setSelectionRange"
+   },
+   {
+    "cat": "React",
+    "name": "useRef to reach a DOM node",
+    "syntax": "const ref = useRef<HTMLTextAreaElement>(null); <textarea ref={ref} />",
+    "example": "const el = ref.current;   // the <textarea>, or null before mount",
+    "note": "<code>ref.current</code> is the <b>DOM element</b>. Changing a ref does not re-render. Check for null before using it.",
+    "search": "react useRef dom"
+   }
+  ]
  }
 }

@@ -445,6 +445,15 @@ const Workspace = (() => {
     } else {
       html += ex.brief;
     }
+    if (ex.primitives && ex.primitives.length && !speed) {
+      html += `<div class="prims"><h3>Today's primitives</h3>
+        <p class="prims-lede">The small building blocks this task needs. Warm-up (2 min): cover the examples and type each one from memory in the console or a scratch file.</p>
+        ${ex.primitives.map((p) => `<div class="prim">
+          <div class="prim-head"><code class="prim-name">${esc(p.name)}</code><span class="prim-cat">${esc(p.cat || '')}</span></div>
+          <pre class="prim-code">${highlight(p.syntax + (p.example ? '\n' + p.example : ''), 'js')}</pre>
+          <p class="prim-note">${p.note || ''}${p.search ? ` <a href="https://www.google.com/search?q=${encodeURIComponent(p.search)}" target="_blank" rel="noopener">Search: “${esc(p.search)}” ↗</a>` : ''}</p>
+        </div>`).join('')}</div>`;
+    }
     if (ex.lookups && !speed) {
       const plan = Progress.get('plan:' + key) || '';
       html += `<h3>Lookup plan · before you code</h3>

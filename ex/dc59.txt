@@ -1,3 +1,28 @@
+@@@ shared src/api.ts
+// Fake API. Treat it like a real backend you can't change.
+export type Availability = {
+  cabinId: string;
+  pricePerNight: number;
+  unavailable: string[]; // ISO dates (nights) already booked
+};
+
+// Resolves after a random delay between min and max milliseconds.
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = min + Math.random() * (max - min);
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// GET /cabins/:id/availability
+export async function getAvailability(cabinId: string): Promise<Availability> {
+  await randomDelay(400, 1000);
+  return {
+    cabinId,
+    pricePerNight: 185,
+    unavailable: ['2026-03-12', '2026-03-13', '2026-03-20', '2026-03-21', '2026-03-22', '2026-04-03', '2026-04-04', '2026-04-17', '2026-05-08', '2026-05-09'],
+  };
+}
 @@@ shared src/utils/date.ts
 // "Today" is fixed so the calendar is the same every time you open it.
 // Never use new Date() / Date.now() for "today" in this app: use TODAY.
@@ -65,31 +90,6 @@ export function getMonthGrid(month: Date): (Date | null)[] {
 // formatPrice(925) -> "$925"
 export function formatPrice(n: number): string {
   return '$' + n.toLocaleString('en-US');
-}
-@@@ shared src/api.ts
-// Fake API. Treat it like a real backend you can't change.
-export type Availability = {
-  cabinId: string;
-  pricePerNight: number;
-  unavailable: string[]; // ISO dates (nights) already booked
-};
-
-// Resolves after a random delay between min and max milliseconds.
-function randomDelay(min: number, max: number): Promise<void> {
-  const ms = min + Math.random() * (max - min);
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-// GET /cabins/:id/availability
-export async function getAvailability(cabinId: string): Promise<Availability> {
-  await randomDelay(400, 1000);
-  return {
-    cabinId,
-    pricePerNight: 185,
-    unavailable: ['2026-03-12', '2026-03-13', '2026-03-20', '2026-03-21', '2026-03-22', '2026-04-03', '2026-04-04', '2026-04-17', '2026-05-08', '2026-05-09'],
-  };
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
@@ -232,7 +232,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .reserve-btn:hover:not(:disabled) { background: var(--forest-dark); }
 .reserve-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 @@@ solution src/App.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getAvailability } from './api';
 import type { Availability } from './api';
 import { TODAY, toISO, fromISO, addDays, addMonths, startOfMonth, getMonthGrid, monthLabel, formatShort, nightsBetween } from './utils/date';
@@ -240,7 +240,10 @@ import { formatPrice } from './utils/money';
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const TODAY_ISO = toISO(TODAY);
+// CHANGE
+const MIN_NIGHTS = 2;
 
+// CORE: everything a day button needs, computed by App (NEXT: isPreviewEnd)
 type DayInfo = {
   disabled: boolean;
   unavailable: boolean;
@@ -250,16 +253,15 @@ type DayInfo = {
   isPreviewEnd: boolean;
 };
 
+// CORE: MonthView stays dumb: it asks getInfo(iso) and reports clicks (NEXT: hover)
 type MonthViewProps = {
   month: Date;
-  focusedIso: string;
   getInfo: (iso: string) => DayInfo;
   onDayClick: (iso: string) => void;
   onDayHover: (iso: string | null) => void;
-  onDayFocus: (iso: string) => void;
 };
 
-function MonthView({ month, focusedIso, getInfo, onDayClick, onDayHover, onDayFocus }: MonthViewProps) {
+function MonthView({ month, getInfo, onDayClick, onDayHover }: MonthViewProps) {
   return (
     <div className="month">
       <h3 className="month-title">{monthLabel(month)}</h3>
@@ -274,11 +276,9 @@ function MonthView({ month, focusedIso, getInfo, onDayClick, onDayHover, onDayFo
             return <span key={'blank-' + i} />;
           }
           const iso = toISO(d);
+          // CORE: class list from the info
           const info = getInfo(iso);
           let cls = 'day';
-          if (info.disabled) {
-            cls += ' is-disabled';
-          }
           if (info.unavailable) {
             cls += ' is-unavailable';
           }
@@ -294,24 +294,17 @@ function MonthView({ month, focusedIso, getInfo, onDayClick, onDayHover, onDayFo
           if (iso === TODAY_ISO) {
             cls += ' is-today';
           }
-          // Roving tabindex: only one day is in the Tab order.
-          let tabIndex = -1;
-          if (iso === focusedIso) {
-            tabIndex = 0;
-          }
           return (
             <button
               key={iso}
               type="button"
               className={cls}
               data-date={iso}
-              tabIndex={tabIndex}
-              aria-disabled={info.disabled}
+              disabled={info.disabled}
               aria-pressed={info.isStart || info.isEnd}
               aria-label={d.toDateString()}
               onClick={() => { onDayClick(iso); }}
               onMouseEnter={() => { onDayHover(iso); }}
-              onFocus={() => { onDayFocus(iso); }}
             >
               {d.getDate()}
             </button>
@@ -337,13 +330,12 @@ function CabinHero() {
 
 export default function App() {
   const [availability, setAvailability] = useState<Availability | null>(null);
+  // CORE: the left month, and the selection as ISO strings
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(TODAY));
   const [start, setStart] = useState<string | null>(null);
   const [end, setEnd] = useState<string | null>(null);
+  // NEXT: hovered day, for the preview
   const [hover, setHover] = useState<string | null>(null);
-  const [focusedIso, setFocusedIso] = useState(TODAY_ISO);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  const keyboardMoved = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -358,19 +350,7 @@ export default function App() {
     };
   }, []);
 
-  // Change: after an arrow key, move real DOM focus to the new day (it may be in a new month).
-  useEffect(() => {
-    if (!keyboardMoved.current || !calendarRef.current) {
-      return;
-    }
-    keyboardMoved.current = false;
-    const el = calendarRef.current.querySelector<HTMLElement>('[data-date="' + focusedIso + '"]');
-    if (el) {
-      el.focus();
-    }
-  }, [focusedIso, viewMonth]);
-
-  // derived
+  // CORE: derived
   const unavailable = new Set<string>();
   if (availability) {
     availability.unavailable.forEach((u) => {
@@ -378,7 +358,7 @@ export default function App() {
     });
   }
   const pickingEnd = start !== null && end === null;
-  // While picking checkout, nothing on or after the next booked night can be chosen.
+  // NEXT: while picking checkout, nothing on or after the next booked night can be chosen.
   let limit: string | null = null;
   if (pickingEnd && start) {
     const s = start;
@@ -390,26 +370,31 @@ export default function App() {
     }
   }
 
-  // Roving tabindex target: the focused day, or the first selectable visible day
-  // if the month buttons scrolled it out of view.
-  const viewStartIso = toISO(viewMonth);
-  const viewEndIso = toISO(addDays(addMonths(viewMonth, 2), -1));
-  let tabbableIso = focusedIso;
-  if (focusedIso < viewStartIso || focusedIso > viewEndIso) {
-    tabbableIso = viewStartIso;
-    if (tabbableIso < TODAY_ISO) {
-      tabbableIso = TODAY_ISO;
-    }
-  }
-
   function isDisabled(iso: string): boolean {
+    // CORE: past or booked
     if (iso < TODAY_ISO || unavailable.has(iso)) {
       return true;
     }
-    return limit !== null && iso >= limit;
+    if (pickingEnd && start && iso > start) {
+      // NEXT: never cross a booked night
+      if (limit !== null && iso >= limit) {
+        return true;
+      }
+      // CHANGE: a checkout must be at least MIN_NIGHTS after check-in
+      return nightsBetween(start, iso) < MIN_NIGHTS;
+    }
+    // CHANGE: as a check-in, the earliest possible checkout (MIN_NIGHTS later) must still be reachable:
+    // none of the next MIN_NIGHTS days can be booked (same rule as the limit above).
+    for (let i = 1; i <= MIN_NIGHTS; i++) {
+      if (unavailable.has(toISO(addDays(fromISO(iso), i)))) {
+        return true;
+      }
+    }
+    // CORE
+    return false;
   }
 
-  // The range end to draw: the real end, or the hovered day while picking.
+  // NEXT: the range end to draw: the real end, or the hovered day while picking.
   let rangeEnd = end;
   let previewing = false;
   if (pickingEnd && hover && start && hover > start && !isDisabled(hover)) {
@@ -417,6 +402,7 @@ export default function App() {
     previewing = true;
   }
 
+  // CORE
   function getInfo(iso: string): DayInfo {
     return {
       disabled: isDisabled(iso),
@@ -428,8 +414,8 @@ export default function App() {
     };
   }
 
+  // CORE: click rules, in order
   function handleDayClick(iso: string) {
-    setFocusedIso(iso);
     if (isDisabled(iso)) {
       return;
     }
@@ -443,37 +429,14 @@ export default function App() {
     }
   }
 
+  // NEXT
   function handleClear() {
     setStart(null);
     setEnd(null);
     setHover(null);
   }
 
-  // ---- change: arrow keys across days ----
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
-    const step = steps[e.key];
-    if (step === undefined) {
-      return;
-    }
-    e.preventDefault();
-    let next = toISO(addDays(fromISO(tabbableIso), step));
-    if (next < TODAY_ISO) {
-      next = TODAY_ISO;
-    }
-    // Keep the focused day inside the two visible months.
-    const nextDate = fromISO(next);
-    if (nextDate < viewMonth) {
-      setViewMonth(startOfMonth(nextDate));
-    } else if (nextDate >= addMonths(viewMonth, 2)) {
-      setViewMonth(addMonths(startOfMonth(nextDate), -1));
-    }
-    keyboardMoved.current = true;
-    setFocusedIso(next);
-    setHover(next); // keyboard users get the same range preview
-  }
-
-  // derived: summary
+  // NEXT: derived summary
   let summary = 'Add your check-in date';
   let total = null;
   if (start && end && availability) {
@@ -486,6 +449,8 @@ export default function App() {
     total = <span className="total">{formatPrice(nights * availability.pricePerNight)} total</span>;
   } else if (start) {
     summary = formatShort(start) + ' → Add checkout';
+    // CHANGE: say why the next night is greyed out
+    summary += ' · ' + MIN_NIGHTS + '-night minimum';
   }
 
   let clearBtn = null;
@@ -493,18 +458,22 @@ export default function App() {
     clearBtn = <button type="button" className="clear-btn" onClick={() => { handleClear(); }}>Clear dates</button>;
   }
 
+  // NEXT: can't page before the current month
   const canGoBack = viewMonth > startOfMonth(TODAY);
 
+  // CORE
   let calendar;
   if (!availability) {
     calendar = <p className="loading">Checking availability…</p>;
   } else {
     calendar = (
-      <div className="calendar" ref={calendarRef} onKeyDown={handleKeyDown} onMouseLeave={() => { setHover(null); }}>
+      <div className="calendar" onMouseLeave={() => { setHover(null); }}>
+        {/* NEXT: month paging */}
         <button type="button" className="nav-btn nav-prev" aria-label="Previous month" disabled={!canGoBack} onClick={() => { setViewMonth((m) => { return addMonths(m, -1); }); }}>‹</button>
         <button type="button" className="nav-btn nav-next" aria-label="Next month" onClick={() => { setViewMonth((m) => { return addMonths(m, 1); }); }}>›</button>
-        <MonthView month={viewMonth} focusedIso={tabbableIso} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} onDayFocus={setFocusedIso} />
-        <MonthView month={addMonths(viewMonth, 1)} focusedIso={tabbableIso} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} onDayFocus={setFocusedIso} />
+        {/* CORE: the same component twice */}
+        <MonthView month={viewMonth} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} />
+        <MonthView month={addMonths(viewMonth, 1)} getInfo={getInfo} onDayClick={handleDayClick} onDayHover={setHover} />
       </div>
     );
   }
@@ -523,10 +492,12 @@ export default function App() {
           {price}
         </div>
         {calendar}
+        {/* STRETCH: legend */}
         <div className="legend">
           <span className="legend-item"><span className="swatch swatch-booked" />Booked</span>
           <span className="legend-item"><span className="swatch swatch-range" />Your stay</span>
         </div>
+        {/* NEXT: summary bar */}
         <div className="summary-bar">
           <div className="summary-text">
             <span className="summary" aria-live="polite">{summary}</span>
@@ -586,34 +557,33 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 .reserve-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---- Added: two-month range picker ---- */
+/* CORE: two months, today, booked, range */
 .calendar { position: relative; display: flex; gap: 32px; }
+.day.is-today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.day.is-unavailable { text-decoration: line-through; }
+.day.in-range { background: var(--forest-soft); border-radius: 0; }
+.day.is-start, .day.is-end { background: var(--forest); color: #fff; font-weight: 600; }
+
+/* NEXT: month paging + summary bar */
 .nav-btn { position: absolute; top: -6px; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%; background: #fff; color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
-.nav-btn:hover:not(:disabled) { background: var(--forest-soft); }
 .nav-btn:disabled { opacity: 0.35; cursor: default; }
 .nav-prev { left: 0; }
 .nav-next { right: 0; }
+.summary-text { display: flex; flex-direction: column; margin-right: auto; }
+.total { font-size: 13px; color: var(--muted); }
+.clear-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 
+/* STRETCH: polish + legend */
+.nav-btn:hover:not(:disabled) { background: var(--forest-soft); }
 .days { row-gap: 2px; }
-.day { position: relative; }
 .day:focus-visible { outline: 2px solid var(--forest); outline-offset: -2px; }
-.day.is-today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-.day.is-disabled { color: #C3C1B8; cursor: default; }
-.day.is-disabled:hover { background: none; }
-.day.is-unavailable { text-decoration: line-through; }
-.day.in-range { background: var(--forest-soft); border-radius: 0; }
 .day.in-range:hover { background: #D3E3D8; }
-.day.is-start, .day.is-end { background: var(--forest); color: #fff; font-weight: 600; }
 .day.is-start:hover, .day.is-end:hover { background: var(--forest-dark); }
-
 .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; }
 .swatch-booked { background: repeating-linear-gradient(135deg, #D9D6CC 0 2px, #fff 2px 4px); border: 1px solid var(--border); }
 .swatch-range { background: var(--forest-soft); border: 1px solid var(--moss); }
-
-.summary-text { display: flex; flex-direction: column; margin-right: auto; }
-.total { font-size: 13px; color: var(--muted); }
-.clear-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 
 @media (max-width: 640px) {
   .calendar { flex-direction: column; gap: 20px; }

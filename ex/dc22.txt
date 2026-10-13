@@ -74,9 +74,15 @@ function Editor({ title, body, onTitleChange, onBodyChange }: EditorProps) {
   );
 }
 
+type TagFieldProps = {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+};
+
 // TODO: turn this into a tag input. Enter or comma adds a chip,
 // Backspace on an empty input removes the last one.
-function TagField() {
+// The post (App) already owns `tags` and passes them down.
+function TagField({ tags, onChange }: TagFieldProps) {
   const [draft, setDraft] = useState('');
   return (
     <div className="field">
@@ -95,7 +101,7 @@ function TagField() {
   );
 }
 
-function PostSettings() {
+function PostSettings({ tags, onTagsChange }: { tags: string[]; onTagsChange: (tags: string[]) => void }) {
   return (
     <aside className="settings">
       <h2>Post settings</h2>
@@ -103,7 +109,7 @@ function PostSettings() {
         <span className="field-label">Publication</span>
         <div><Chip label="Engineering Notes" /></div>
       </div>
-      <TagField />
+      <TagField tags={tags} onChange={onTagsChange} />
       <div className="field">
         <span className="field-label">Visibility</span>
         <p className="field-value">Public · appears on your profile</p>
@@ -114,6 +120,7 @@ function PostSettings() {
 
 export default function App() {
   const [title, setTitle] = useState('What I learned shipping a design system');
+  const [tags, setTags] = useState<string[]>([]);
   const [body, setBody] = useState('Six months ago our product had four different button styles and no shared tokens. This is the story of how we fixed it without stopping feature work.');
 
   return (
@@ -121,7 +128,7 @@ export default function App() {
       <TopBar />
       <div className="workspace">
         <Editor title={title} body={body} onTitleChange={setTitle} onBodyChange={setBody} />
-        <PostSettings />
+        <PostSettings tags={tags} onTagsChange={setTags} />
       </div>
     </div>
   );
@@ -164,6 +171,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
 .chip-x { width: 18px; height: 18px; margin-right: -4px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .chip-x:hover { background: rgba(181, 83, 44, 0.15); }
+
+/* Error variant of the help line */
+.field-help.is-error { color: #B42318; font-weight: 500; }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import Chip from './components/Chip';
@@ -213,18 +223,22 @@ type TagFieldProps = {
 // The tags belong to the post (App). Only the half-typed text is local.
 function TagField({ tags, onChange }: TagFieldProps) {
   const [draft, setDraft] = useState('');
+  // NEXT: the error message (duplicates, limit)
   const [message, setMessage] = useState('');
 
+  // CORE: clean the draft, ignore empty, append, clear the input
   function addTag() {
     const tag = cleanTag(draft);
     if (tag === '') {
       setDraft('');
       return;
     }
+    // STRETCH: limit of 5
     if (tags.length >= MAX_TAGS) {
       setMessage('You can add up to ' + MAX_TAGS + ' tags.');
       return;
     }
+    // NEXT: case-insensitive duplicates
     const exists = tags.some((t) => {
       return t.toLowerCase() === tag.toLowerCase();
     });
@@ -233,11 +247,13 @@ function TagField({ tags, onChange }: TagFieldProps) {
       setDraft('');
       return;
     }
+    // CORE: add
     onChange([...tags, tag]);
     setDraft('');
     setMessage('');
   }
 
+  // CORE: × removes one chip
   function removeTag(tag: string) {
     onChange(tags.filter((t) => {
       return t !== tag;
@@ -245,29 +261,33 @@ function TagField({ tags, onChange }: TagFieldProps) {
     setMessage('');
   }
 
+  // CORE: Enter or comma adds
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault(); // stop the comma from being typed
       addTag();
       return;
     }
+    // NEXT: Backspace in an empty input removes the last chip
     if (e.key === 'Backspace' && draft === '' && tags.length > 0) {
       onChange(tags.slice(0, -1));
       setMessage('');
     }
   }
 
-  // decisions
+  // STRETCH: counter help line (NEXT: the message replaces it)
   let help = <p className="field-help">Press Enter or comma to add · {tags.length} / {MAX_TAGS}</p>;
   if (message !== '') {
     help = <p className="field-help is-error" role="alert">{message}</p>;
   }
 
+  // CORE: hide the placeholder once there are chips
   let placeholder = 'Add a tag…';
   if (tags.length > 0) {
     placeholder = '';
   }
 
+  // CORE: chips before the input
   return (
     <div className="field">
       <label className="field-label" htmlFor="tags">Tags</label>
@@ -309,8 +329,8 @@ function PostSettings({ tags, onTagsChange }: { tags: string[]; onTagsChange: (t
 
 export default function App() {
   const [title, setTitle] = useState('What I learned shipping a design system');
-  const [body, setBody] = useState('Six months ago our product had four different button styles and no shared tokens. This is the story of how we fixed it without stopping feature work.');
   const [tags, setTags] = useState<string[]>([]);
+  const [body, setBody] = useState('Six months ago our product had four different button styles and no shared tokens. This is the story of how we fixed it without stopping feature work.');
 
   return (
     <div className="app">
@@ -361,5 +381,5 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .chip-x { width: 18px; height: 18px; margin-right: -4px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .chip-x:hover { background: rgba(181, 83, 44, 0.15); }
 
-/* ---- Added: tag input ---- */
+/* Error variant of the help line */
 .field-help.is-error { color: #B42318; font-weight: 500; }

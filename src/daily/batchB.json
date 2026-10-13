@@ -3,7 +3,7 @@
   "kind": "drill",
   "level": 1,
   "order": 11,
-  "minutes": 12,
+  "minutes": 14,
   "changeAt": 9,
   "title": "Notification toggles",
   "focus": "src/App.tsx",
@@ -101,7 +101,41 @@
      "link button · 13/600 · --primary"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "map() to update one item",
+    "syntax": "list.map((x) => { if (x.id !== id) { return x; } return { ...x, done: true }; })",
+    "example": "[{id:'a',on:false},{id:'b',on:false}].map((x) => { if (x.id !== 'b') { return x; } return { ...x, on: true }; })\n// [{id:'a',on:false},{id:'b',on:true}]",
+    "note": "Returns a <b>new array</b> of the same length. Return the old item untouched for the others and a <b>new object</b> for the one you change. Never assign <code>x.on = true</code>: that mutates state.",
+    "search": "react updating arrays in state"
+   },
+   {
+    "cat": "Objects",
+    "name": "Object spread",
+    "syntax": "{ ...obj, key: newValue }",
+    "example": "const s = { id: 'dm', enabled: true };\n({ ...s, enabled: false })   // { id: 'dm', enabled: false }  (s is unchanged)",
+    "note": "Returns a <b>new object</b>: a shallow copy with the listed keys overridden. Keys written after the spread win.",
+    "search": "mdn spread syntax object"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Count with filter().length",
+    "syntax": "list.filter((x) => { return x.enabled; }).length",
+    "example": "[{on:true},{on:false},{on:true}].filter((x) => { return x.on; }).length   // 2",
+    "note": "<code>filter</code> returns a new array of the items where the callback returned true; <code>.length</code> counts them. Derive counts like this instead of keeping a counter in state.",
+    "search": "mdn array filter"
+   },
+   {
+    "cat": "React",
+    "name": "useState updater form",
+    "syntax": "setItems((prev) => { return newValueFrom(prev); })",
+    "example": "setCount((prev) => { return prev + 1; });   // always uses the latest value",
+    "note": "Pass a <b>function</b> when the new state depends on the old one. React calls it with the current value and stores what you return.",
+    "search": "react usestate updater function"
+   }
+  ]
  },
  "dc12": {
   "kind": "drill",
@@ -117,16 +151,18 @@
    "derived prices",
    "reusing a formatter"
   ],
-  "brief": "<p>Framecut’s pricing page renders three <code>PlanCard</code>s from <code>data/plans.ts</code>, plus a <code>BillingToggle</code> that looks right but does nothing. Prices are stored in <b>cents</b> as a monthly price.</p><p>Read <code>utils/formatPrice.ts</code> first: it already turns cents into \"$12\", \"$24.17\" or \"Free\". Reuse it for every number you show. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Billing and the selected plan are needed by every card and by the toggle, so both live in <code>App</code> and go down as props. Whether a card’s feature list is expanded only matters to that card, so that is local state in <code>PlanCard</code>. The yearly price is derived: <code>monthlyCents * 10</code>, never stored.\"</p></div></details>",
+  "brief": "<p>Framecut’s pricing page renders three <code>PlanCard</code>s from <code>data/plans.ts</code>, plus a <code>BillingToggle</code> that looks right but does nothing. Prices are stored in <b>cents</b> as a monthly price.</p><p>Read <code>utils/formatPrice.ts</code> first: it already turns cents into \"$12\", \"$24.17\" or \"Free\". Reuse it for every number you show. No API in this one.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. Stretch: 5.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Billing and the selected plan are needed by every card and by the toggle, so both live in <code>App</code> and go down as props. Whether a card’s feature list is expanded only matters to that card, so that is local state in <code>PlanCard</code>. The yearly price is derived: <code>monthlyCents * 10</code>, never stored.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
    "Clicking <b>Monthly</b> / <b>Yearly</b> switches billing. The active option gets the white pill (<code>is-active</code>). Monthly is the default",
-   "Monthly: paid plans show \"$12\" + \"/month\". Yearly: they show the yearly total, <b>monthly × 10</b> (\"$120\" + \"/year\"), and a muted line under it: <b>\"$10/mo, billed yearly\"</b> (Studio: \"$290\", \"$24.17/mo, billed yearly\"). Hobby always shows \"Free\" with no period. All via <code>formatPrice</code>",
+   "Monthly: paid plans show \"$12\" + \"/month\". Yearly: they show the yearly total, <b>monthly × 10</b>: \"$120\" + \"/year\" (Studio \"$290\"). Hobby always shows \"Free\" with no period. All via <code>formatPrice</code>",
+   "Yearly also shows a muted line under the price: <b>\"$10/mo, billed yearly\"</b> (Studio: <b>\"$24.17/mo, billed yearly\"</b>). Not shown for Hobby or on Monthly",
    "Clicking <b>Choose Creator</b> selects that plan: the card gets a purple border + glow (<code>is-selected</code>) and the button reads <b>Selected ✓</b>. Only one plan is selected at a time",
    "Each card’s <b>Show all N features</b> expands just that card’s list and becomes <b>Show less</b>. Other cards stay as they are"
   ],
@@ -206,13 +242,39 @@
      "gradient --primary → --accent"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "String literal union type",
+    "syntax": "type Billing = 'monthly' | 'yearly';",
+    "example": "type Billing = 'monthly' | 'yearly';\nconst [billing, setBilling] = useState<Billing>('monthly');\nsetBilling('weekly');   // type error: not one of the two",
+    "note": "A type that only allows the listed strings. Use it instead of a boolean like <code>isYearly</code> when the options have names.",
+    "search": "typescript literal types union"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "Typing a callback prop",
+    "syntax": "type Props = { value: Billing; onChange: (next: Billing) => void };",
+    "example": "function BillingToggle({ value, onChange }: Props) { ... onChange('yearly'); ... }",
+    "note": "<code>(next: Billing) =&gt; void</code> means \"a function that takes a Billing and returns nothing\". The parent owns the state; the child only calls <code>onChange</code>.",
+    "search": "react typescript function props"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Money in cents",
+    "syntax": "const yearlyCents = monthlyCents * 10;",
+    "example": "1200 * 10        // 12000 → formatPrice(12000) === '$120'\n0.1 + 0.2        // 0.30000000000000004 (why we avoid dollars as floats)",
+    "note": "Keep money as <b>integer cents</b> and only format at the edge. Integer maths is exact; decimal dollars are not.",
+    "search": "javascript floating point money cents"
+   }
+  ]
  },
  "dc13": {
   "kind": "drill",
   "level": 2,
   "order": 13,
-  "minutes": 18,
+  "minutes": 20,
   "title": "Courses: loading, error, empty",
   "focus": "src/App.tsx",
   "summary": "A learning app’s \"My learning\" page. Load courses per tab with skeleton cards, an error panel with Retry, and an empty state.",
@@ -222,17 +284,19 @@
    "retry by re-running an effect",
    "stale-response guard"
   ],
-  "brief": "<p>Learnloop’s \"My learning\" page has a header, working tabs (<code>In progress</code> / <code>Completed</code> / <code>Wishlist</code>) and a dev-only <b>Simulate failure</b> checkbox. <code>CourseList</code> receives <code>status</code> and <code>shouldFail</code> but renders nothing yet.</p><p>Read <code>api.ts</code>: <code>getCourses(status, shouldFail)</code> takes 0.4–1.2 s, <b>rejects</b> when <code>shouldFail</code> is true, and returns an empty array for the wishlist. <code>components/CourseCard.tsx</code> already renders one course; reuse it.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>CourseList</code> owns <code>courses</code>, <code>loading</code> and <code>error</code>. One effect depends on <code>status</code> and <code>shouldFail</code>: it sets loading, calls the API, and handles <code>.then</code> and <code>.catch</code>, with a <code>cancelled</code> flag so a slow old tab can’t overwrite a new one. For Retry I add an <code>attempt</code> counter to the dependencies and bump it. Rendering is four early returns: loading, error, empty, list.\"</p></div></details>",
+  "brief": "<p>Learnloop’s \"My learning\" page has a header, working tabs (<code>In progress</code> / <code>Completed</code> / <code>Wishlist</code>) and a dev-only <b>Simulate failure</b> checkbox. <code>CourseList</code> receives <code>status</code> and <code>shouldFail</code> but renders nothing yet.</p><p>Read <code>api.ts</code>: <code>getCourses(status, shouldFail)</code> takes 0.4–1.2 s, <b>rejects</b> when <code>shouldFail</code> is true, and returns an empty array for the wishlist. <code>components/CourseCard.tsx</code> already renders one course and <code>components/SkeletonCard.tsx</code> its grey placeholder; reuse both. The CSS for skeletons and the <code>.state-panel</code> / <code>.primary-btn</code> classes is already in <code>styles.css</code>, so this one is all React.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. Stretch: 5.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>CourseList</code> owns <code>courses</code>, <code>loading</code> and <code>error</code>. One effect depends on <code>status</code> and <code>shouldFail</code>: it sets loading, calls the API, and handles <code>.then</code> and <code>.catch</code>, with a <code>cancelled</code> flag so a slow old tab can’t overwrite a new one. For Retry I add an <code>attempt</code> counter to the dependencies and bump it. Rendering is four early returns: loading, error, empty, list.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "On first load and on every tab change, show <b>3 skeleton cards</b> (<code>.skeleton-card</code>, grey shimmering blocks the size of a course card) until the API answers, then a <code>CourseCard</code> per course",
-   "With <b>Simulate failure</b> checked, the request fails and the list shows an error panel: <b>\"Couldn’t load your courses.\"</b>, a short help line, and a <b>Retry</b> button. Retry shows the skeletons again and re-requests (uncheck the box first and it succeeds)",
-   "The <b>Wishlist</b> tab (empty array) shows an empty state: <b>\"No courses here yet\"</b>, a help line and a <b>Browse catalog</b> button. Never a blank area",
+   "On first load and on every tab change, show <b>3 skeleton cards</b> (reuse <code>components/SkeletonCard</code>) until the API answers, then a <code>CourseCard</code> per course",
+   "With <b>Simulate failure</b> checked, the request fails and the list shows an error panel (<code>.state-panel.is-error</code>): <b>\"Couldn’t load your courses.\"</b>, a short help line, and a <b>Retry</b> button",
+   "<b>Retry</b> shows the skeletons again and re-requests (still failing while the box is checked; uncheck it and the courses load)",
+   "The <b>Wishlist</b> tab (empty array) shows an empty state (<code>.state-panel</code>): <b>\"No courses here yet\"</b>, a help line and a <b>Browse catalog</b> button. Never a blank area",
    "Clicking tabs quickly never shows the wrong tab’s courses (ignore responses from an effect that has been cleaned up)"
   ],
   "hints": [
@@ -240,7 +304,7 @@
    "Errors from a Promise go to <code>.catch</code>. Search: \"mdn Promise catch\".",
    "Retry without duplicating the fetch: <code>const [attempt, setAttempt] = useState(0);</code> put <code>attempt</code> in the effect’s dependency array, and Retry does <code>setAttempt((prev) =&gt; { return prev + 1; });</code>",
    "Start of the effect: <code>let cancelled = false; setLoading(true); setError(null);</code> and in both <code>.then</code> and <code>.catch</code>: <code>if (cancelled) { return; }</code>",
-   "Render with early returns above the main JSX: <code>if (loading) { return &lt;div className=\"course-grid\"&gt;&lt;SkeletonCard /&gt;…&lt;/div&gt;; }</code>, then <code>if (error)</code>, then <code>if (courses.length === 0)</code>."
+   "Render with early returns above the main JSX: <code>if (loading) { return &lt;div className=\"course-grid\"&gt;&lt;SkeletonCard /&gt;&lt;SkeletonCard /&gt;&lt;SkeletonCard /&gt;&lt;/div&gt;; }</code>, then <code>if (error)</code>, then <code>if (courses.length === 0)</code>."
   ],
   "rubric": [
    "Effect depends on status + shouldFail (+ retry counter)",
@@ -308,13 +372,47 @@
      "h 38 · radius 10 · --primary · 800"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Promises & async",
+    "name": ".then() / .catch()",
+    "syntax": "promise.then((data) => { ... }).catch((err) => { ... });",
+    "example": "getCourses('wishlist', true)\n  .then((data) => { setCourses(data); })\n  .catch((err) => { setError('Couldn’t load your courses.'); });   // runs: it rejected",
+    "note": "<code>.then</code> runs when the promise <b>resolves</b>, <code>.catch</code> when it <b>rejects</b> (a thrown error). Turn loading off in <b>both</b>, or a failure spins forever.",
+    "search": "mdn promise catch"
+   },
+   {
+    "cat": "React",
+    "name": "useEffect dependency array",
+    "syntax": "useEffect(() => { ... }, [status, shouldFail]);",
+    "example": "useEffect(() => { load(status); }, [status]);   // runs on mount, then again whenever status changes",
+    "note": "The effect re-runs after any render where a listed value changed. List every prop/state the effect reads. An empty <code>[]</code> means \"once, on mount\".",
+    "search": "react useEffect dependencies"
+   },
+   {
+    "cat": "React",
+    "name": "Early return for UI states",
+    "syntax": "if (loading) { return <Spinner />; }",
+    "example": "if (loading) { return <Skeletons />; }\nif (error) { return <ErrorPanel />; }\nreturn <List />;   // only reached when loaded",
+    "note": "A component can <code>return</code> different JSX before the main return. Order matters: check loading, then error, then empty, then the list. Hooks must all be called <b>above</b> the first early return.",
+    "search": "react conditional rendering early return"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "State that can be null",
+    "syntax": "useState<string | null>(null)",
+    "example": "const [error, setError] = useState<string | null>(null);\nif (error) { /* here TS knows error is a string */ }",
+    "note": "The union <code>string | null</code> says \"a message, or nothing yet\". An <code>if (error)</code> check narrows it to <code>string</code>.",
+    "search": "typescript union null narrowing"
+   }
+  ]
  },
  "dc14": {
   "kind": "drill",
   "level": 2,
   "order": 14,
-  "minutes": 18,
+  "minutes": 20,
   "title": "Shop: category chips",
   "focus": "src/App.tsx",
   "summary": "A plant shop grid. Load categories from the API, show filter chips with product counts and an \"All\" chip, and filter the grid.",
@@ -324,7 +422,7 @@
    "derived counts",
    "filter chips"
   ],
-  "brief": "<p>Fernwood’s product grid already loads and renders: <code>ProductGrid</code> fetches with <code>getProducts()</code> and maps to <code>ProductCard</code>. The Figma adds a row of category chips between the heading and the grid.</p><p>Read <code>api.ts</code>: <code>getCategories()</code> returns names but <b>no counts</b> (0.3–0.9 s; products take 0.5–1.2 s). Think about where the products have to live once the chips need to count them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The chips need the products to count them and the grid needs them to render, so the products move up into a parent (<code>Catalog</code>) along with the categories and <code>activeCategory</code>. I load both with <code>Promise.all</code> so there’s one loading state. Counts and the visible list are derived with <code>filter</code>. <code>ProductGrid</code> becomes a plain component that just receives the visible products.\"</p></div></details>",
+  "brief": "<p>Fernwood’s product grid already loads and renders: <code>ProductGrid</code> fetches with <code>getProducts()</code> and maps to <code>ProductCard</code>. The Figma adds a row of category chips between the heading and the grid.</p><p>Read <code>api.ts</code>: <code>getCategories()</code> returns names but <b>no counts</b> (0.3–0.9 s; products take 0.5–1.2 s). Think about where the products have to live once the chips need to count them.</p><p><code>components/Chip.tsx</code> is the pill button from the design system (label, count bubble, <code>active</code>, <code>disabled</code>), and its CSS is already in <code>styles.css</code>. You only lay out the row.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The chips need the products to count them and the grid needs them to render, so the products move up into a parent (<code>Catalog</code>) along with the categories and <code>activeCategory</code>. I load both with <code>Promise.all</code> so there’s one loading state. Counts and the visible list are derived with <code>filter</code>. <code>ProductGrid</code> becomes a plain component that just receives the visible products.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
@@ -332,17 +430,17 @@
    "Next"
   ],
   "requirements": [
-   "Above the grid, a chip per category from <code>getCategories()</code>, preceded by an <b>All</b> chip. Each chip shows its product count in a small pill: \"All 12\", \"Indoor plants 5\", \"Pots 4\", \"Plant care 3\", \"Gift cards 0\"",
+   "Above the grid, a <code>Chip</code> (reuse <code>components/Chip.tsx</code>) per category from <code>getCategories()</code>, preceded by an <b>All</b> chip. Each chip shows its product count: \"All 12\", \"Indoor plants 5\", \"Pots 4\", \"Plant care 3\", \"Gift cards 0\"",
    "Clicking a chip filters the grid to that category; <b>All</b> shows everything. The active chip is filled dark green with white text (<code>is-active</code>). All is active on load",
    "Chips and grid appear together after both requests finish (\"Loading the greenhouse…\" until then)",
-   "A chip with a count of 0 (Gift cards) is disabled and faded"
+   "A chip with a count of 0 (Gift cards) is disabled and faded (pass <code>disabled</code> to <code>Chip</code>)"
   ],
   "hints": [
    "This is \"lifting state up\": move <code>products</code> out of <code>ProductGrid</code> into a parent that renders both the chips and the grid.",
    "Two requests, one loading state. Search: \"mdn Promise.all\". <code>Promise.all([getProducts(), getCategories()]).then(([products, categories]) =&gt; { ... })</code>",
    "Count for a chip: <code>products.filter((p) =&gt; { return p.categoryId === c.id; }).length</code>",
    "Use a constant for All: <code>const ALL = \"all\";</code> and <code>useState(ALL)</code>. Visible list: <code>let visible = products; if (active !== ALL) { visible = products.filter(...); }</code>",
-   "A small <code>Chip</code> component with <code>label</code>, <code>count</code>, <code>active</code>, <code>onClick</code> keeps the map tidy."
+   "<code>components/Chip.tsx</code> already takes <code>label</code>, <code>count</code>, <code>active</code>, <code>disabled</code> and <code>onClick</code>: render one for All and one per category inside a <code>&lt;div className=\"chips\"&gt;</code>."
   ],
   "rubric": [
    "Recognised that products must be lifted",
@@ -402,14 +500,48 @@
      "opacity .45"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Promises & async",
+    "name": "Promise.all",
+    "syntax": "Promise.all([a(), b()]).then(([resA, resB]) => { ... });",
+    "example": "Promise.all([getProducts(), getCategories()]).then(([products, categories]) => {\n  // both have arrived: products.length === 12, categories.length === 4\n});",
+    "note": "Starts both requests at once and resolves with an <b>array of results in the same order</b> once all have finished. If any one rejects, the whole thing rejects.",
+    "search": "mdn promise all"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Array destructuring",
+    "syntax": "const [first, second] = pair;",
+    "example": "const [products, categories] = [['p1', 'p2'], ['plants']];\nproducts     // ['p1', 'p2']",
+    "note": "Unpacks an array by position into named variables. Works in parameters too: <code>.then(([a, b]) =&gt; ...)</code>.",
+    "search": "mdn destructuring assignment array"
+   },
+   {
+    "cat": "Arrays",
+    "name": "filter() by a field",
+    "syntax": "products.filter((p) => { return p.categoryId === id; })",
+    "example": "[{c:'pots'},{c:'plants'},{c:'pots'}].filter((p) => { return p.c === 'pots'; })   // 2 items",
+    "note": "Returns a <b>new</b> array with the matching items (possibly empty). Use it for both the visible list and, with <code>.length</code>, the counts.",
+    "search": "mdn array filter"
+   },
+   {
+    "cat": "React",
+    "name": "Lifting state up",
+    "syntax": "// move the state to the closest common parent, pass it down as props",
+    "example": "function Catalog() { const [products, setProducts] = useState<Product[]>([]); ...\n  return <><Chips products={products} /><ProductGrid products={visible} /></>; }",
+    "note": "When two siblings need the same data, the state moves up to their parent and both receive it as props. The child that used to fetch becomes a plain component.",
+    "search": "react sharing state between components"
+   }
+  ]
  },
  "dc15": {
   "kind": "drill",
   "level": 2,
   "order": 15,
-  "minutes": 18,
-  "changeAt": 12,
+  "minutes": 20,
+  "changeAt": 13,
   "title": "Transactions: sortable table",
   "focus": "src/App.tsx",
   "summary": "A business-banking transactions table. Make the headers sort by date, text and amount, asc/desc with arrows, without mutating the data.",
@@ -419,16 +551,16 @@
    "sort state",
    "aria-sort"
   ],
-  "brief": "<p>Ledgerly’s transactions page loads and renders a table via <code>getTransactions()</code> (0.3–1.0 s). The rows come back in the order the bank posted them. The headers are plain text.</p><p>Read <code>utils/format.ts</code> (<code>formatMoney</code>, <code>formatDate</code>) and the <code>Transaction</code> type: <code>date</code> is an ISO string, <code>amountCents</code> is negative for money out.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Sort state is <code>sortKey</code> (or null) and <code>sortDir</code>, in <code>TransactionsTable</code> next to the data. The sorted list is derived each render from a <b>copy</b> (<code>[...list].sort</code>), so the API order is always still there. One comparator per type: subtraction for amounts, timestamps for dates, <code>localeCompare</code> for text. A <code>SortHeader</code> component renders the button and arrow.\"</p></div></details>",
+  "brief": "<p>Ledgerly’s transactions page loads and renders a table via <code>getTransactions()</code> (0.3–1.0 s). The rows come back in the order the bank posted them. The headers are plain text.</p><p>Read <code>utils/format.ts</code> (<code>formatMoney</code>, <code>formatDate</code>) and the <code>Transaction</code> type: <code>date</code> is an ISO string, <code>amountCents</code> is negative for money out.</p><p><code>components/SortHeader.tsx</code> was built for the Invoices table: give it a <code>direction</code> (<code>\"asc\"</code>, <code>\"desc\"</code> or <code>null</code>) and an <code>onClick</code> and it renders the header button with ▲/▼. Its base CSS is in <code>styles.css</code>. Your job is the sort state and the sorting.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Sort state is <code>sortKey</code> (or null) and <code>sortDir</code>, in <code>TransactionsTable</code> next to the data. The sorted list is derived each render from a <b>copy</b> (<code>[...list].sort</code>), so the API order is always still there. One comparator per type: subtraction for amounts, timestamps for dates, <code>localeCompare</code> for text. A <code>SortHeader</code> component renders the button and arrow.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next"
   ],
   "requirements": [
-   "Every header (Date, Description, Category, Amount) is a button. First click sorts that column ascending (▲), the next click descending (▼). Clicking another column starts it at ascending",
+   "Every header (Date, Description, Category, Amount) is a <code>SortHeader</code> (reuse <code>components/SortHeader.tsx</code>). First click sorts that column ascending (▲), the next click descending (▼). Clicking another column starts it at ascending",
    "Correct per type: Amount numerically (−$14,500.00 is lowest), Date chronologically, Description/Category alphabetically (case-insensitive, <code>localeCompare</code>)",
-   "Inactive headers show a muted <b>↕</b>; the active one is green with its arrow. The <code>&lt;th&gt;</code> has <code>aria-sort</code> (\"ascending\" / \"descending\" / \"none\")"
+   "Extend <code>SortHeader</code>: inactive headers show a muted <b>↕</b>; the active one is green (<code>is-active</code>) with its arrow. The <code>&lt;th&gt;</code> has <code>aria-sort</code> (\"ascending\" / \"descending\" / \"none\")"
   ],
   "change": {
    "title": "Third click clears",
@@ -439,7 +571,7 @@
    "Copy first: <code>const sorted = [...list].sort((a, b) =&gt; { return a.amountCents - b.amountCents; });</code>",
    "Dates: <code>new Date(a.date).getTime() - new Date(b.date).getTime()</code>. Text: <code>a.description.localeCompare(b.description)</code>.",
    "Descending: sort ascending and then <code>sorted.reverse()</code>. That’s safe because <code>sorted</code> is already your copy.",
-   "Click logic: <code>if (column !== sortKey) { setSortKey(column); setSortDir(\"asc\"); return; } if (sortDir === \"asc\") { setSortDir(\"desc\"); return; } setSortKey(null);</code>"
+   "Click logic: <code>if (column !== sortKey) { setSortKey(column); setSortDir(\"asc\"); return; } setSortDir(\"desc\");</code>. For each header: <code>direction={dirFor(\"date\")}</code> where <code>dirFor</code> returns <code>sortDir</code> for the active column and <code>null</code> otherwise. (The change adds one more branch.)"
   ],
   "rubric": [
    "Never mutated the loaded array",
@@ -498,13 +630,47 @@
      "right · mono 13"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "sort() with a comparator, on a copy",
+    "syntax": "const sorted = [...list].sort((a, b) => { return a.n - b.n; });",
+    "example": "const nums = [3, -14500, 12];\n[...nums].sort((a, b) => { return a - b; })   // [-14500, 3, 12]\nnums                                          // still [3, -14500, 12]",
+    "note": "<code>sort</code> sorts <b>in place</b> and returns the same array, so copy first (<code>[...list]</code> or <code>list.toSorted(...)</code>). Comparator: negative = a first, positive = b first. Without one, numbers sort as text (10 before 9).",
+    "search": "mdn array sort compareFn"
+   },
+   {
+    "cat": "Strings",
+    "name": "localeCompare()",
+    "syntax": "a.localeCompare(b)",
+    "example": "'figma'.localeCompare('Amazon')                              // 1  (f after a)\n['b','A','c'].sort((x, y) => { return x.localeCompare(y); })   // ['A','b','c']",
+    "note": "Returns a <b>negative number, 0 or positive</b>: exactly what a sort comparator needs. Handles case and accents like a human would expect.",
+    "search": "mdn string localeCompare"
+   },
+   {
+    "cat": "Dates",
+    "name": "Date.getTime()",
+    "syntax": "new Date('2026-09-14').getTime()",
+    "example": "new Date('2026-09-02').getTime() - new Date('2026-09-14').getTime()   // negative: Sep 2 comes first",
+    "note": "Returns milliseconds since 1970 as a number, so dates can be subtracted. (ISO strings like \"2026-09-14\" also sort correctly as text.)",
+    "search": "mdn date getTime"
+   },
+   {
+    "cat": "Arrays",
+    "name": "reverse()",
+    "syntax": "sorted.reverse();",
+    "example": "const copy = [1, 2, 3];\ncopy.reverse();   // copy is now [3, 2, 1]",
+    "note": "Reverses <b>in place</b> (and returns the same array). Fine on your own sorted copy; never on state.",
+    "search": "mdn array reverse"
+   }
+  ]
  },
  "dc16": {
   "kind": "drill",
   "level": 2,
   "order": 16,
-  "minutes": 18,
+  "minutes": 20,
   "title": "Orders: pagination",
   "focus": "src/App.tsx",
   "summary": "A bakery’s wholesale admin. Page through 23 orders from a paginated API: Prev/Next, page numbers, \"Showing 6–10 of 23\", disabled at the ends.",
@@ -591,7 +757,41 @@
      "tbody opacity .45"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Numbers",
+    "name": "Math.ceil() for a page count",
+    "syntax": "Math.ceil(total / pageSize)",
+    "example": "Math.ceil(23 / 5)   // 5  (4.6 rounds UP: the last page has 3 rows)\nMath.floor(23 / 5)  // 4",
+    "note": "Rounds <b>up</b> to the next whole number. Pages are always rounded up; a partial page is still a page.",
+    "search": "mdn math ceil"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Math.min() to clamp",
+    "syntax": "Math.min(page * pageSize, total)",
+    "example": "Math.min(5 * 5, 23)   // 23  (not 25: the last page stops at the total)\nMath.min(2 * 5, 23)   // 10",
+    "note": "Returns the smallest of its arguments. Use it to cap a value; <code>Math.max</code> sets a floor.",
+    "search": "mdn math min"
+   },
+   {
+    "cat": "React",
+    "name": "State in the effect’s dependencies",
+    "syntax": "useEffect(() => { load(page); }, [page]);",
+    "example": "setPage(2);   // render → effect sees page changed → getOrders(2, 5)",
+    "note": "Changing <code>page</code> is all a button does; the effect notices the new value and refetches. Don’t call the API from the click handler as well.",
+    "search": "react useEffect dependencies"
+   },
+   {
+    "cat": "DOM",
+    "name": "disabled buttons",
+    "syntax": "<button disabled={isFirst}>← Prev</button>",
+    "example": "<button disabled={page === 1}>← Prev</button>   // greyed out, no click events, skipped by Tab",
+    "note": "A disabled button does not fire <code>onClick</code>, so the handler needs no extra guard. Style it with <code>:disabled</code>.",
+    "search": "mdn button disabled attribute"
+   }
+  ]
  },
  "dc17": {
   "kind": "drill",
@@ -607,18 +807,20 @@
    "async submit states",
    "API error handling"
   ],
-  "brief": "<p>Northstar’s sign-up page has a brand panel and a form with three controlled inputs inside the existing <code>Field</code> component. Submitting does nothing yet.</p><p>Read <code>components/Field.tsx</code> (pass it an <code>error</code> and it renders the red line and border), <code>utils/validate.ts</code> (<code>isValidEmail</code> and <code>PASSWORD_RULES</code>) and <code>api.ts</code>: <code>createAccount</code> takes 0.6–1.2 s and <b>rejects for <code>taken@example.com</code></b>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Errors are <b>derived</b> from the three values on every render, never stored. Whether to <b>show</b> them is separate state: a <code>touched</code> object set on blur, and a <code>submitted</code> flag set on submit. The checklist maps over <code>PASSWORD_RULES</code>. Submit sets <code>submitted</code>, returns if anything is invalid, otherwise sets status to submitting and calls the API; <code>.catch</code> shows the server message, <code>.then</code> swaps to a success panel.\"</p></div></details>",
+  "brief": "<p>Northstar’s sign-up page has a brand panel and a form with three controlled inputs inside the existing <code>Field</code> component. Submitting does nothing yet.</p><p>Read <code>components/Field.tsx</code> (pass it an <code>error</code> and it renders the red line and border), <code>utils/validate.ts</code> (<code>isValidEmail</code> and <code>PASSWORD_RULES</code>) and <code>api.ts</code>: <code>createAccount</code> takes 0.6–1.2 s and <b>rejects for <code>taken@example.com</code></b>.</p><p>The CSS for the checklist, the API banner and the success panel is already in <code>styles.css</code>, so you can spend the time on the logic.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. Stretch: 5.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Errors are <b>derived</b> from the three values on every render, never stored. Whether to <b>show</b> them is separate state: a <code>touched</code> object set on blur, and a <code>submitted</code> flag set on submit. The checklist maps over <code>PASSWORD_RULES</code>. Submit sets <code>submitted</code>, returns if anything is invalid, otherwise sets status to submitting and calls the API; <code>.catch</code> shows the server message, <code>.then</code> swaps to a success panel.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Email: after the field is blurred (or on submit), show <b>\"Email is required\"</b> when empty or <b>\"Enter a valid email address\"</b> when <code>isValidEmail</code> fails. No errors while the user is still typing in a fresh field",
-   "Under the password, a live checklist of the 3 <code>PASSWORD_RULES</code>: grey <b>○</b> when unmet, green <b>✓</b> (<code>is-met</code>) as soon as it’s met. After blur/submit, the password shows <b>\"Password doesn’t meet all the requirements\"</b> until all 3 are met, and Confirm password shows <b>\"Confirm your password\"</b> when empty or <b>\"Passwords don’t match\"</b>",
-   "Submitting with errors shows every error and does not call the API. A valid submit calls <code>createAccount</code>; the button reads <b>Creating…</b> and is disabled until it settles",
-   "For <code>taken@example.com</code>, the API message appears in a red banner above the fields and the form stays filled. Success replaces the form with <b>\"Check your inbox\"</b> and the email address"
+   "Under the password, a live checklist of the 3 <code>PASSWORD_RULES</code>: grey <b>○</b> when unmet, green <b>✓</b> (<code>is-met</code>) as soon as it’s met (styles exist: <code>.rules</code>, <code>.rule</code>)",
+   "Submitting (<code>e.preventDefault()</code>) shows the email error: <b>\"Email is required\"</b> when empty or <b>\"Enter a valid email address\"</b> when <code>isValidEmail</code> fails, passed to <code>Field</code>’s <code>error</code>. No errors before the first submit, and an invalid form never calls the API",
+   "Password shows <b>\"Password doesn’t meet all the requirements\"</b> until all 3 rules are met; Confirm shows <b>\"Confirm your password\"</b> when empty or <b>\"Passwords don’t match\"</b>. Each field also reveals its errors after it is blurred (never while typing in a fresh field)",
+   "A valid submit calls <code>createAccount</code>; the button reads <b>Creating…</b> and is disabled until it settles",
+   "For <code>taken@example.com</code>, the API message appears in a red banner above the fields (<code>.api-error</code>) and the form stays filled. Success replaces the form with <b>\"Check your inbox\"</b> and the email address (<code>.success</code>)"
   ],
   "hints": [
    "Don’t put error messages in state. Compute <code>emailError</code>, <code>passwordError</code>, <code>confirmError</code> with plain <code>if</code>s above the return.",
@@ -693,7 +895,41 @@
      "56 circle · #E7F8EE"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Events",
+    "name": "e.preventDefault() on submit",
+    "syntax": "function handleSubmit(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); ... }",
+    "example": "<form onSubmit={(e) => { handleSubmit(e); }}> ... <button type=\"submit\">Create account</button></form>",
+    "note": "A form submit reloads the page by default. <code>preventDefault()</code> stops that so React handles it. Enter in any input also submits.",
+    "search": "mdn event preventDefault form submit"
+   },
+   {
+    "cat": "Other",
+    "name": "Calling a function stored in an object",
+    "syntax": "rule.test(password)",
+    "example": "const rule = { label: 'Contains a number', test: (pw: string) => { return /\\d/.test(pw); } };\nrule.test('abc1')   // true",
+    "note": "Objects can hold functions. Here each rule carries its own check, so the checklist is just a <code>map</code> calling <code>rule.test(...)</code>.",
+    "search": "mdn method definitions object"
+   },
+   {
+    "cat": "Strings",
+    "name": "trim() for \"empty\"",
+    "syntax": "email.trim() === ''",
+    "example": "'   '.trim() === ''     // true: only spaces counts as empty\n' a@b.co '.trim()      // 'a@b.co'",
+    "note": "Returns a new string without leading/trailing whitespace. Check emptiness on the trimmed value.",
+    "search": "mdn string trim"
+   },
+   {
+    "cat": "Other",
+    "name": "if / else if chain for one message",
+    "syntax": "if (a) { msg = ...; } else if (b) { msg = ...; }",
+    "example": "let emailError: string | null = null;\nif (email.trim() === '') { emailError = 'Email is required'; }\nelse if (!isValidEmail(email)) { emailError = 'Enter a valid email address'; }",
+    "note": "Only the <b>first</b> matching branch runs, so each field shows its most important error. Compute it every render; don’t store it.",
+    "search": "mdn if else"
+   }
+  ]
  },
  "dc18": {
   "kind": "drill",
@@ -709,7 +945,7 @@
    "race conditions (cancelled flag)",
    "loading skeleton"
   ],
-  "brief": "<p>Carepoint shows today’s patients on the left (<code>PatientList</code>, already loading via <code>getPatients()</code>) and an empty <code>ChartPanel</code> on the right. Rows don’t respond to clicks yet.</p><p>Read <code>api.ts</code>: <code>getPatient(id)</code> returns the full chart. <b>Margaret’s chart is archived and always takes 1.2–1.5 s</b>; the others take 0.3–0.7 s. So clicking Margaret then Daniel quickly is a real race. <code>components/Avatar.tsx</code> and <code>utils/age.ts</code> are there to reuse.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list sets the selection and the chart reads it, so <code>selectedId</code> lives in <code>App</code>. I store the <b>id</b>, not the patient. <code>ChartPanel</code> gets <code>patientId</code> and has an effect on <code>[patientId]</code> that fetches the details. The cleanup sets <code>cancelled = true</code>, so when I click Daniel while Margaret is still loading, Margaret’s late answer is ignored.\"</p></div></details>",
+  "brief": "<p>Carepoint shows today’s patients on the left (<code>PatientList</code>, already loading via <code>getPatients()</code>) and an empty <code>ChartPanel</code> on the right. Rows don’t respond to clicks yet.</p><p>Read <code>api.ts</code>: <code>getPatient(id)</code> returns the full chart. <b>Margaret’s chart is archived and always takes 1.2–1.5 s</b>; the others take 0.3–0.7 s. So clicking Margaret then Daniel quickly is a real race. <code>components/PatientChart.tsx</code> (built for the printable view) already renders a full chart from a loaded <code>PatientDetail</code>, and <code>components/ChartSkeleton.tsx</code> is the loading placeholder; their CSS is in <code>styles.css</code>. <code>utils/age.ts</code> is there to reuse.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list sets the selection and the chart reads it, so <code>selectedId</code> lives in <code>App</code>. I store the <b>id</b>, not the patient. <code>ChartPanel</code> gets <code>patientId</code> and has an effect on <code>[patientId]</code> that fetches the details. The cleanup sets <code>cancelled = true</code>, so when I click Daniel while Margaret is still loading, Margaret’s late answer is ignored.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
@@ -718,16 +954,16 @@
   ],
   "requirements": [
    "Clicking a patient row selects it: light-blue background with a blue left bar (<code>is-selected</code>). Before any click the right panel keeps \"Select a patient to view their chart.\"",
-   "Selecting fetches <code>getPatient(id)</code>. While loading, the panel shows a shimmering skeleton and <b>\"Loading chart…\"</b>; then the chart: avatar, name, \"age y · sex · MRN · phone\", three vitals tiles, Allergies, Conditions and Medications",
+   "Selecting fetches <code>getPatient(id)</code>. While loading, the panel shows <code>&lt;ChartSkeleton /&gt;</code> (shimmer + <b>\"Loading chart…\"</b>); then <code>&lt;PatientChart patient={...} /&gt;</code> (both already exist in <code>components/</code>)",
    "Click <b>Margaret Ellison</b> then immediately <b>Daniel Reyes</b>: the panel ends on Daniel and never flashes Margaret’s chart when her slow response arrives",
-   "Empty allergy list shows \"No known allergies\" (Daniel). Age uses <code>ageFrom</code>, avatar uses <code>Avatar</code>"
+   "Extend <code>PatientChart</code>: the meta line reads <b>\"36 y · M · MRN … · phone\"</b> using <code>ageFrom</code> (not the raw DOB), and an empty allergy list shows <b>\"No known allergies\"</b> (Daniel) instead of a blank area"
   ],
   "hints": [
    "State placement: <code>const [selectedId, setSelectedId] = useState&lt;string | null&gt;(null);</code> in <code>App</code>. <code>PatientList</code> gets <code>selectedId</code> + <code>onSelect</code>.",
    "<code>ChartPanel</code> effect: <code>useEffect(() =&gt; { if (!patientId) { return; } ... }, [patientId]);</code>",
    "The race: search \"react useEffect race condition fetch\" (react.dev \"You might not need an effect\" → \"Fetching data\" shows the <code>ignore</code> flag).",
    "Shape: <code>let cancelled = false; setLoading(true); getPatient(patientId).then((data) =&gt; { if (cancelled) { return; } setPatient(data); setLoading(false); }); return () =&gt; { cancelled = true; };</code>",
-   "Decide the panel with early returns: no id → empty, <code>loading || !patient</code> → skeleton, else the chart."
+   "Decide the panel with early returns: no id → the existing empty message, <code>loading || !patient</code> → <code>&lt;ChartSkeleton /&gt;</code>, else <code>&lt;PatientChart patient={patient} /&gt;</code>."
   ],
   "rubric": [
    "Selection lifted to the common parent, stored as an id",
@@ -790,14 +1026,40 @@
      "pill · 1px border · 13"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "Effect keyed on a prop",
+    "syntax": "useEffect(() => { if (!id) { return; } load(id); }, [id]);",
+    "example": "useEffect(() => { if (!patientId) { return; } getPatient(patientId).then(...); }, [patientId]);\n// click Daniel → patientId 'p2' → effect runs again",
+    "note": "Every new id re-runs the effect. Return early when there is nothing to load; you cannot put a hook inside an <code>if</code>, but you can put an <code>if</code> inside the hook.",
+    "search": "react useEffect fetch on prop change"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "Narrowing a nullable value",
+    "syntax": "if (!patient) { return ...; }",
+    "example": "const [patient, setPatient] = useState<PatientDetail | null>(null);\nif (loading || !patient) { return <ChartSkeleton />; }\npatient.name   // OK here: TS knows it isn’t null",
+    "note": "After an <code>if (!x) return</code>, TypeScript treats <code>x</code> as non-null for the rest of the function.",
+    "search": "typescript narrowing truthiness"
+   },
+   {
+    "cat": "React",
+    "name": "Callback prop to report a click",
+    "syntax": "onSelect: (id: string) => void",
+    "example": "<button onClick={() => { onSelect(p.id); }}>...</button>\n// parent: <PatientList onSelect={(id) => { setSelectedId(id); }} />",
+    "note": "The child doesn’t own the selection; it tells the parent. The parent stores the <b>id</b> and passes it to whoever needs it.",
+    "search": "react passing functions as props"
+   }
+  ]
  },
  "dc19": {
   "kind": "drill",
   "level": 2,
   "order": 19,
   "minutes": 20,
-  "changeAt": 14,
+  "changeAt": 13,
   "title": "Deploy toasts",
   "focus": "src/App.tsx",
   "summary": "A dark deploy dashboard. Show stacked success/error toasts bottom-right for each action, auto-dismissed after 3 s with proper timer cleanup.",
@@ -807,14 +1069,14 @@
    "useRef for ids",
    "useCallback for a stable callback"
   ],
-  "brief": "<p>Shipyard’s service page has three actions that already work: <b>Deploy to staging</b> (resolves, 0.3–0.8 s), <b>Roll back production</b> (always <b>rejects</b> with a message: change freeze), and <b>Clear cache</b> (instant). They show busy labels but nobody is told the result.</p><p>Read <code>Actions</code> in <code>App.tsx</code> (the TODOs mark where results arrive), <code>api.ts</code>, and <code>components/Button.tsx</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Toasts are a list in <code>App</code>, because they sit outside <code>Actions</code> and outlive it. <code>Actions</code> gets a <code>notify(kind, message)</code> prop. Each toast has an id from a <code>useRef</code> counter. Each <code>Toast</code> owns a <code>setTimeout</code> in an effect and clears it in the cleanup, so closing early doesn’t leave a timer behind. <code>dismiss</code> is wrapped in <code>useCallback</code> so the timers don’t restart on every render.\"</p></div></details>",
+  "brief": "<p>Shipyard’s service page has three actions that already work: <b>Deploy to staging</b> (resolves, 0.3–0.8 s), <b>Roll back production</b> (always <b>rejects</b> with a message: change freeze), and <b>Clear cache</b> (instant). They show busy labels but nobody is told the result.</p><p>Read <code>Actions</code> in <code>App.tsx</code> (the TODOs mark where results arrive), <code>api.ts</code>, and <code>components/Toast.tsx</code>: it exports the <code>ToastData</code> type and a <code>Toast</code> card that only renders (no list, no position, no timer). Its CSS is in <code>styles.css</code>; you write the stack’s positioning.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3, and the change.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Toasts are a list in <code>App</code>, because they sit outside <code>Actions</code> and outlive it. <code>Actions</code> gets a <code>notify(kind, message)</code> prop. Each toast has an id from a <code>useRef</code> counter. Each <code>Toast</code> owns a <code>setTimeout</code> in an effect and clears it in the cleanup, so closing early doesn’t leave a timer behind. <code>dismiss</code> is wrapped in <code>useCallback</code> so the timers don’t restart on every render.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next"
   ],
   "requirements": [
-   "Deploy shows a green success toast <b>\"Deployed &lt;commit&gt; to staging\"</b>; Roll back shows a red error toast with the API’s message; Clear cache shows <b>\"Cache cleared for api-gateway\"</b>. Toasts stack bottom-right (fixed, 20px from the edges, 340 wide), newest at the bottom",
+   "Deploy shows a green success toast <b>\"Deployed &lt;commit&gt; to staging\"</b>; Roll back shows a red error toast with the API’s message; Clear cache shows <b>\"Cache cleared for api-gateway\"</b>. Render each with the existing <code>&lt;Toast /&gt;</code> inside a stack fixed bottom-right (<code>.toast-stack</code>: 20px from the edges, 340 wide), newest at the bottom",
    "Each toast disappears on its own after <b>3 seconds</b>. Its <b>✕</b> button removes it immediately. Timers are cleared in an effect cleanup",
    "Removing one toast doesn’t reset the timers of the others (each toast keeps its own 3 s)"
   ],
@@ -823,7 +1085,7 @@
    "html": "<p>\"Someone mashed Clear cache and the toasts covered the page.\"</p><ul><li>Show at most <b>3</b> toasts. When a 4th arrives, the oldest one is dropped.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">One line in the updater. Check that the dropped toast’s timer is cleaned up too (it is, if the timer lives in the toast’s effect).</p>"
   },
   "hints": [
-   "State: <code>useState&lt;ToastData[]&gt;([])</code> in <code>App</code>, where <code>type ToastData = { id: number; kind: \"success\" | \"error\"; message: string }</code>.",
+   "State: <code>useState&lt;ToastData[]&gt;([])</code> in <code>App</code>, with <code>import type { ToastData, ToastKind } from \"./components/Toast\";</code>",
    "Ids that don’t need a render: <code>const nextId = useRef(1);</code> then <code>nextId.current += 1</code>. Search: \"react useRef\".",
    "Timer per toast: <code>useEffect(() =&gt; { const t = setTimeout(() =&gt; { onDismiss(toast.id); }, 3000); return () =&gt; { clearTimeout(t); }; }, [toast.id, onDismiss]);</code>",
    "If <code>onDismiss</code> is a new function every render, that effect restarts every time. Search: \"react useCallback\". <code>const dismiss = useCallback((id: number) =&gt; { setToasts((prev) =&gt; { return prev.filter(...); }); }, []);</code>",
@@ -891,13 +1153,47 @@
      "fade + 8px slide · 180ms"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Timers",
+    "name": "setTimeout / clearTimeout",
+    "syntax": "const id = setTimeout(fn, ms); clearTimeout(id);",
+    "example": "const t = setTimeout(() => { console.log('gone'); }, 3000);\nclearTimeout(t);   // cancelled: 'gone' never logs",
+    "note": "<code>setTimeout</code> returns an <b>id</b>; pass it to <code>clearTimeout</code> to cancel. Cancelling an already-fired timer is harmless.",
+    "search": "mdn setTimeout clearTimeout"
+   },
+   {
+    "cat": "React",
+    "name": "useEffect cleanup",
+    "syntax": "useEffect(() => { ...; return () => { cleanup(); }; }, [deps]);",
+    "example": "useEffect(() => {\n  const t = setTimeout(() => { onDismiss(toast.id); }, 3000);\n  return () => { clearTimeout(t); };   // runs on unmount or before the effect re-runs\n}, [toast.id, onDismiss]);",
+    "note": "The function you return runs when the component unmounts (toast closed) and before the effect runs again. Put the timer in the toast, and closing it early clears it for free.",
+    "search": "react useEffect cleanup function"
+   },
+   {
+    "cat": "React",
+    "name": "useRef as a counter",
+    "syntax": "const nextId = useRef(1); nextId.current += 1;",
+    "example": "const nextId = useRef(1);\nconst id = nextId.current;   // 1\nnextId.current += 1;          // next one gets 2, and nothing re-renders",
+    "note": "A ref is a box that survives renders. Changing <code>.current</code> does <b>not</b> re-render, which is exactly right for an id counter.",
+    "search": "react useRef"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Append, then keep the last N",
+    "syntax": "[...prev, item].slice(-3)",
+    "example": "[1, 2, 3, 4].slice(-3)          // [2, 3, 4]\n[...[1, 2], 3]                  // [1, 2, 3]",
+    "note": "Spread makes a new array with the item added. <code>slice(-n)</code> returns a <b>new</b> array of the last n items (fewer if shorter). Used for the change.",
+    "search": "mdn array slice negative"
+   }
+  ]
  },
  "dc20": {
   "kind": "drill",
   "level": 2,
   "order": 20,
-  "minutes": 18,
+  "minutes": 20,
   "title": "Files: confirm delete",
   "focus": "src/App.tsx",
   "summary": "A cloud-files list. The trash button opens a confirm modal naming the file; Delete calls the API, shows \"Deleting…\", then removes the row.",
@@ -907,18 +1203,20 @@
    "async action states",
    "immutable remove"
   ],
-  "brief": "<p>Driftbox lists your files (<code>FileList</code>, loaded via <code>getFiles()</code>). Each row has a 🗑 button that does nothing yet.</p><p>Read <code>api.ts</code> (<code>deleteFile(id)</code> takes 0.4–1.0 s) and <code>components/Button.tsx</code>: it already has a <b>danger</b> variant and supports <code>autoFocus</code> and <code>disabled</code>. Reuse it for the modal’s buttons.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus 4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>FileList</code> owns the files, so it also owns <code>pendingId</code> (which file we’re asking about; null means closed) and <code>deleting</code>. <code>FileRow</code> gets an <code>onDelete(id)</code> callback. A <code>ConfirmDeleteModal</code> component gets the name and <code>onCancel</code>/<code>onConfirm</code>, and adds a keydown listener for Escape with a cleanup. Confirm calls the API, then filters the file out and closes.\"</p></div></details>",
+  "brief": "<p>Driftbox lists your files (<code>FileList</code>, loaded via <code>getFiles()</code>). Each row’s 🗑 already calls <code>handleDeleteClick(id)</code> in <code>FileList</code>, which does nothing yet.</p><p>Read <code>api.ts</code> (<code>deleteFile(id)</code> takes 0.4–1.0 s) and <code>components/Button.tsx</code>: it already has a <b>danger</b> variant and supports <code>autoFocus</code> and <code>disabled</code>. Reuse it for the modal’s buttons.</p><p><code>components/ConfirmDeleteModal.tsx</code> is the <b>static markup from the design hand-off</b>: not rendered anywhere, no props, buttons that do nothing. Its CSS is in <code>styles.css</code>. Make it real.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4. Stretch: 5.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>FileList</code> owns the files, so it also owns <code>pendingId</code> (which file we’re asking about; null means closed) and <code>deleting</code>. <code>FileRow</code> gets an <code>onDelete(id)</code> callback. A <code>ConfirmDeleteModal</code> component gets the name and <code>onCancel</code>/<code>onConfirm</code>, and adds a keydown listener for Escape with a cleanup. Confirm calls the API, then filters the file out and closes.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Clicking a row’s 🗑 opens a centered modal over a dark backdrop: title <b>Delete “Q3 roadmap.pdf”?</b> (the real file name), a warning line, and two buttons: <b>Cancel</b> (secondary) and <b>Delete</b> (red, danger variant)",
-   "<b>Cancel</b>, <b>Escape</b> and clicking the backdrop close the modal without deleting. Clicking inside the panel does not close it",
-   "<b>Delete</b> calls <code>deleteFile(id)</code>; while it runs the button reads <b>Deleting…</b> and both buttons are disabled. When it resolves, the row disappears and the modal closes",
-   "Focus starts on <b>Cancel</b> (the safe choice), the dialog has <code>role=\"alertdialog\"</code> and <code>aria-modal</code>, and Escape is ignored while deleting"
+   "Clicking a row’s 🗑 opens the modal (turn the static <code>ConfirmDeleteModal</code> into one that takes props): title <b>Delete “Q3 roadmap.pdf”?</b> with the real file name, the warning line, <b>Cancel</b> (secondary) and <b>Delete</b> (red, danger variant)",
+   "<b>Cancel</b> closes without deleting. <b>Delete</b> calls <code>deleteFile(id)</code>; when it resolves, the row disappears and the modal closes",
+   "While deleting, the button reads <b>Deleting…</b> and both buttons are disabled",
+   "<b>Escape</b> and clicking the backdrop close the modal without deleting. Clicking inside the panel does not close it",
+   "Focus starts on <b>Cancel</b> (the safe choice), the dialog has <code>role=\"alertdialog\"</code> and <code>aria-modal</code>, and Escape is ignored while deleting. When the last file is gone, show \"No files left.\""
   ],
   "hints": [
    "Store <b>which</b> file, not a copy: <code>const [pendingId, setPendingId] = useState&lt;string | null&gt;(null);</code> Then <code>files.find(...)</code> to get its name.",
@@ -989,6 +1287,40 @@
      "h 36 · radius 8 · 14/600"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "find() by id",
+    "syntax": "list.find((x) => { return x.id === id; })",
+    "example": "files.find((f) => { return f.id === 'f3'; })    // { id: 'f3', name: 'Offsite agenda.docx', ... }\nfiles.find((f) => { return f.id === 'nope'; })  // undefined",
+    "note": "Returns the <b>first matching item</b>, or <code>undefined</code>. Store only the id in state and derive the object with <code>find</code>.",
+    "search": "mdn array find"
+   },
+   {
+    "cat": "Arrays",
+    "name": "filter() to remove an item",
+    "syntax": "setList((prev) => { return prev.filter((x) => { return x.id !== id; }); });",
+    "example": "['f1', 'f2', 'f3'].filter((id) => { return id !== 'f2'; })   // ['f1', 'f3']",
+    "note": "Keeps everything except the match and returns a <b>new</b> array: the immutable way to delete.",
+    "search": "mdn array filter"
+   },
+   {
+    "cat": "Promises & async",
+    "name": "Act after the request",
+    "syntax": "deleteFile(id).then(() => { ... });",
+    "example": "deleteFile('f3').then(() => {\n  // only now: remove the row and close the modal\n});",
+    "note": "Code after <code>.then(...)</code> on the next line runs <b>immediately</b>; code inside the callback runs when the server answers. Update the UI inside.",
+    "search": "mdn using promises"
+   },
+   {
+    "cat": "React",
+    "name": "Render only when there is something",
+    "syntax": "let modal = null; if (pendingFile) { modal = <Modal ... />; }",
+    "example": "let modal = null;\nif (pendingFile) { modal = <ConfirmDeleteModal fileName={pendingFile.name} ... />; }\nreturn <div>...{modal}</div>;   // null renders nothing",
+    "note": "<code>null</code> in JSX renders nothing, so the modal mounts when a file is pending and unmounts (cleaning up its effects) when it is closed.",
+    "search": "react conditional rendering"
+   }
+  ]
  }
 }

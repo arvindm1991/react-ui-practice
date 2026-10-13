@@ -51,13 +51,24 @@ function PlannerHeader() {
   );
 }
 
-function TaskRow({ task }: { task: Task }) {
+type TaskRowProps = {
+  task: Task;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+};
+
+// Already wired: it reports clicks up with the task's id.
+function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
+  let cls = 'task';
+  if (task.done) {
+    cls = 'task is-done';
+  }
   return (
-    <li className="task">
-      <input type="checkbox" className="task-check" checked={task.done} readOnly />
+    <li className={cls}>
+      <input type="checkbox" className="task-check" checked={task.done} onChange={() => { onToggle(task.id); }} />
       <span className="task-title">{task.title}</span>
       <span className="subject">{task.subject}</span>
-      <button type="button" className="delete-btn" aria-label="Delete task">×</button>
+      <button type="button" className="delete-btn" aria-label="Delete task" onClick={() => { onDelete(task.id); }}>×</button>
     </li>
   );
 }
@@ -89,12 +100,20 @@ function Planner() {
     };
   }, []);
 
+  // TODO: flip done for the task with this id
+  function handleToggle(id: string) {
+  }
+
+  // TODO: remove the task with this id
+  function handleDelete(id: string) {
+  }
+
   let list = <p className="empty">Loading your tasks…</p>;
   if (!loading) {
     list = (
       <ul className="task-list">
         {tasks.map((task) => {
-          return <TaskRow key={task.id} task={task} />;
+          return <TaskRow key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} />;
         })}
       </ul>
     );
@@ -159,13 +178,26 @@ body { margin: 0; font-family: 'Nunito', 'Trebuchet MS', system-ui, sans-serif; 
 .delete-btn:hover { background: #FDECEC; color: var(--danger); }
 
 .empty { margin: 0; padding: 24px 0; text-align: center; color: var(--muted); }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: <span class="left-badge"> (add is-done for "All done") */
+.left-badge { font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--highlight); }
+.left-badge.is-done { background: #DDF7E6; color: #1B7F45; }
+/* Already used by TaskRow */
+.task.is-done .task-title { text-decoration: line-through; color: var(--muted); }
+.task.is-done .subject { opacity: 0.5; }
+
+/* STRETCH: clear completed */
+.planner-foot { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 4px; border-top: 2px solid var(--line); }
+.clear-btn { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.clear-btn:hover { color: var(--danger); }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getTasks } from './api';
 import type { Task } from './api';
 import { makeId } from './utils/id';
 
-// remaining is null while tasks are still loading.
+// NEXT: the "3 left" badge. remaining is null while tasks are still loading.
 function PlannerHeader({ remaining }: { remaining: number | null }) {
   let badge = null;
   if (remaining === 0) {
@@ -190,6 +222,7 @@ type TaskRowProps = {
   onDelete: (id: string) => void;
 };
 
+// Already wired: it reports clicks up with the task's id.
 function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
   let cls = 'task';
   if (task.done) {
@@ -205,7 +238,7 @@ function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
   );
 }
 
-// Owns only the draft text. It reports a finished title up.
+// CORE: owns only the draft text. It reports a finished title up.
 function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
   const [draft, setDraft] = useState('');
 
@@ -220,6 +253,7 @@ function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
     setDraft('');
   }
 
+  // NEXT: Add disabled while blank
   const isEmpty = draft.trim() === '';
 
   return (
@@ -248,13 +282,15 @@ function Planner() {
     };
   }, []);
 
+  // CORE: add (CHANGE: newest first, so it goes to the front: was [...prev, task])
   function handleAdd(title: string) {
     const task: Task = { id: makeId('t'), title, subject: 'Inbox', done: false };
     setTasks((prev) => {
-      return [...prev, task];
+      return [task, ...prev];
     });
   }
 
+  // CORE: toggle with map + object spread (never mutate t.done)
   function handleToggle(id: string) {
     setTasks((prev) => {
       return prev.map((t) => {
@@ -266,6 +302,7 @@ function Planner() {
     });
   }
 
+  // NEXT: delete with filter
   function handleDelete(id: string) {
     setTasks((prev) => {
       return prev.filter((t) => {
@@ -274,7 +311,7 @@ function Planner() {
     });
   }
 
-  // Change
+  // STRETCH: clear completed
   function handleClearCompleted() {
     setTasks((prev) => {
       return prev.filter((t) => {
@@ -283,13 +320,14 @@ function Planner() {
     });
   }
 
-  // derived: never stored in state
+  // NEXT: derived, never stored in state
   const remaining = tasks.filter((t) => {
     return !t.done;
   }).length;
   const doneCount = tasks.length - remaining;
 
   let list = <p className="empty">Loading your tasks…</p>;
+  // NEXT: a friendly empty state once everything is deleted
   if (!loading && tasks.length === 0) {
     list = <p className="empty">Nothing planned. Add your first task above.</p>;
   } else if (!loading) {
@@ -302,6 +340,7 @@ function Planner() {
     );
   }
 
+  // STRETCH
   let footer = null;
   if (doneCount > 0) {
     footer = (
@@ -377,13 +416,15 @@ body { margin: 0; font-family: 'Nunito', 'Trebuchet MS', system-ui, sans-serif; 
 
 .empty { margin: 0; padding: 24px 0; text-align: center; color: var(--muted); }
 
-/* ---- Added: todo interactions ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: <span class="left-badge"> (add is-done for "All done") */
 .left-badge { font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--highlight); }
 .left-badge.is-done { background: #DDF7E6; color: #1B7F45; }
+/* Already used by TaskRow */
 .task.is-done .task-title { text-decoration: line-through; color: var(--muted); }
 .task.is-done .subject { opacity: 0.5; }
 
-/* Change: clear completed */
+/* STRETCH: clear completed */
 .planner-foot { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 4px; border-top: 2px solid var(--line); }
 .clear-btn { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
 .clear-btn:hover { color: var(--danger); }

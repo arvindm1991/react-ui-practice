@@ -75,14 +75,6 @@ export function streamReply(prompt: string, onToken: (token: string) => void, si
     timer = setTimeout(next, 300 + Math.random() * 400);
   });
 }
-@@@ shared src/utils/id.ts
-let counter = 0;
-
-// makeId('msg') -> "msg-1", "msg-2", ...
-export function makeId(prefix: string): string {
-  counter += 1;
-  return prefix + '-' + counter;
-}
 @@@ shared src/seed.ts
 import type { ChatMessage } from './api';
 
@@ -108,6 +100,14 @@ export const SEED: ChatMessage[] = [
     text: 'For a team of about twenty, yes: that is roughly one late message per person every other night. If you have your real numbers from the Slack analytics export, use those instead. A real, slightly odd number is more convincing than a round one.',
   },
 ];
+@@@ shared src/utils/id.ts
+let counter = 0;
+
+// makeId('msg') -> "msg-1", "msg-2", ...
+export function makeId(prefix: string): string {
+  counter += 1;
+  return prefix + '-' + counter;
+}
 @@@ starter src/App.tsx
 import React, { useState } from 'react';
 import type { ChatMessage } from './api';
@@ -253,6 +253,7 @@ import type { ChatMessage } from './api';
 import { makeId } from './utils/id';
 import { SEED } from './seed';
 
+// CORE: per-message status (client-only)
 type Status = 'streaming' | 'done' | 'stopped' | 'error';
 type Message = ChatMessage & { status?: Status };
 
@@ -268,6 +269,7 @@ function Header() {
   );
 }
 
+// CHANGE: canRegenerate / onRegenerate props
 type MessageBubbleProps = {
   message: Message;
   canRegenerate: boolean;
@@ -283,6 +285,7 @@ function MessageBubble({ message, canRegenerate, onRegenerate }: MessageBubblePr
     );
   }
 
+  // CORE: blinking cursor while streaming
   const streaming = message.status === 'streaming';
 
   let cursor = null;
@@ -290,12 +293,14 @@ function MessageBubble({ message, canRegenerate, onRegenerate }: MessageBubblePr
     cursor = <span className="cursor" aria-hidden="true" />;
   }
 
+  // NEXT: thinking dots before the first token arrives
   // Before the first token arrives, show "thinking" dots instead of an empty line.
   let text = <p className="assistant-text">{message.text}{cursor}</p>;
   if (streaming && message.text === '') {
     text = <p className="thinking" aria-label="Quill is thinking"><span /><span /><span /></p>;
   }
 
+  // CORE: Stopped / error pill
   let note = null;
   if (message.status === 'stopped') {
     note = <span className="msg-note">Stopped</span>;
@@ -303,11 +308,13 @@ function MessageBubble({ message, canRegenerate, onRegenerate }: MessageBubblePr
     note = <span className="msg-note is-error">Something went wrong</span>;
   }
 
+  // CHANGE: Regenerate under the last answer
   let regen = null;
   if (canRegenerate) {
     regen = <button type="button" className="regen-btn" onClick={() => { onRegenerate(); }}>↻ Regenerate</button>;
   }
 
+  // CORE: footer row
   let footer = null;
   if (note || regen) {
     footer = <div className="msg-footer">{note}{regen}</div>;
@@ -324,6 +331,7 @@ function MessageBubble({ message, canRegenerate, onRegenerate }: MessageBubblePr
   );
 }
 
+// CORE: Composer knows about streaming and Stop
 type ComposerProps = {
   value: string;
   streaming: boolean;
@@ -366,13 +374,17 @@ function Composer({ value, streaming, onChange, onSend, onStop }: ComposerProps)
 export default function App() {
   const [messages, setMessages] = useState<Message[]>(SEED);
   const [input, setInput] = useState('');
+  // CORE: which message is streaming (drives Stop) + the controller (never rendered, so a ref)
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  // NEXT: scroll-follow state
   // Is the user scrolled to the bottom? Only then do new tokens auto-scroll.
   const [atBottom, setAtBottom] = useState(true);
+  // CORE
   const controllerRef = useRef<AbortController | null>(null);
+  // NEXT
   const threadRef = useRef<HTMLDivElement>(null);
 
-  // Follow the stream, but never yank someone who scrolled up to read.
+  // NEXT: follow the stream, but never yank someone who scrolled up to read.
   useEffect(() => {
     const el = threadRef.current;
     if (el && atBottom) {
@@ -380,7 +392,7 @@ export default function App() {
     }
   }, [messages, atBottom]);
 
-  // Leaving the page mid-stream must not keep the request running.
+  // NEXT: leaving the page mid-stream must not keep the request running.
   useEffect(() => {
     return () => {
       if (controllerRef.current) {
@@ -389,6 +401,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: one place that updates a message and one that ends a stream
   function patchMessage(id: string, patch: Partial<Message>) {
     setMessages((prev) => {
       return prev.map((m) => {
@@ -406,11 +419,12 @@ export default function App() {
     controllerRef.current = null;
   }
 
+  // CORE: start a stream into an existing assistant message
   function runStream(assistantId: string, prompt: string) {
     const controller = new AbortController();
     controllerRef.current = controller;
     setStreamingId(assistantId);
-    setAtBottom(true);
+    setAtBottom(true); // NEXT: sending always scrolls down
 
     function handleToken(token: string) {
       // updater form: tokens arrive faster than renders
@@ -437,6 +451,7 @@ export default function App() {
       });
   }
 
+  // CORE: append both messages, then stream
   function handleSend() {
     const prompt = input.trim();
     if (prompt === '' || streamingId) {
@@ -451,13 +466,14 @@ export default function App() {
     runStream(assistantMsg.id, prompt);
   }
 
+  // CORE: Stop aborts; the catch above marks it 'stopped'
   function handleStop() {
     if (controllerRef.current) {
       controllerRef.current.abort();
     }
   }
 
-  // Change: clear the last answer in place and stream it again for the same prompt.
+  // CHANGE: clear the last answer in place and stream it again for the same prompt.
   function handleRegenerate() {
     const last = messages[messages.length - 1];
     const prev = messages[messages.length - 2];
@@ -468,6 +484,7 @@ export default function App() {
     runStream(last.id, prev.text);
   }
 
+  // NEXT: track whether the user is at the bottom
   function handleScroll() {
     const el = threadRef.current;
     if (!el) {
@@ -481,14 +498,16 @@ export default function App() {
     setAtBottom(true);
   }
 
-  // derived
+  // CHANGE: only the last message can regenerate
   const lastId = messages[messages.length - 1].id;
 
+  // NEXT: jump pill
   let jump = null;
   if (!atBottom && streamingId) {
     jump = <button type="button" className="jump-btn" onClick={() => { jumpToLatest(); }}>↓ Jump to latest</button>;
   }
 
+  // CORE: render (NEXT adds thread-wrap, ref, onScroll and the pill)
   return (
     <div className="app">
       <Header />
@@ -550,25 +569,32 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ---- Added: streaming, stop, auto-scroll, regenerate ---- */
+/* NEXT: wrapper for the floating pill */
 .thread-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 
+/* CORE: cursor, Stop button, Stopped pill */
 .cursor { display: inline-block; width: 8px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: var(--accent); border-radius: 1px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* NEXT: thinking dots */
 .thinking { margin: 0; height: 27px; display: flex; align-items: center; gap: 5px; }
 .thinking span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
 .thinking span:nth-child(2) { animation-delay: 0.15s; }
 .thinking span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes pulse { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 
+/* CORE */
 .msg-footer { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .msg-note { font-size: 12px; color: var(--muted); padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; }
 .msg-note.is-error { color: var(--danger); border-color: rgba(248, 113, 113, 0.4); }
+/* CHANGE: Regenerate */
 .regen-btn { border: 0; background: none; padding: 4px 8px; margin-left: -8px; border-radius: 8px; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
 .regen-btn:hover { background: var(--surface-2); color: var(--text); }
 
+/* CORE */
 .stop-btn { height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
 .stop-btn:hover { border-color: #4A505E; }
 .stop-icon { width: 10px; height: 10px; border-radius: 2px; background: var(--text); }
 
+/* NEXT: jump pill */
 .jump-btn { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); height: 32px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }

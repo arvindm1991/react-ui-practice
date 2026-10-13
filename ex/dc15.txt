@@ -211,12 +211,50 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .sidebar { display: none; }
   .main { padding: 20px 16px; }
 }
+
+/* SortHeader (components/SortHeader.tsx) */
+.sort-btn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.sort-btn:hover { color: var(--text); }
+.arrow { font-size: 10px; color: #A4B1AC; }
+@@@ starter src/components/SortHeader.tsx
+import React from 'react';
+
+type SortHeaderProps = {
+  label: string;
+  direction: 'asc' | 'desc' | null; // null = this column is not the sorted one
+  numeric?: boolean;                // right-aligns the column (amounts)
+  onClick: () => void;
+};
+
+// A clickable <th>, built for the Invoices table. Styles: .sort-btn / .arrow in styles.css.
+export function SortHeader({ label, direction, numeric, onClick }: SortHeaderProps) {
+  let arrow = '';
+  if (direction === 'asc') {
+    arrow = '▲';
+  }
+  if (direction === 'desc') {
+    arrow = '▼';
+  }
+  let thCls = '';
+  if (numeric) {
+    thCls = 'num';
+  }
+  return (
+    <th className={thCls}>
+      <button type="button" className="sort-btn" onClick={() => { onClick(); }}>
+        {label} <span className="arrow">{arrow}</span>
+      </button>
+    </th>
+  );
+}
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getTransactions } from './api';
 import type { Transaction } from './api';
 import { formatDate, formatMoney } from './utils/format';
+import { SortHeader } from './components/SortHeader';
 
+// CORE: which column, which direction
 type SortKey = 'date' | 'description' | 'category' | 'amountCents';
 type SortDir = 'asc' | 'desc';
 
@@ -266,44 +304,7 @@ function TransactionRow({ tx }: { tx: Transaction }) {
   );
 }
 
-type SortHeaderProps = {
-  label: string;
-  column: SortKey;
-  sortKey: SortKey | null;
-  sortDir: SortDir;
-  onSort: (column: SortKey) => void;
-  numeric?: boolean;
-};
-
-function SortHeader({ label, column, sortKey, sortDir, onSort, numeric }: SortHeaderProps) {
-  const active = sortKey === column;
-  let arrow = '↕';
-  let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
-  let btnCls = 'sort-btn';
-  if (active && sortDir === 'asc') {
-    arrow = '▲';
-    ariaSort = 'ascending';
-    btnCls = 'sort-btn is-active';
-  }
-  if (active && sortDir === 'desc') {
-    arrow = '▼';
-    ariaSort = 'descending';
-    btnCls = 'sort-btn is-active';
-  }
-  let thCls = '';
-  if (numeric) {
-    thCls = 'num';
-  }
-  return (
-    <th className={thCls} aria-sort={ariaSort}>
-      <button type="button" className={btnCls} onClick={() => { onSort(column); }}>
-        {label} <span className="arrow">{arrow}</span>
-      </button>
-    </th>
-  );
-}
-
-// Returns a NEW sorted array. .sort() sorts in place, so copy first.
+// CORE: one comparator per type. Returns a NEW array: .sort() sorts in place, so copy first.
 function sortTransactions(list: Transaction[], key: SortKey, dir: SortDir): Transaction[] {
   const sorted = [...list].sort((a, b) => {
     if (key === 'amountCents') {
@@ -323,6 +324,7 @@ function sortTransactions(list: Transaction[], key: SortKey, dir: SortDir): Tran
 function TransactionsTable() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  // CORE: sort state lives next to the data
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -340,7 +342,7 @@ function TransactionsTable() {
     };
   }, []);
 
-  // New column: asc. Same column: asc -> desc -> off (back to the bank's order).
+  // CORE: new column -> asc. Same column -> asc -> desc.
   function handleSort(column: SortKey) {
     if (column !== sortKey) {
       setSortKey(column);
@@ -351,11 +353,12 @@ function TransactionsTable() {
       setSortDir('desc');
       return;
     }
+    // CHANGE: third click clears, back to the bank's order
     setSortKey(null);
     setSortDir('asc');
   }
 
-  // derived: the original list is never touched, so "off" can show it again
+  // CORE: derived. The original list is never touched, so "off" can show it again
   let visible = transactions;
   if (sortKey) {
     visible = sortTransactions(transactions, sortKey, sortDir);
@@ -370,16 +373,22 @@ function TransactionsTable() {
     });
   }
 
-  const headerProps = { sortKey: sortKey, sortDir: sortDir, onSort: handleSort };
+  // CORE: what each header shows
+  function dirFor(column: SortKey) {
+    if (column === sortKey) {
+      return sortDir;
+    }
+    return null;
+  }
 
   return (
     <table className="table">
       <thead>
         <tr>
-          <SortHeader label="Date" column="date" {...headerProps} />
-          <SortHeader label="Description" column="description" {...headerProps} />
-          <SortHeader label="Category" column="category" {...headerProps} />
-          <SortHeader label="Amount" column="amountCents" numeric {...headerProps} />
+          <SortHeader label="Date" direction={dirFor('date')} onClick={() => { handleSort('date'); }} />
+          <SortHeader label="Description" direction={dirFor('description')} onClick={() => { handleSort('description'); }} />
+          <SortHeader label="Category" direction={dirFor('category')} onClick={() => { handleSort('category'); }} />
+          <SortHeader label="Amount" direction={dirFor('amountCents')} numeric onClick={() => { handleSort('amountCents'); }} />
         </tr>
       </thead>
       <tbody>{body}</tbody>
@@ -453,9 +462,50 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .main { padding: 20px 16px; }
 }
 
-/* ---- Added: sortable headers ---- */
+/* SortHeader (components/SortHeader.tsx) */
 .sort-btn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
 .sort-btn:hover { color: var(--text); }
-.sort-btn.is-active { color: var(--primary); }
 .arrow { font-size: 10px; color: #A4B1AC; }
+
+/* ---- Added: sortable headers ---- */
+/* NEXT: active column in green */
+.sort-btn.is-active { color: var(--primary); }
 .sort-btn.is-active .arrow { color: var(--primary); }
+@@@ solution src/components/SortHeader.tsx
+import React from 'react';
+
+type SortHeaderProps = {
+  label: string;
+  direction: 'asc' | 'desc' | null; // null = this column is not the sorted one
+  numeric?: boolean;                // right-aligns the column (amounts)
+  onClick: () => void;
+};
+
+// A clickable <th>, built for the Invoices table. Styles: .sort-btn / .arrow in styles.css.
+export function SortHeader({ label, direction, numeric, onClick }: SortHeaderProps) {
+  // NEXT: neutral ↕ when inactive, an active class, and aria-sort for screen readers
+  let arrow = '↕';
+  let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
+  let btnCls = 'sort-btn';
+  if (direction === 'asc') {
+    arrow = '▲';
+    ariaSort = 'ascending';
+    btnCls = 'sort-btn is-active';
+  }
+  if (direction === 'desc') {
+    arrow = '▼';
+    ariaSort = 'descending';
+    btnCls = 'sort-btn is-active';
+  }
+  let thCls = '';
+  if (numeric) {
+    thCls = 'num';
+  }
+  return (
+    <th className={thCls} aria-sort={ariaSort}>
+      <button type="button" className={btnCls} onClick={() => { onClick(); }}>
+        {label} <span className="arrow">{arrow}</span>
+      </button>
+    </th>
+  );
+}

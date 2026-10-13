@@ -149,6 +149,41 @@ export function PreferencesStep({ values, errors, onChange }: StepProps) {
     </div>
   );
 }
+
+// Read-only summary for the last step.
+export function ReviewStep({ values }: { values: OnboardingData }) {
+  const goal = GOALS.find((g) => {
+    return g.id === values.goal;
+  });
+  let goalLabel = '—';
+  if (goal) {
+    goalLabel = goal.label;
+  }
+  let unitsLabel = 'Metric';
+  if (values.units === 'imperial') {
+    unitsLabel = 'Imperial';
+  }
+  const rows = [
+    ['Name', values.name.trim()],
+    ['Email', values.email.trim()],
+    ['Age', values.age],
+    ['Goal', goalLabel],
+    ['Workouts', values.daysPerWeek + ' days a week'],
+    ['Units', unitsLabel],
+  ];
+  return (
+    <dl className="review">
+      {rows.map((row) => {
+        return (
+          <div key={row[0]} className="review-row">
+            <dt>{row[0]}</dt>
+            <dd>{row[1]}</dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
 @@@ shared src/utils/validate.ts
 // isValidEmail('a@b.co') -> true, isValidEmail('a@b') -> false
 export function isValidEmail(value: string): boolean {
@@ -267,6 +302,13 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .choice-label { font-weight: 700; }
 .choice-blurb { font-size: 12px; color: var(--muted); line-height: 1.4; }
 
+/* ReviewStep (components/Steps.tsx) */
+.review { margin: 0; flex: 1; border: 1.5px solid var(--border); border-radius: 12px; padding: 4px 16px; align-self: stretch; }
+.review-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.review-row:last-child { border-bottom: 0; }
+.review dt { color: var(--muted); }
+.review dd { margin: 0; font-weight: 600; text-align: right; }
+
 .wizard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
 .btn { height: 44px; padding: 0 22px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; border: 1.5px solid transparent; }
 .btn-primary { background: var(--primary); color: #fff; }
@@ -276,18 +318,19 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .btn-ghost:hover { background: var(--bg); }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
-import { EMPTY_FORM, GOALS } from './types';
+import { EMPTY_FORM } from './types';
 import type { OnboardingData } from './types';
-import { ProfileStep, PreferencesStep } from './components/Steps';
+import { ProfileStep, PreferencesStep, ReviewStep } from './components/Steps';
 import type { StepErrors } from './components/Steps';
 import { isIntInRange, isValidEmail } from './utils/validate';
 import { createAccount } from './api';
 import type { Account } from './api';
 
+// CORE: step names + titles
 const STEPS = ['Profile', 'Preferences', 'Review'];
 const TITLES = ['Tell us about you', 'What are you training for?', 'Check your details'];
 
-// Pure function: which fields on this step are invalid?
+// CORE: validation. Pure function: which fields on this step are invalid?
 function validateStep(step: number, form: OnboardingData): StepErrors {
   const errors: StepErrors = {};
   if (step === 0) {
@@ -327,12 +370,13 @@ function SidePanel() {
   );
 }
 
+// STRETCH: step indicator
 type IndicatorProps = {
   current: number;
   onJump: (index: number) => void;
 };
 
-// Change: completed steps are buttons you can jump back to. Current and future steps are disabled.
+// STRETCH: step indicator. Completed steps are buttons you can jump back to; current and future steps are disabled.
 function StepIndicator({ current, onJump }: IndicatorProps) {
   return (
     <ol className="stepper">
@@ -358,44 +402,12 @@ function StepIndicator({ current, onJump }: IndicatorProps) {
   );
 }
 
-function ReviewStep({ values }: { values: OnboardingData }) {
-  const goal = GOALS.find((g) => {
-    return g.id === values.goal;
-  });
-  let goalLabel = '—';
-  if (goal) {
-    goalLabel = goal.label;
-  }
-  let unitsLabel = 'Metric';
-  if (values.units === 'imperial') {
-    unitsLabel = 'Imperial';
-  }
-  const rows = [
-    ['Name', values.name.trim()],
-    ['Email', values.email.trim()],
-    ['Age', values.age],
-    ['Goal', goalLabel],
-    ['Workouts', values.daysPerWeek + ' days a week'],
-    ['Units', unitsLabel],
-  ];
-  return (
-    <dl className="review">
-      {rows.map((row) => {
-        return (
-          <div key={row[0]} className="review-row">
-            <dt>{row[0]}</dt>
-            <dd>{row[1]}</dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-}
-
 function OnboardingWizard() {
   const [form, setForm] = useState<OnboardingData>(EMPTY_FORM);
+  // CORE: step + errors
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<StepErrors>({});
+  // NEXT: submit
   const [submitting, setSubmitting] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
 
@@ -403,12 +415,13 @@ function OnboardingWizard() {
     setForm((prev) => {
       return { ...prev, [field]: value };
     });
-    // Clear that field's error as soon as they fix it.
+    // CHANGE: clear that field's error as soon as they fix it.
     setErrors((prev) => {
       return { ...prev, [field]: undefined };
     });
   }
 
+  // CORE: Continue validates, then advances
   function handleNext() {
     const found = validateStep(step, form);
     if (Object.keys(found).length > 0) {
@@ -421,6 +434,7 @@ function OnboardingWizard() {
     });
   }
 
+  // CORE: Back (CHANGE: also clears errors)
   function handleBack() {
     setErrors({});
     setStep((prev) => {
@@ -428,6 +442,7 @@ function OnboardingWizard() {
     });
   }
 
+  // STRETCH: jump back from the indicator
   function handleJump(index: number) {
     if (index < step) {
       setErrors({});
@@ -435,6 +450,7 @@ function OnboardingWizard() {
     }
   }
 
+  // NEXT: submit + success screen
   function handleSubmit() {
     setSubmitting(true);
     createAccount(form).then((result) => {
@@ -453,6 +469,7 @@ function OnboardingWizard() {
     );
   }
 
+  // CORE: body per step
   let body;
   if (step === 0) {
     body = <ProfileStep values={form} errors={errors} onChange={handleChange} />;
@@ -462,12 +479,14 @@ function OnboardingWizard() {
     body = <ReviewStep values={form} />;
   }
 
+  // CORE: footer buttons
   let backBtn = <span />;
   if (step > 0) {
     backBtn = <button type="button" className="btn btn-ghost" disabled={submitting} onClick={() => { handleBack(); }}>Back</button>;
   }
 
   let nextBtn = <button type="button" className="btn btn-primary" onClick={() => { handleNext(); }}>Continue</button>;
+  // NEXT: last step submits
   if (step === STEPS.length - 1) {
     let label = 'Create my plan';
     if (submitting) {
@@ -476,6 +495,7 @@ function OnboardingWizard() {
     nextBtn = <button type="button" className="btn btn-primary" disabled={submitting} onClick={() => { handleSubmit(); }}>{label}</button>;
   }
 
+  // CORE: render (STRETCH: StepIndicator)
   return (
     <section className="wizard">
       <StepIndicator current={step} onJump={handleJump} />
@@ -550,6 +570,13 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .choice-label { font-weight: 700; }
 .choice-blurb { font-size: 12px; color: var(--muted); line-height: 1.4; }
 
+/* ReviewStep (components/Steps.tsx) */
+.review { margin: 0; flex: 1; border: 1.5px solid var(--border); border-radius: 12px; padding: 4px 16px; align-self: stretch; }
+.review-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.review-row:last-child { border-bottom: 0; }
+.review dt { color: var(--muted); }
+.review dd { margin: 0; font-weight: 600; text-align: right; }
+
 .wizard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
 .btn { height: 44px; padding: 0 22px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; border: 1.5px solid transparent; }
 .btn-primary { background: var(--primary); color: #fff; }
@@ -559,6 +586,7 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .btn-ghost:hover { background: var(--bg); }
 
 /* ---- Added: wizard steps ---- */
+/* STRETCH: step indicator */
 .stepper { display: flex; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
 .stepper-item { flex: 1; }
 .step { width: 100%; display: flex; align-items: center; gap: 8px; padding: 0 0 10px; border: 0; border-bottom: 3px solid var(--border); background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; }
@@ -570,12 +598,7 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .step.is-done .step-dot { background: var(--primary-soft); color: var(--primary); }
 .step.is-done:hover .step-label { text-decoration: underline; }
 
-.review { margin: 0; flex: 1; border: 1.5px solid var(--border); border-radius: 12px; padding: 4px 16px; align-self: stretch; }
-.review-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-.review-row:last-child { border-bottom: 0; }
-.review dt { color: var(--muted); }
-.review dd { margin: 0; font-weight: 600; text-align: right; }
-
+/* NEXT: success screen */
 .wizard-done { align-items: center; justify-content: center; text-align: center; }
 .done-badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; color: #fff; background: var(--primary); margin-bottom: 16px; }
 .done-copy { margin: 0; color: var(--muted); }

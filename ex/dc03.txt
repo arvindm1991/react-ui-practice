@@ -118,11 +118,38 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 @media (max-width: 720px) {
   .brand-panel { display: none; }
 }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: Show/Hide button inside the field */
+.password-wrap .input { margin-bottom: 8px; padding-right: 64px; }
+.show-btn { position: absolute; right: 6px; top: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.show-btn:hover { background: #E8F3F0; }
+
+/* CORE: <div class="strength"> wrapping <span class="strength-label">Weak / Fair / Strong</span> */
+.strength { display: flex; align-items: center; justify-content: flex-end; gap: 10px; height: 18px; margin-bottom: 10px; }
+.strength-label { width: 48px; text-align: right; font-size: 12px; font-weight: 600; }
+
+/* NEXT: segments + colour. Put is-weak / is-fair / is-strong on .strength, is-on on lit segments */
+.segments { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.segment { height: 4px; border-radius: 999px; background: var(--track); transition: background 0.2s; }
+.strength.is-weak .segment.is-on { background: var(--weak); }
+.strength.is-weak .strength-label { color: var(--weak); }
+.strength.is-fair .segment.is-on { background: var(--fair); }
+.strength.is-fair .strength-label { color: var(--fair); }
+.strength.is-strong .segment.is-on { background: var(--strong); }
+.strength.is-strong .strength-label { color: var(--strong); }
+
+/* CHANGE: rules checklist */
+.rules { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.rule { display: flex; align-items: center; gap: 8px; }
+.rule-mark { width: 14px; text-align: center; }
+.rule.is-met { color: var(--strong); }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { Logo } from './components/Logo';
 
-const LEVELS = ['', 'Weak', 'Fair', 'Strong'];
+// Index = number of rules met. 0 and 1 are both "Weak" (anything typed is at least Weak).
+const LEVELS = ['Weak', 'Weak', 'Fair', 'Strong'];
 
 function BrandPanel() {
   return (
@@ -138,44 +165,8 @@ function BrandPanel() {
   );
 }
 
-type Rule = {
-  id: string;
-  label: string;
-  met: boolean;
-};
-
-// Pure function: easy to reason about, easy to test.
-function getRules(password: string): Rule[] {
-  return [
-    { id: 'length', label: 'At least 8 characters', met: password.length >= 8 },
-    { id: 'number', label: 'Contains a number', met: /\d/.test(password) },
-    { id: 'symbol', label: 'Contains a symbol', met: /[^A-Za-z0-9]/.test(password) },
-  ];
-}
-
-type StrengthMeterProps = {
-  password: string;
-  rules: Rule[];
-};
-
-function StrengthMeter({ password, rules }: StrengthMeterProps) {
-  const score = rules.filter((r) => {
-    return r.met;
-  }).length;
-
-  // Anything typed is at least "Weak". Empty shows nothing.
-  let level = 0;
-  if (password !== '') {
-    level = Math.max(score, 1);
-  }
-
-  let meterCls = 'strength';
-  let label = '';
-  if (level > 0) {
-    label = LEVELS[level];
-    meterCls = 'strength is-' + label.toLowerCase();
-  }
-
+// NEXT: three bar segments. Segment n is "on" when n <= level.
+function StrengthBars({ level }: { level: number }) {
   const segments = [1, 2, 3].map((n) => {
     let cls = 'segment';
     if (n <= level) {
@@ -183,55 +174,48 @@ function StrengthMeter({ password, rules }: StrengthMeterProps) {
     }
     return <span key={n} className={cls} />;
   });
-
-  return (
-    <div className={meterCls}>
-      <div className="segments">{segments}</div>
-      <span className="strength-label">{label}</span>
-    </div>
-  );
-}
-
-// Change: checklist of rules.
-function RuleList({ rules }: { rules: Rule[] }) {
-  return (
-    <ul className="rules">
-      {rules.map((r) => {
-        let cls = 'rule';
-        let mark = '○';
-        if (r.met) {
-          cls = 'rule is-met';
-          mark = '✓';
-        }
-        return (
-          <li key={r.id} className={cls}>
-            <span className="rule-mark">{mark}</span>
-            {r.label}
-          </li>
-        );
-      })}
-    </ul>
-  );
+  return <div className="segments">{segments}</div>;
 }
 
 function SignUpForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // CORE: show/hide is the only new piece of state
   const [showPassword, setShowPassword] = useState(false);
 
+  // CORE: toggle with the updater form
   function handleToggleShow() {
     setShowPassword((prev) => {
       return !prev;
     });
   }
 
-  // derived: never stored in state
-  const rules = getRules(password);
-  const allMet = rules.every((r) => {
+  // CORE: the three rules, derived from password (never stored in state)
+  const rules = [
+    { id: 'length', label: 'At least 8 characters', met: password.length >= 8 },
+    { id: 'number', label: 'Contains a number', met: /\d/.test(password) },
+    { id: 'symbol', label: 'Contains a symbol', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+  const score = rules.filter((r) => {
     return r.met;
-  });
-  const canSubmit = email.includes('@') && allMet;
+  }).length;
 
+  // CORE: the label. Empty password shows nothing.
+  let strength = '';
+  if (password !== '') {
+    strength = LEVELS[score];
+  }
+
+  // NEXT: bar level, wrapper colour class and the submit gate reuse the same derived values
+  let level = 0;
+  let meterCls = 'strength';
+  if (strength !== '') {
+    level = Math.max(score, 1);
+    meterCls = 'strength is-' + strength.toLowerCase();
+  }
+  const canSubmit = email.includes('@') && strength === 'Strong';
+
+  // CORE: input type and button text decided above the return
   let inputType = 'password';
   let toggleText = 'Show';
   if (showPassword) {
@@ -239,6 +223,17 @@ function SignUpForm() {
     toggleText = 'Hide';
   }
   const toggleLabel = toggleText + ' password';
+
+  // CHANGE: the same rules as a checklist (one .map)
+  const ruleItems = rules.map((r) => {
+    let cls = 'rule';
+    let mark = '○';
+    if (r.met) {
+      cls = 'rule is-met';
+      mark = '✓';
+    }
+    return <li key={r.id} className={cls}><span className="rule-mark">{mark}</span>{r.label}</li>;
+  });
 
   return (
     <form className="form" onSubmit={(e) => { e.preventDefault(); }}>
@@ -268,8 +263,11 @@ function SignUpForm() {
           {toggleText}
         </button>
       </div>
-      <StrengthMeter password={password} rules={rules} />
-      <RuleList rules={rules} />
+      <div className={meterCls}>
+        <StrengthBars level={level} />
+        <span className="strength-label">{strength}</span>
+      </div>
+      <ul className="rules">{ruleItems}</ul>
 
       <button type="submit" className="btn-primary" disabled={!canSubmit}>Create account</button>
       <p className="fine">Already have an account? <a href="#">Sign in</a></p>
@@ -335,15 +333,19 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   .brand-panel { display: none; }
 }
 
-/* ---- Added: show/hide + strength meter ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: Show/Hide button inside the field */
 .password-wrap .input { margin-bottom: 8px; padding-right: 64px; }
 .show-btn { position: absolute; right: 6px; top: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .show-btn:hover { background: #E8F3F0; }
 
-.strength { display: flex; align-items: center; gap: 10px; height: 18px; margin-bottom: 10px; }
+/* CORE: <div class="strength"> wrapping <span class="strength-label">Weak / Fair / Strong</span> */
+.strength { display: flex; align-items: center; justify-content: flex-end; gap: 10px; height: 18px; margin-bottom: 10px; }
+.strength-label { width: 48px; text-align: right; font-size: 12px; font-weight: 600; }
+
+/* NEXT: segments + colour. Put is-weak / is-fair / is-strong on .strength, is-on on lit segments */
 .segments { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .segment { height: 4px; border-radius: 999px; background: var(--track); transition: background 0.2s; }
-.strength-label { width: 48px; text-align: right; font-size: 12px; font-weight: 600; }
 .strength.is-weak .segment.is-on { background: var(--weak); }
 .strength.is-weak .strength-label { color: var(--weak); }
 .strength.is-fair .segment.is-on { background: var(--fair); }
@@ -351,6 +353,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 .strength.is-strong .segment.is-on { background: var(--strong); }
 .strength.is-strong .strength-label { color: var(--strong); }
 
+/* CHANGE: rules checklist */
 .rules { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .rule { display: flex; align-items: center; gap: 8px; }
 .rule-mark { width: 14px; text-align: center; }

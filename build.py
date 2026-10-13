@@ -76,7 +76,30 @@ if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 4000 }
                  'tick the self-review honestly · only then open the Solution tab. If you finish well under time, move up a level. '
                  'If you blow way past it, redo the same challenge tomorrow from scratch.</p></div>'
                  + ''.join(sections) + '</template>')
-    html = (SRC / 'head.html').read_text() + extra_head + '\n' + (SRC / 'body.html').read_text() + '\n' + lessons + '\n' + tpl_daily + '\n<script>\n' + js + '\n</script>\n'
+    # Primitives reference page, built from every daily challenge's "primitives" list.
+    import html as _h
+    cats = {}
+    for k in sorted(daily, key=lambda k: daily[k].get('order', 0)):
+        for p in daily[k].get('primitives', []):
+            key = (p.get('cat', 'Other'), p.get('name', ''))
+            if key not in cats:
+                cats[key] = (p, k)
+    CAT_ORDER = ['Strings', 'Numbers', 'Regex', 'Arrays', 'Objects', 'Map & Set', 'Dates', 'Timers', 'Promises & async', 'Events', 'DOM', 'React', 'TypeScript', 'CSS', 'Other']
+    by_cat = {}
+    for (cat, name), (p, k) in cats.items():
+        by_cat.setdefault(cat, []).append((p, k))
+    prim_sections = []
+    for cat in sorted(by_cat, key=lambda c: CAT_ORDER.index(c) if c in CAT_ORDER else 99):
+        rows = ''.join(
+            f'<tr><td><code>{_h.escape(p["name"])}</code></td><td><code>{_h.escape(p["syntax"])}</code>'
+            + (f'<br><code>{_h.escape(p["example"])}</code>' if p.get("example") else '')
+            + f'</td><td>{p.get("note", "")}</td><td>Day {daily[k].get("order", "")}</td></tr>'
+            for p, k in by_cat[cat])
+        prim_sections.append(f'<h2>{_h.escape(cat)}</h2><div class="table-wrap"><table class="prim-table"><tr><th>Primitive</th><th>Syntax · example</th><th>What it does</th><th>First used</th></tr>{rows}</table></div>')
+    tpl_prims = ('<template id="tpl-primitives"><h1>Primitives</h1><p class="lede">Every small building block the daily challenges use, '
+                 'grouped by topic. Each challenge shows its own few at the top of the task; this page collects them all. '
+                 'If you can type a row from memory, you own it.</p>' + ''.join(prim_sections) + '</template>')
+    html = (SRC / 'head.html').read_text() + extra_head + '\n' + (SRC / 'body.html').read_text() + '\n' + lessons + '\n' + tpl_daily + '\n' + tpl_prims + '\n<script>\n' + js + '\n</script>\n'
     pathlib.Path(out_path).write_text(html)
     return exfiles
 

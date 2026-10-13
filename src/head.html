@@ -471,6 +471,20 @@ body.toc-collapsed .toc-select { display: block; width: 100%; max-width: 720px; 
 .task-scroll code { font-family: var(--font-mono); font-size: 12px; background: var(--ide-raised); padding: 1px 5px; border-radius: 4px; color: #E7ECF6; }
 .task-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .task-meta span { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--ide-raised); color: var(--ide-muted); }
+
+.prims { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--ide-line); border-radius: 8px; background: var(--ide-panel-2); }
+.prims h3 { margin: 0 0 4px; }
+.prims-lede { margin: 0 0 8px; font-size: 12px; color: var(--ide-muted); }
+.prim { padding: 8px 0; border-top: 1px solid var(--ide-line); }
+.prim:first-of-type { border-top: 0; }
+.prim-head { display: flex; align-items: center; gap: 8px; }
+.prim-name { font-size: 13px; font-weight: 600; }
+.prim-cat { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--ide-muted); margin-left: auto; }
+.prim-code { margin: 6px 0 4px; padding: 6px 8px; border-radius: 6px; background: var(--ide-bg); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; }
+.prim-note { margin: 0; font-size: 12px; color: var(--ide-muted); }
+.prim-note a { color: var(--ide-blue); }
+.prim-table td code { white-space: pre-wrap; }
+
 .req { list-style: none; padding: 0 !important; display: grid; gap: 4px; }
 .req label { display: flex; gap: 10px; align-items: flex-start; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
 .req label:hover { background: var(--ide-panel-2); }

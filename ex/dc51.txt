@@ -77,6 +77,28 @@ export async function getScopes(): Promise<Scope[]> {
   await randomDelay(400, 1200);
   return SCOPES.map(copy);
 }
+@@@ shared src/components/Field.tsx
+import React from 'react';
+
+type FieldProps = {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+};
+
+export default function Field({ label, hint, children }: FieldProps) {
+  let hintEl = null;
+  if (hint) {
+    hintEl = <span className="field-hint">{hint}</span>;
+  }
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      {children}
+      {hintEl}
+    </label>
+  );
+}
 @@@ shared src/utils/tree.ts
 import type { Scope } from '../api';
 
@@ -105,27 +127,47 @@ export function countLeaves(nodes: Scope[]): number {
   });
   return total;
 }
-@@@ shared src/components/Field.tsx
-import React from 'react';
 
-type FieldProps = {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-};
+function matches(node: Scope, q: string): boolean {
+  return node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q);
+}
 
-export default function Field({ label, hint, children }: FieldProps) {
-  let hintEl = null;
-  if (hint) {
-    hintEl = <span className="field-hint">{hint}</span>;
+function addSubtree(node: Scope, out: Set<string>) {
+  out.add(node.id);
+  (node.children || []).forEach((child) => {
+    addSubtree(child, out);
+  });
+}
+
+// Returns true if anything in `nodes` ended up visible.
+function collectVisible(nodes: Scope[], q: string, out: Set<string>): boolean {
+  let any = false;
+  nodes.forEach((node) => {
+    if (matches(node, q)) {
+      addSubtree(node, out);
+      any = true;
+      return;
+    }
+    if (node.children && collectVisible(node.children, q, out)) {
+      out.add(node.id); // an ancestor of a match
+      any = true;
+    }
+  });
+  return any;
+}
+
+// Ids to show for a filter query (label or id, case-insensitive): every match,
+// everything inside a matching group, and every ancestor of a match.
+// Empty query -> null, meaning "no filter, show everything".
+// getVisibleIds(scopes, 'billing') -> Set { "org", "org:billing" }
+export function getVisibleIds(nodes: Scope[], query: string): Set<string> | null {
+  const q = query.trim().toLowerCase();
+  if (q === '') {
+    return null;
   }
-  return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      {children}
-      {hintEl}
-    </label>
-  );
+  const out = new Set<string>();
+  collectVisible(nodes, q, out);
+  return out;
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
@@ -306,7 +348,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getScopes } from './api';
 import type { Scope } from './api';
 import Field from './components/Field';
-import { isLeaf, getLeafIds, countLeaves } from './utils/tree';
+import { isLeaf, getLeafIds, countLeaves, getVisibleIds } from './utils/tree';
 
 function TopNav() {
   return (
@@ -317,6 +359,7 @@ function TopNav() {
   );
 }
 
+// CORE: a checkbox that can show the native indeterminate dash
 type TriCheckboxProps = {
   id: string;
   checked: boolean;
@@ -348,35 +391,7 @@ function TriCheckbox({ id, checked, indeterminate, onToggle }: TriCheckboxProps)
   );
 }
 
-function matches(node: Scope, q: string): boolean {
-  return node.label.toLowerCase().includes(q) || node.id.toLowerCase().includes(q);
-}
-
-function addSubtree(node: Scope, out: Set<string>) {
-  out.add(node.id);
-  (node.children || []).forEach((child) => {
-    addSubtree(child, out);
-  });
-}
-
-// Fills `out` with ids to show: matches, everything under a matching group,
-// and the ancestors of any match. Returns true if anything in `nodes` is visible.
-function collectVisible(nodes: Scope[], q: string, out: Set<string>): boolean {
-  let any = false;
-  nodes.forEach((node) => {
-    if (matches(node, q)) {
-      addSubtree(node, out);
-      any = true;
-      return;
-    }
-    if (node.children && collectVisible(node.children, q, out)) {
-      out.add(node.id);
-      any = true;
-    }
-  });
-  return any;
-}
-
+// CORE: props for the recursive node (CHANGE adds `visible`)
 type ScopeNodeProps = {
   node: Scope;
   selected: Set<string>;
@@ -385,7 +400,7 @@ type ScopeNodeProps = {
 };
 
 function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
-  // derived: a group's state comes from its leaves, never stored
+  // CORE: derived: a group's state comes from its leaves, never stored
   const leafIds = getLeafIds(node);
   const onCount = leafIds.filter((id) => {
     return selected.has(id);
@@ -398,6 +413,7 @@ function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
     children = (
       <ul className="scope-children" role="group">
         {(node.children || []).map((child) => {
+          // CHANGE: skip nodes the filter hides
           if (visible && !visible.has(child.id)) {
             return null;
           }
@@ -407,6 +423,7 @@ function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
     );
   }
 
+  // NEXT: selected / mixed row styling
   let rowCls = 'scope-row';
   if (checked) {
     rowCls = 'scope-row is-on';
@@ -414,11 +431,13 @@ function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
     rowCls = 'scope-row is-mixed';
   }
 
+  // NEXT: "2/5" on group rows
   let count = null;
   if (!isLeaf(node)) {
     count = <span className="scope-count">{onCount}/{leafIds.length}</span>;
   }
 
+  // CORE: checkbox + clickable label
   const inputId = 'scope-' + node.id;
   return (
     <li className="scope">
@@ -436,6 +455,7 @@ function ScopeNode({ node, selected, visible, onToggle }: ScopeNodeProps) {
   );
 }
 
+// CORE: selection comes in from App
 type PermissionsCardProps = {
   selected: Set<string>;
   onToggle: (node: Scope) => void;
@@ -445,6 +465,7 @@ type PermissionsCardProps = {
 function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) {
   const [scopes, setScopes] = useState<Scope[]>([]);
   const [loading, setLoading] = useState(true);
+  // CHANGE: filter text
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -461,21 +482,19 @@ function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) 
     };
   }, []);
 
-  // derived
+  // CORE: derived total for "3 of 12 selected"
   const total = countLeaves(scopes);
-  const q = query.trim().toLowerCase();
-  let visible: Set<string> | null = null;
-  if (q !== '') {
-    visible = new Set<string>();
-    collectVisible(scopes, q, visible);
-  }
+  // CHANGE: null = no filter; otherwise the ids to render (helper in utils/tree.ts)
+  const visible = getVisibleIds(scopes, query);
 
   let body;
   if (loading) {
     body = <p className="muted-msg">Loading scopes…</p>;
   } else if (visible && visible.size === 0) {
+    // CHANGE: no match
     body = <p className="muted-msg">No scopes match “{query}”.</p>;
   } else {
+    // CORE: pass selection down the tree
     body = (
       <ul className="scope-tree">
         {scopes.map((node) => {
@@ -488,11 +507,13 @@ function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) 
     );
   }
 
+  // NEXT: Clear link only when something is selected
   let clearBtn = null;
   if (selected.size > 0) {
     clearBtn = <button type="button" className="link-btn" onClick={() => { onClear(); }}>Clear</button>;
   }
 
+  // CORE: count in the header (CHANGE: the filter input under it)
   return (
     <section className="card">
       <div className="card-head">
@@ -505,6 +526,7 @@ function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) 
           {clearBtn}
         </div>
       </div>
+      {/* CHANGE: filter input */}
       <div className="scope-search-wrap">
         <input
           className="input scope-search"
@@ -515,6 +537,7 @@ function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) 
           onChange={(e) => { setQuery(e.target.value); }}
         />
       </div>
+      {/* CORE: the tree */}
       {body}
     </section>
   );
@@ -523,12 +546,13 @@ function PermissionsCard({ selected, onToggle, onClear }: PermissionsCardProps) 
 export default function App() {
   const [name, setName] = useState('');
   const [expiry, setExpiry] = useState('30');
-  // Only LEAF ids live in state. Group checkboxes are derived from them.
+  // CORE: only LEAF ids live in state. Group checkboxes are derived from them.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // NEXT: success message
   const [created, setCreated] = useState('');
 
-  // Checking a group selects every leaf under it (even hidden ones).
-  // An indeterminate group also selects all: only a fully checked group clears.
+  // CORE: one toggle for leaves and groups. Checking a group selects every leaf under it
+  // (even hidden ones). An indeterminate group also selects all: only a fully checked group clears.
   function handleToggle(node: Scope) {
     const ids = getLeafIds(node);
     setSelected((prev) => {
@@ -547,6 +571,7 @@ export default function App() {
     });
   }
 
+  // NEXT: "Token … created with 3 scopes."
   function handleGenerate() {
     let noun = 'scopes';
     if (selected.size === 1) {
@@ -555,13 +580,16 @@ export default function App() {
     setCreated('Token “' + name.trim() + '” created with ' + selected.size + ' ' + noun + '.');
   }
 
+  // CORE: Generate needs a name and a scope
   const canGenerate = name.trim() !== '' && selected.size > 0;
 
+  // NEXT: banner
   let banner = null;
   if (created) {
     banner = <p className="success-banner" role="status">{created}</p>;
   }
 
+  // CORE: wire selection into the card and the button
   return (
     <div className="page">
       <TopNav />
@@ -649,19 +677,21 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 }
 
 /* ---- Added: tri-state permission tree ---- */
+/* CORE: checkbox + count pill */
 .tri-check { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
 .scope-text { cursor: pointer; }
+.selection-summary { display: flex; align-items: center; gap: 10px; }
+.selected-count { font-size: 12.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+
+/* NEXT: row states, group counts, Clear link, success banner */
 .scope-row.is-on { background: var(--primary-soft); }
 .scope-row.is-on .scope-code { background: #E0E7FF; color: var(--primary-hover); }
 .scope-row.is-mixed .scope-label { color: var(--primary-hover); }
 .scope-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
-
-.selection-summary { display: flex; align-items: center; gap: 10px; }
-.selected-count { font-size: 12.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .link-btn { border: 0; background: none; padding: 0; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
 .link-btn:hover { color: var(--text); }
+.success-banner { margin: 0 0 16px; padding: 10px 14px; border-radius: 8px; background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-weight: 500; }
 
+/* CHANGE: filter box */
 .scope-search-wrap { padding: 12px 18px 4px; }
 .scope-search { width: 100%; }
-
-.success-banner { margin: 0 0 16px; padding: 10px 14px; border-radius: 8px; background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; font-weight: 500; }

@@ -47,6 +47,48 @@ export async function getProjects(): Promise<Project[]> {
   await randomDelay(400, 1000);
   return PROJECTS.map((p) => ({ ...p }));
 }
+@@@ shared src/components/CheckList.tsx
+import React from 'react';
+
+type CheckListProps = {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+};
+
+// A list of labelled checkboxes. Fully controlled: the parent owns `selected`
+// and decides what a toggle does (toggleInList in utils/list.ts is a good fit).
+export default function CheckList({ options, selected, onToggle }: CheckListProps) {
+  return (
+    <ul className="check-list">
+      {options.map((opt) => {
+        return (
+          <li key={opt}>
+            <label className="check-option">
+              <input type="checkbox" checked={selected.includes(opt)} onChange={() => { onToggle(opt); }} />
+              <span>{opt}</span>
+            </label>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+@@@ shared src/components/Initials.tsx
+import React from 'react';
+
+export default function Initials({ name }: { name: string }) {
+  const parts = name.split(' ');
+  return <span className="initials" aria-hidden="true">{parts[0][0] + parts[parts.length - 1][0]}</span>;
+}
+@@@ shared src/components/StatusBadge.tsx
+import React from 'react';
+import type { Status } from '../api';
+
+export default function StatusBadge({ status }: { status: Status }) {
+  const slug = status.toLowerCase().replace(' ', '-');
+  return <span className={'badge badge-' + slug}>{status}</span>;
+}
 @@@ shared src/utils/list.ts
 // Add the value if it's missing, remove it if it's there. Returns a new array.
 // toggleInList(['a'], 'b') -> ['a', 'b'];  toggleInList(['a', 'b'], 'a') -> ['b']
@@ -60,21 +102,6 @@ export function toggleInList(list: string[], value: string): string[] {
 // Sorted unique values: uniqueSorted(['b', 'a', 'b']) -> ['a', 'b']
 export function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-@@@ shared src/components/StatusBadge.tsx
-import React from 'react';
-import type { Status } from '../api';
-
-export default function StatusBadge({ status }: { status: Status }) {
-  const slug = status.toLowerCase().replace(' ', '-');
-  return <span className={'badge badge-' + slug}>{status}</span>;
-}
-@@@ shared src/components/Initials.tsx
-import React from 'react';
-
-export default function Initials({ name }: { name: string }) {
-  const parts = name.split(' ');
-  return <span className="initials" aria-hidden="true">{parts[0][0] + parts[parts.length - 1][0]}</span>;
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
@@ -193,175 +220,12 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
   .project { grid-template-columns: 1fr auto; }
   .project-owner { display: none; }
 }
-@@@ solution src/components/FilterPopover.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { toggleInList } from '../utils/list';
 
-export type Filters = { statuses: string[]; owners: string[] };
-
-type SectionHeadProps = {
-  title: string;
-  onSelectAll: () => void;
-  onClear: () => void;
-};
-
-function SectionHead({ title, onSelectAll, onClear }: SectionHeadProps) {
-  return (
-    <div className="pop-section-head">
-      <h3>{title}</h3>
-      <button type="button" className="pop-link" onClick={() => { onSelectAll(); }}>Select all</button>
-      <button type="button" className="pop-link" onClick={() => { onClear(); }}>Clear</button>
-    </div>
-  );
-}
-
-type CheckListProps = {
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
-};
-
-function CheckList({ options, selected, onToggle }: CheckListProps) {
-  return (
-    <ul className="pop-options">
-      {options.map((opt) => {
-        return (
-          <li key={opt}>
-            <label className="pop-option">
-              <input type="checkbox" checked={selected.includes(opt)} onChange={() => { onToggle(opt); }} />
-              <span>{opt}</span>
-            </label>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-type FilterPopoverProps = {
-  applied: Filters;
-  statusOptions: string[];
-  ownerOptions: string[];
-  anchorRef: React.RefObject<HTMLButtonElement>;
-  onApply: (filters: Filters) => void;
-  onCancel: () => void;
-};
-
-// Mounted only while open, so the draft starts as a fresh copy of `applied`
-// every time, and Cancel is just "unmount without applying".
-export default function FilterPopover({ applied, statusOptions, ownerOptions, anchorRef, onApply, onCancel }: FilterPopoverProps) {
-  const [draft, setDraft] = useState<Filters>(applied);
-  const [ownerQuery, setOwnerQuery] = useState('');
-  const popRef = useRef<HTMLDivElement>(null);
-
-  // Escape or a click outside (but not on the Filter button itself) cancels.
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    }
-    function handleMouseDown(e: MouseEvent) {
-      const target = e.target as Node;
-      if (popRef.current && popRef.current.contains(target)) {
-        return;
-      }
-      if (anchorRef.current && anchorRef.current.contains(target)) {
-        return;
-      }
-      onCancel();
-    }
-    document.addEventListener('keydown', handleKey);
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, [onCancel, anchorRef]);
-
-  // Move focus into the popover when it opens.
-  useEffect(() => {
-    if (popRef.current) {
-      const first = popRef.current.querySelector<HTMLElement>('input');
-      if (first) {
-        first.focus();
-      }
-    }
-  }, []);
-
-  // derived: owners matching the search box
-  const q = ownerQuery.trim().toLowerCase();
-  const visibleOwners = ownerOptions.filter((o) => {
-    return o.toLowerCase().includes(q);
-  });
-
-  function toggleStatus(value: string) {
-    setDraft((prev) => {
-      return { ...prev, statuses: toggleInList(prev.statuses, value) };
-    });
-  }
-
-  function toggleOwner(value: string) {
-    setDraft((prev) => {
-      return { ...prev, owners: toggleInList(prev.owners, value) };
-    });
-  }
-
-  // "Select all" / "Clear" act on what you can see.
-  function selectVisibleOwners() {
-    setDraft((prev) => {
-      const extra = visibleOwners.filter((o) => {
-        return !prev.owners.includes(o);
-      });
-      return { ...prev, owners: [...prev.owners, ...extra] };
-    });
-  }
-
-  function clearVisibleOwners() {
-    setDraft((prev) => {
-      return {
-        ...prev,
-        owners: prev.owners.filter((o) => {
-          return !visibleOwners.includes(o);
-        }),
-      };
-    });
-  }
-
-  let ownerList = <CheckList options={visibleOwners} selected={draft.owners} onToggle={toggleOwner} />;
-  if (visibleOwners.length === 0) {
-    ownerList = <p className="pop-empty">No one matches “{ownerQuery}”</p>;
-  }
-
-  return (
-    <div className="popover" role="dialog" aria-label="Filter projects" ref={popRef}>
-      <section className="pop-section">
-        <SectionHead
-          title="Status"
-          onSelectAll={() => { setDraft((prev) => { return { ...prev, statuses: [...statusOptions] }; }); }}
-          onClear={() => { setDraft((prev) => { return { ...prev, statuses: [] }; }); }}
-        />
-        <CheckList options={statusOptions} selected={draft.statuses} onToggle={toggleStatus} />
-      </section>
-      <section className="pop-section">
-        <SectionHead title="Owner" onSelectAll={selectVisibleOwners} onClear={clearVisibleOwners} />
-        <input
-          className="pop-search"
-          type="search"
-          placeholder="Search people"
-          aria-label="Search owners"
-          value={ownerQuery}
-          onChange={(e) => { setOwnerQuery(e.target.value); }}
-        />
-        {ownerList}
-      </section>
-      <footer className="pop-footer">
-        <button type="button" className="btn-ghost" onClick={() => { onCancel(); }}>Cancel</button>
-        <button type="button" className="btn-dark" onClick={() => { onApply(draft); }}>Apply</button>
-      </footer>
-    </div>
-  );
-}
+/* CheckList (components/CheckList.tsx) */
+.check-list { list-style: none; margin: 0; padding: 0; max-height: 186px; overflow-y: auto; }
+.check-option { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
+.check-option:hover { background: #F7F5F0; }
+.check-option input { width: 15px; height: 15px; margin: 0; accent-color: var(--ink); }
 @@@ solution src/App.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getProjects, STATUSES } from './api';
@@ -372,16 +236,14 @@ import FilterPopover from './components/FilterPopover';
 import type { Filters } from './components/FilterPopover';
 import { uniqueSorted } from './utils/list';
 
+// CORE: empty group = "any"
 const EMPTY: Filters = { statuses: [], owners: [] };
 
-// Change: the URL is the source of truth on load (shareable links).
-function readFiltersFromUrl(): Filters {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return { statuses: params.getAll('status'), owners: params.getAll('owner') };
-  } catch (e) {
-    return EMPTY;
-  }
+// CORE: OR within a group, AND across groups (CHANGE reuses it for the preview count)
+function matchesFilters(p: Project, f: Filters): boolean {
+  const statusOk = f.statuses.length === 0 || f.statuses.includes(p.status);
+  const ownerOk = f.owners.length === 0 || f.owners.includes(p.owner);
+  return statusOk && ownerOk;
 }
 
 function ProjectList({ projects }: { projects: Project[] }) {
@@ -403,6 +265,7 @@ function ProjectList({ projects }: { projects: Project[] }) {
   );
 }
 
+// NEXT: removable chips
 type ChipsProps = {
   filters: Filters;
   onRemove: (kind: 'statuses' | 'owners', value: string) => void;
@@ -438,8 +301,10 @@ function FilterChips({ filters, onRemove, onClearAll }: ChipsProps) {
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [applied, setApplied] = useState<Filters>(readFiltersFromUrl); // lazy: read once
+  // CORE: applied filters live here (list, chips and badge read them); the draft lives in the popover
+  const [applied, setApplied] = useState<Filters>(EMPTY);
   const [open, setOpen] = useState(false);
+  // NEXT: focus goes back to the button
   const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -456,25 +321,8 @@ export default function App() {
     };
   }, []);
 
-  // Change: mirror applied filters into the query string, keeping any other params and the hash.
-  useEffect(() => {
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('status');
-      url.searchParams.delete('owner');
-      applied.statuses.forEach((s) => {
-        url.searchParams.append('status', s);
-      });
-      applied.owners.forEach((o) => {
-        url.searchParams.append('owner', o);
-      });
-      window.history.replaceState(null, '', url.toString());
-    } catch (e) {
-      // sandboxed iframes can block history: filters still work without the URL
-    }
-  }, [applied]);
-
-  // useCallback: the popover's document listeners depend on it
+  // CORE: close (NEXT: useCallback, because the popover's document listeners depend on it,
+  // and return focus to the Filter button)
   const closePopover = useCallback(() => {
     setOpen(false);
     if (filterBtnRef.current) {
@@ -482,11 +330,13 @@ export default function App() {
     }
   }, []);
 
+  // CORE
   function handleApply(next: Filters) {
     setApplied(next);
     closePopover();
   }
 
+  // NEXT: remove one chip
   function handleRemove(kind: 'statuses' | 'owners', value: string) {
     setApplied((prev) => {
       return {
@@ -498,17 +348,26 @@ export default function App() {
     });
   }
 
-  // derived
+  // CHANGE: how many projects a draft would show
+  function countMatches(f: Filters): number {
+    return projects.filter((p) => {
+      return matchesFilters(p, f);
+    }).length;
+  }
+
+  // CORE: derived, never stored
+  // NEXT: owner options from the data
   const ownerOptions = uniqueSorted(projects.map((p) => {
     return p.owner;
   }));
+  // CORE
   const visible = projects.filter((p) => {
-    const statusOk = applied.statuses.length === 0 || applied.statuses.includes(p.status);
-    const ownerOk = applied.owners.length === 0 || applied.owners.includes(p.owner);
-    return statusOk && ownerOk;
+    return matchesFilters(p, applied);
   });
+  // NEXT: the badge and "5 of 18" read this
   const activeCount = applied.statuses.length + applied.owners.length;
 
+  // NEXT: count badge
   let badge = null;
   if (activeCount > 0) {
     badge = <span className="count-badge">{activeCount}</span>;
@@ -519,6 +378,7 @@ export default function App() {
     btnCls = 'filter-btn is-active';
   }
 
+  // CORE: mounted only while open, so every open starts a fresh draft
   let popover = null;
   if (open) {
     popover = (
@@ -527,6 +387,7 @@ export default function App() {
         statusOptions={STATUSES}
         ownerOptions={ownerOptions}
         anchorRef={filterBtnRef}
+        countMatches={countMatches}
         onApply={handleApply}
         onCancel={closePopover}
       />
@@ -537,6 +398,7 @@ export default function App() {
   if (loading) {
     body = <p className="muted-msg">Loading projects…</p>;
   } else if (visible.length === 0) {
+    // NEXT: empty state
     body = (
       <div className="empty">
         <p>No projects match these filters.</p>
@@ -544,14 +406,17 @@ export default function App() {
       </div>
     );
   } else {
+    // CORE
     body = <ProjectList projects={visible} />;
   }
 
+  // NEXT: "5 of 18 projects"
   let countText = projects.length + ' projects';
   if (activeCount > 0) {
     countText = visible.length + ' of ' + projects.length + ' projects';
   }
 
+  // CORE: anchor wrapper + toggle button (NEXT: ref, aria-haspopup, aria-expanded)
   return (
     <div className="app">
       <header className="header">
@@ -575,6 +440,7 @@ export default function App() {
         </div>
         <span className="result-count">{countText}</span>
       </div>
+      {/* NEXT */}
       <FilterChips filters={applied} onRemove={handleRemove} onClearAll={() => { setApplied(EMPTY); }} />
       {body}
     </div>
@@ -630,29 +496,41 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
   .project-owner { display: none; }
 }
 
+/* CheckList (components/CheckList.tsx) */
+.check-list { list-style: none; margin: 0; padding: 0; max-height: 186px; overflow-y: auto; }
+.check-option { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
+.check-option:hover { background: #F7F5F0; }
+.check-option input { width: 15px; height: 15px; margin: 0; accent-color: var(--ink); }
+
 /* ---- Added: filter popover, chips, badge ---- */
+/* CORE: anchor, popover, options, footer */
 .filter-anchor { position: relative; }
+/* NEXT: active button + badge */
 .filter-btn.is-active { border-color: var(--ink); }
 .count-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+/* CORE */
 
 .popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 290px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 18px 40px rgba(28, 27, 25, 0.16); }
 .pop-section { padding: 12px 14px 8px; border-bottom: 1px solid #EFECE5; }
 .pop-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .pop-section-head h3 { margin: 0 auto 0 0; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+/* STRETCH: section links + search */
 .pop-link { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; }
 .pop-link:hover { text-decoration: underline; }
 .pop-search { width: 100%; height: 30px; margin: 2px 0 6px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 13px; }
 .pop-search:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
-.pop-options { list-style: none; margin: 0; padding: 0; max-height: 186px; overflow-y: auto; }
-.pop-option { display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
-.pop-option:hover { background: #F7F5F0; }
-.pop-option input { width: 15px; height: 15px; margin: 0; accent-color: var(--ink); }
+/* CORE */
+/* STRETCH */
 .pop-empty { margin: 4px 0 8px; font-size: 12.5px; color: var(--muted); }
+/* CORE */
 .pop-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; }
 .btn-ghost, .btn-dark { height: 32px; padding: 0 14px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn-ghost { border: 1px solid var(--border); background: #fff; color: var(--text); }
 .btn-dark { border: 1px solid var(--ink); background: var(--ink); color: #fff; }
+/* CHANGE: the count in the label must not jiggle the button */
+.btn-dark { min-width: 132px; font-variant-numeric: tabular-nums; }
 
+/* NEXT: chips + empty state */
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 12.5px; }
 .chip-label { color: var(--muted); }
@@ -662,3 +540,172 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 sys
 
 .empty { padding: 36px; text-align: center; background: var(--surface); border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
 .empty p { margin: 0 0 6px; }
+@@@ solution src/components/FilterPopover.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { toggleInList } from '../utils/list';
+import CheckList from './CheckList';
+
+// CORE
+export type Filters = { statuses: string[]; owners: string[] };
+
+// STRETCH: Select all / Clear per section
+type SectionHeadProps = {
+  title: string;
+  onSelectAll: () => void;
+  onClear: () => void;
+};
+
+function SectionHead({ title, onSelectAll, onClear }: SectionHeadProps) {
+  return (
+    <div className="pop-section-head">
+      <h3>{title}</h3>
+      <button type="button" className="pop-link" onClick={() => { onSelectAll(); }}>Select all</button>
+      <button type="button" className="pop-link" onClick={() => { onClear(); }}>Clear</button>
+    </div>
+  );
+}
+
+// CORE: props (NEXT: ownerOptions, anchorRef; CHANGE: countMatches)
+type FilterPopoverProps = {
+  applied: Filters;
+  statusOptions: string[];
+  ownerOptions: string[];
+  anchorRef: React.RefObject<HTMLButtonElement>;
+  countMatches: (filters: Filters) => number;
+  onApply: (filters: Filters) => void;
+  onCancel: () => void;
+};
+
+// Mounted only while open, so the draft starts as a fresh copy of `applied`
+// every time, and Cancel is just "unmount without applying".
+export default function FilterPopover({ applied, statusOptions, ownerOptions, anchorRef, countMatches, onApply, onCancel }: FilterPopoverProps) {
+  // CORE: the draft is a copy; nothing outside changes until Apply
+  const [draft, setDraft] = useState<Filters>(applied);
+  // STRETCH
+  const [ownerQuery, setOwnerQuery] = useState('');
+  // NEXT
+  const popRef = useRef<HTMLDivElement>(null);
+
+  // NEXT: Escape or a click outside (but not on the Filter button itself) cancels.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    }
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (popRef.current && popRef.current.contains(target)) {
+        return;
+      }
+      if (anchorRef.current && anchorRef.current.contains(target)) {
+        return;
+      }
+      onCancel();
+    }
+    document.addEventListener('keydown', handleKey);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [onCancel, anchorRef]);
+
+  // NEXT: move focus into the popover when it opens.
+  useEffect(() => {
+    if (popRef.current) {
+      const first = popRef.current.querySelector<HTMLElement>('input');
+      if (first) {
+        first.focus();
+      }
+    }
+  }, []);
+
+  // STRETCH: derived: owners matching the search box
+  const q = ownerQuery.trim().toLowerCase();
+  const visibleOwners = ownerOptions.filter((o) => {
+    return o.toLowerCase().includes(q);
+  });
+
+  // CORE: toggles only touch the draft
+  function toggleStatus(value: string) {
+    setDraft((prev) => {
+      return { ...prev, statuses: toggleInList(prev.statuses, value) };
+    });
+  }
+
+  // NEXT: the Owner section
+  function toggleOwner(value: string) {
+    setDraft((prev) => {
+      return { ...prev, owners: toggleInList(prev.owners, value) };
+    });
+  }
+
+  // STRETCH: "Select all" / "Clear" act on what you can see.
+  function selectVisibleOwners() {
+    setDraft((prev) => {
+      const extra = visibleOwners.filter((o) => {
+        return !prev.owners.includes(o);
+      });
+      return { ...prev, owners: [...prev.owners, ...extra] };
+    });
+  }
+
+  function clearVisibleOwners() {
+    setDraft((prev) => {
+      return {
+        ...prev,
+        owners: prev.owners.filter((o) => {
+          return !visibleOwners.includes(o);
+        }),
+      };
+    });
+  }
+
+  // NEXT (STRETCH: the no-match message)
+  let ownerList = <CheckList options={visibleOwners} selected={draft.owners} onToggle={toggleOwner} />;
+  if (visibleOwners.length === 0) {
+    ownerList = <p className="pop-empty">No one matches “{ownerQuery}”</p>;
+  }
+
+  // CHANGE: live preview on the Apply button (derived from the draft on every render)
+  const matchCount = countMatches(draft);
+  let applyLabel = 'Show ' + matchCount + ' projects';
+  if (matchCount === 1) {
+    applyLabel = 'Show 1 project';
+  }
+
+  // CORE: Status section + Cancel / Apply
+  return (
+    <div className="popover" role="dialog" aria-label="Filter projects" ref={popRef}>
+      <section className="pop-section">
+        {/* STRETCH: Select all / Clear (Core: a plain <h3>Status</h3>) */}
+        <SectionHead
+          title="Status"
+          onSelectAll={() => { setDraft((prev) => { return { ...prev, statuses: [...statusOptions] }; }); }}
+          onClear={() => { setDraft((prev) => { return { ...prev, statuses: [] }; }); }}
+        />
+        {/* CORE */}
+        <CheckList options={statusOptions} selected={draft.statuses} onToggle={toggleStatus} />
+      </section>
+      {/* NEXT: Owner section (STRETCH: SectionHead + search) */}
+      <section className="pop-section">
+        <SectionHead title="Owner" onSelectAll={selectVisibleOwners} onClear={clearVisibleOwners} />
+        <input
+          className="pop-search"
+          type="search"
+          placeholder="Search people"
+          aria-label="Search owners"
+          value={ownerQuery}
+          onChange={(e) => { setOwnerQuery(e.target.value); }}
+        />
+        {ownerList}
+      </section>
+      {/* CORE */}
+      <footer className="pop-footer">
+        <button type="button" className="btn-ghost" onClick={() => { onCancel(); }}>Cancel</button>
+        <button type="button" className="btn-dark" onClick={() => { onApply(draft); }}>{applyLabel}</button>
+      </footer>
+    </div>
+  );
+}

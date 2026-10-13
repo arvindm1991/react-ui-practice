@@ -3,8 +3,8 @@
   "kind": "drill",
   "level": 1,
   "order": 1,
-  "minutes": 10,
-  "changeAt": 7,
+  "minutes": 13,
+  "changeAt": 9,
   "title": "Like button",
   "focus": "src/App.tsx",
   "summary": "A photo post card is built. Make the heart toggle, fill red, and keep the like count in sync.",
@@ -14,16 +14,16 @@
    "callback props",
    "derived value"
   ],
-  "brief": "<p>A small photo-sharing app, <b>lumen</b>. <code>App.tsx</code> has <code>TopBar</code>, <code>PostCard</code>, <code>PostHeader</code>, <code>PostPhoto</code> and an empty <code>LikeButton</code>. No API: the post is a constant.</p><p>Read <code>components/Icons.tsx</code> and <code>utils/format.ts</code> first. The heart icon and the \"241 likes\" text helper already exist and are worth reusing.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The heart, the likes line and (later) the photo all depend on <i>liked</i>, so the state goes in <code>PostCard</code>, the closest common parent. <code>LikeButton</code> gets <code>liked</code> and <code>onToggle</code> as props and stays dumb. The count is <code>post.likes + 1</code> when liked. I won't store the count, I'll derive it.\"</p></div></details>",
+  "brief": "<p>A small photo-sharing app, <b>lumen</b>. <code>App.tsx</code> has <code>TopBar</code>, <code>PostCard</code>, <code>PostHeader</code>, <code>PostPhoto</code> and a static <code>LikeButton</code>. No API: the post is a constant.</p><p>Read <code>components/Icons.tsx</code> and <code>utils/format.ts</code> first. The heart icon (it takes a <code>filled</code> prop) and the \"241 likes\" text helper already exist and are worth reusing.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The heart, the likes line and (later) the photo all depend on <i>liked</i>, so the state goes in <code>PostCard</code>, the closest common parent. <code>LikeButton</code> gets <code>liked</code> and <code>onToggle</code> as props and stays dumb. The count is <code>post.likes + 1</code> when liked. I won't store the count, I'll derive it.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next"
   ],
   "requirements": [
-   "Clicking the heart toggles liked. Liked: the heart is <b>filled</b> and red (<code>--like</code>, #E8445A). Clicking again unlikes it (outline, dark)",
+   "Clicking the heart toggles liked. Liked: the heart is <b>filled</b> (<code>&lt;HeartIcon filled /&gt;</code>) and red (add <code>is-liked</code> to the button). Clicking again unlikes it (outline, dark)",
    "The likes line reads <b>\"241 likes\"</b>, and <b>\"242 likes\"</b> while liked. The count is derived from <code>post.likes</code>, not kept in its own state",
-   "The button's <code>aria-label</code> is \"Like\" / \"Unlike\" and it has <code>aria-pressed</code>. The heart does a quick scale \"pop\" when liked"
+   "The button's <code>aria-label</code> is \"Like\" / \"Unlike\" and it has <code>aria-pressed</code> (true while liked). The CSS \"pop\" then plays on its own when liked"
   ],
   "change": {
    "title": "Double-click to like",
@@ -90,14 +90,40 @@
      "14 / 700"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "useState updater form",
+    "syntax": "setX((prev) => { return newValue; })",
+    "example": "setLiked((prev) => { return !prev; });   // false -> true -> false",
+    "note": "Pass a <b>function</b> when the new state depends on the old one. React calls it with the latest value, so quick double clicks never read a stale value. Returns nothing; it schedules a re-render.",
+    "search": "react useState updater function"
+   },
+   {
+    "cat": "TypeScript",
+    "name": "Callback prop types",
+    "syntax": "type Props = { liked: boolean; onToggle: () => void; }",
+    "example": "function LikeButton({ liked, onToggle }: Props) { … }\n<LikeButton liked={liked} onToggle={handleToggle} />",
+    "note": "<code>() =&gt; void</code> means \"a function that takes nothing and returns nothing\". With an argument: <code>(id: string) =&gt; void</code>. Pass the function itself, not <code>handleToggle()</code>.",
+    "search": "typescript function type props react"
+   },
+   {
+    "cat": "Events",
+    "name": "onDoubleClick",
+    "syntax": "<div onDoubleClick={() => { … }}>",
+    "example": "<div className=\"photo\" onDoubleClick={() => { onDoubleClick(); }} />",
+    "note": "Fires after two quick clicks on the same element (each click also fires <code>onClick</code> first). Works on any element, not just buttons.",
+    "search": "mdn dblclick event"
+   }
+  ]
  },
  "dc02": {
   "kind": "drill",
   "level": 1,
   "order": 2,
-  "minutes": 10,
-  "changeAt": 7,
+  "minutes": 12,
+  "changeAt": 8,
   "title": "Bio character counter",
   "focus": "src/App.tsx",
   "summary": "A dev-profile settings page. Add a live \"characters left\" counter with warning and over-limit states.",
@@ -107,18 +133,18 @@
    "conditional classes",
    "disabled button"
   ],
-  "brief": "<p>Settings page of a developer platform, <b>forge</b>. <code>ProfileForm</code> already holds <code>bio</code> in state (a controlled textarea) and saves on click. <code>BIO_LIMIT</code> is 160. No API.</p><p>Read <code>components/Field.tsx</code>: the counter goes inside the Bio <code>Field</code>, under the textarea.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>bio</code> is already state, so everything new is derived from <code>bio.length</code>: remaining, the status (ok / warn / over) and the label. Nothing new goes in state. I'll pull it into a small <code>BioMeter</code> component that takes the length, and compute <code>isOver</code> in the form for the Save button.\"</p></div></details>",
+  "brief": "<p>Settings page of a developer platform, <b>forge</b>. <code>ProfileForm</code> already holds <code>bio</code> in state (a controlled textarea) and saves on click. <code>BIO_LIMIT</code> is 160. No API.</p><p>Read <code>components/Field.tsx</code>: the counter goes inside the Bio <code>Field</code>, under the textarea.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"<code>bio</code> is already state, so everything new is derived from <code>bio.length</code>: remaining, the text and (later) the status. Nothing new goes in state. I'll pull it into a small <code>BioMeter</code> component that takes the length, and compute <code>isOver</code> in the form for the Save button.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
-   "Under the bio, right-aligned and monospace: <b>\"96 characters left\"</b>, updating as you type. Exactly 1 reads <b>\"1 character left\"</b>",
-   "Under 20 left the counter turns amber (<code>--warn</code>). Over the limit it turns red (<code>--danger</code>) and reads <b>\"5 characters over\"</b> (never a negative number)",
+   "Under the bio, right-aligned and monospace (<code>.bio-meter</code> &gt; <code>.bio-count</code>): <b>\"96 characters left\"</b>, updating as you type. Exactly 1 reads <b>\"1 character left\"</b>. Over the limit it reads <b>\"5 characters over\"</b> (never a negative number)",
    "<b>Save profile</b> is disabled while the bio is over 160 characters",
-   "While over, the textarea border turns red too"
+   "Under 20 left the counter turns amber (<code>is-warn</code> on <code>.bio-meter</code>). Over the limit it turns red (<code>is-over</code>)",
+   "While over, the textarea border turns red too (<code>is-over</code> on the textarea)"
   ],
   "change": {
    "title": "Progress bar",
@@ -126,17 +152,17 @@
   },
   "hints": [
    "You need no new state. <code>const remaining = BIO_LIMIT - bio.length;</code>",
-   "Decide one status string above the return (<code>\"ok\"</code>, <code>\"warn\"</code>, <code>\"over\"</code>) and use it for the class: <code>\"bio-meter is-\" + status</code>. One decision, used everywhere.",
-   "For \"over\", flip the sign: <code>-remaining + \" characters over\"</code>.",
-   "Disable with <code>disabled={isOver}</code>, and style it with <code>.btn-primary:disabled</code> (already in the CSS).",
-   "For the bar, search: <b>mdn Math.min</b>. <code>Math.min(100, (length / BIO_LIMIT) * 100)</code>."
+   "Text with an <code>if / else if</code> chain above the return. For \"over\", flip the sign: <code>-remaining + \" characters over\"</code> (or <code>Math.abs(remaining)</code>). Search: <b>mdn Math.abs</b>.",
+   "Disable with <code>disabled={isOver}</code>, where <code>const isOver = bio.length &gt; BIO_LIMIT;</code>. <code>.btn-primary:disabled</code> is already styled.",
+   "Next: decide one status string above the return (<code>\"ok\"</code>, <code>\"warn\"</code>, <code>\"over\"</code>) and use it for the class: <code>\"bio-meter is-\" + status</code>. One decision, used everywhere.",
+   "Change: search <b>mdn Math.min</b>. <code>const percent = Math.min(100, (length / BIO_LIMIT) * 100);</code> then <code>style={{ width: percent + \"%\" }}</code> (build the object above the return)."
   ],
   "rubric": [
    "No new state: all derived from bio.length",
-   "Status decided once, reused for color and text",
    "Singular / plural and \"over\" wording correct",
    "Save disabled exactly when over",
    "Counter placed inside the existing Field",
+   "Status decided once, reused for colour classes",
    "Bar width capped at 100%"
   ],
   "spec": {
@@ -180,52 +206,90 @@
      "border --danger · 3px ring"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Strings",
+    "name": "Template literals",
+    "syntax": "`${value} text`",
+    "example": "const n = 96;\n`${n} characters left`   // \"96 characters left\"",
+    "note": "Backticks, not quotes. Anything inside <code>${ }</code> is evaluated and turned into text. Same result as <code>n + \" characters left\"</code>, easier to read.",
+    "search": "mdn template literals"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Math.abs()",
+    "syntax": "Math.abs(n)",
+    "example": "Math.abs(-5)   // 5\nMath.abs(5)    // 5",
+    "note": "Returns the number without its sign. Handy for \"5 characters over\" when <code>remaining</code> is <code>-5</code>. <code>-remaining</code> works too.",
+    "search": "mdn math abs"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Math.min() as a cap",
+    "syntax": "Math.min(limit, value)",
+    "example": "Math.min(100, 112.5)   // 100\nMath.min(100, 40)      // 40",
+    "note": "Returns the <b>smallest</b> argument, so it caps a value at a maximum. (Math.max does the opposite: a floor.)",
+    "search": "mdn math min"
+   },
+   {
+    "cat": "React",
+    "name": "style prop (inline style object)",
+    "syntax": "style={{ width: percent + \"%\" }}",
+    "example": "const fillStyle = { width: 50 + \"%\" };\n<div className=\"fill\" style={fillStyle} />   // width: 50%",
+    "note": "React takes an <b>object</b>, not a CSS string. Property names are camelCase (<code>backgroundColor</code>). Use it only for values computed at runtime; everything else stays in CSS classes.",
+    "search": "react style prop"
+   }
+  ]
  },
  "dc03": {
   "kind": "drill",
   "level": 1,
   "order": 3,
-  "minutes": 12,
-  "changeAt": 8,
+  "minutes": 15,
+  "changeAt": 10,
   "title": "Password show/hide + strength",
   "focus": "src/App.tsx",
-  "summary": "A bank sign-up form. Add a Show/Hide toggle and a 3-level strength meter derived from the password.",
+  "summary": "A bank sign-up form. Add a Show/Hide toggle and a Weak / Fair / Strong label derived from three password rules.",
   "skills": [
    "boolean toggle",
    "derived values",
    "regex test",
-   "segmented meter"
+   "lookup array"
   ],
-  "brief": "<p>The account sign-up form for <b>Ledgerly</b>, a business bank. <code>SignUpForm</code> already holds <code>email</code> and <code>password</code> as controlled inputs. The password input sits in an empty <code>.password-wrap</code> (already <code>position: relative</code>). No API.</p><p>The strength rules: <b>8+ characters</b>, <b>contains a number</b>, <b>contains a symbol</b> (anything not a letter or digit). Each rule met adds one level.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Only one new piece of state: <code>showPassword</code>. The strength is derived from <code>password</code>, so I'll write a pure <code>getRules(password)</code> that returns three rules with <code>met</code> booleans, count them for the score, and pass that to a <code>StrengthMeter</code>. Empty password shows nothing; anything typed is at least Weak.\"</p></div></details>",
+  "brief": "<p>The account sign-up form for <b>Ledgerly</b>, a business bank. <code>SignUpForm</code> already holds <code>email</code> and <code>password</code> as controlled inputs. The password input sits in an empty <code>.password-wrap</code> (already <code>position: relative</code>). No API.</p><p>The strength rules: <b>8+ characters</b>, <b>contains a number</b>, <b>contains a symbol</b> (anything not a letter or digit). Count the rules met: 0–1 → Weak, 2 → Fair, 3 → Strong.</p><p><b>The CSS is already written</b> (bottom of <code>styles.css</code>, marked CORE / NEXT / CHANGE): today is about React, not stylesheets. Use <code>.show-btn</code>, <code>.strength</code> + <code>.strength-label</code>, and later <code>.segments</code> / <code>.segment</code> and <code>.rules</code> / <code>.rule</code>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working (Show/Hide + the text label). <b>Strong:</b> plus 3–4 (bars + disabled button).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Only one new piece of state: <code>showPassword</code>. Everything about strength is derived from <code>password</code> on each render: three true/false checks (two of them with <code>RegExp.test</code>), count how many are true, and look the word up in <code>['Weak', 'Weak', 'Fair', 'Strong']</code>. Empty password means no label. The input's <code>type</code> and the button text are decided above the return. The button needs <code>type=\\\"button\\\"</code> or it submits the form.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
+   "Next",
    "Next"
   ],
   "requirements": [
-   "A <b>Show</b> text button inside the right edge of the password field switches the input to plain text and its label to <b>Hide</b>. Clicking again hides it. It must not submit the form",
-   "Under the password: 3 bar segments + a label. Score = rules met. 1 → <b>Weak</b> (1 red segment), 2 → <b>Fair</b> (2 amber), 3 → <b>Strong</b> (3 green). Empty password: grey segments, no label. Typed but 0 rules met still shows Weak",
+   "A <b>Show</b> text button inside the right edge of the password field (<code>.show-btn</code>) switches the input to plain text and its label to <b>Hide</b>. Clicking again hides it. It must not submit the form",
+   "Under the password, right-aligned, a text label (<code>&lt;div class=\"strength\"&gt;&lt;span class=\"strength-label\"&gt;</code>) from the three rules: 0 or 1 met → <b>Weak</b>, 2 → <b>Fair</b>, 3 → <b>Strong</b>. Empty password: no label. \"abc\" → Weak, \"abcdefgh1\" → Fair, \"abcdefgh1!\" → Strong",
+   "3 bar segments to the left of the label. Lit segments = 1 / 2 / 3 for Weak / Fair / Strong (grey when empty), coloured red / amber / green, and the label takes the same colour (put <code>is-weak</code> / <code>is-fair</code> / <code>is-strong</code> on <code>.strength</code>, <code>is-on</code> on lit segments)",
    "<b>Create account</b> is disabled until the email contains \"@\" and the password is Strong"
   ],
   "change": {
    "title": "Show the rules",
-   "html": "<p>\"Users don't know what makes it Strong.\"</p><ul><li>Under the meter, list the three rules: \"At least 8 characters\", \"Contains a number\", \"Contains a symbol\".</li><li>Unmet: muted with ○. Met: green with ✓. Updates as you type.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if your rules are already an array of <code>{ id, label, met }</code>, this is one <code>.map</code>.</p>"
+   "html": "<p>\"Users don't know what makes it Strong.\"</p><ul><li>Under the meter, list the three rules: \"At least 8 characters\", \"Contains a number\", \"Contains a symbol\".</li><li>Unmet: muted with ○. Met: green with ✓ (<code>.rule</code> / <code>.rule.is-met</code>, <code>.rule-mark</code> are styled). Updates as you type.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if your rules are an array of <code>{ id, label, met }</code>, this is one <code>.map</code>.</p>"
   },
   "hints": [
-   "The toggle is <code>type={inputType}</code> where <code>inputType</code> is <code>\"password\"</code> or <code>\"text\"</code>, decided above the return.",
-   "A <code>&lt;button&gt;</code> inside a form submits it by default. Give it <code>type=\"button\"</code>. Search: <b>mdn button type attribute</b>.",
-   "Test a string with a regex: <code>/\\d/.test(password)</code> for a number, <code>/[^A-Za-z0-9]/.test(password)</code> for a symbol. Search: <b>mdn RegExp test</b>.",
-   "Score: <code>rules.filter((r) =&gt; { return r.met; }).length</code>. Level: <code>0</code> if empty, else <code>Math.max(score, 1)</code>.",
-   "Segments: <code>[1, 2, 3].map((n) =&gt; { ... })</code> with <code>is-on</code> when <code>n &lt;= level</code>, and one class on the wrapper (<code>is-weak</code> / <code>is-fair</code> / <code>is-strong</code>) to color them."
+   "The toggle is <code>type={inputType}</code> where <code>inputType</code> is <code>\"password\"</code> or <code>\"text\"</code>, decided above the return with an <code>if</code>.",
+   "A <code>&lt;button&gt;</code> inside a <code>&lt;form&gt;</code> submits it by default. Give it <code>type=\"button\"</code>. Search: <b>mdn button type attribute</b>.",
+   "Test a string with a regex: <code>/\\d/.test(password)</code> is true when it contains a digit; <code>/[^A-Za-z0-9]/.test(password)</code> when it contains a symbol. Search: <b>mdn RegExp test</b>.",
+   "Count with an array: <code>const rules = [{ id: \"length\", label: \"At least 8 characters\", met: password.length &gt;= 8 }, …];</code> then <code>const score = rules.filter((r) =&gt; { return r.met; }).length;</code>",
+   "Word from the score: <code>const LEVELS = [\"Weak\", \"Weak\", \"Fair\", \"Strong\"];</code> then <code>let strength = \"\"; if (password !== \"\") { strength = LEVELS[score]; }</code> and render <code>&lt;span className=\"strength-label\"&gt;{strength}&lt;/span&gt;</code>.",
+   "Next: segments are <code>[1, 2, 3].map((n) =&gt; { … })</code> with <code>is-on</code> when <code>n &lt;= level</code> (level = <code>Math.max(score, 1)</code> when typed), and one class on <code>.strength</code> (<code>\"strength is-\" + strength.toLowerCase()</code>) colours everything."
   ],
   "rubric": [
    "Only showPassword is new state; strength is derived",
-   "Rules written as a pure function",
-   "Toggle button is type=\"button\" and labelled",
-   "Empty vs typed handled",
-   "Segments built with map, colored by one wrapper class",
-   "Submit gate uses the same derived values"
+   "Toggle button is type=\"button\" (and labelled)",
+   "Regex checks use .test, not manual loops",
+   "Empty vs typed handled (no label when empty, Weak when typed)",
+   "Score → word via a lookup, decided above the return",
+   "Segments built with map, coloured by one wrapper class",
+   "Submit gate reuses the same derived strength"
   ],
   "spec": {
    "colors": [
@@ -276,14 +340,48 @@
      "13 · gap 4"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Regex",
+    "name": "RegExp.test()",
+    "syntax": "/pattern/.test(str)",
+    "example": "/\\d/.test('abc1')   // true  (contains a digit)\n/\\d/.test('abc')    // false",
+    "note": "Returns <b>true/false</b>: does the string contain a match anywhere? Perfect for simple checks like \"has a number\". Write the regex between slashes, no quotes.",
+    "search": "mdn regexp test"
+   },
+   {
+    "cat": "Regex",
+    "name": "Character classes: \\d and [^...]",
+    "syntax": "/\\d/   /[A-Z]/   /[^A-Za-z0-9]/",
+    "example": "/[^A-Za-z0-9]/.test('pass!')   // true  ('!' is not a letter or digit)\n/[A-Z]/.test('pass')          // false",
+    "note": "<code>\\d</code> = any digit. <code>[abc]</code> = any one of these. <code>[^abc]</code> = any character <b>except</b> these (the ^ inside brackets means NOT). So <code>[^A-Za-z0-9]</code> = a symbol or space.",
+    "search": "mdn regex character classes"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Count matches: filter().length",
+    "syntax": "arr.filter((x) => { return test; }).length",
+    "example": "[true, false, true].filter((ok) => { return ok; }).length   // 2",
+    "note": "<code>filter</code> returns a <b>new array</b> of the items where the callback returned true; <code>.length</code> of that is the count. The original array is not changed.",
+    "search": "mdn array filter"
+   },
+   {
+    "cat": "DOM",
+    "name": "<button type=\"button\">",
+    "syntax": "<button type=\"button\" onClick={...}>Show</button>",
+    "example": "// inside a <form>:\n<button>Show</button>               // submits the form!\n<button type=\"button\">Show</button> // just a click",
+    "note": "A button inside a form defaults to <code>type=\"submit\"</code>. Any button that is not the submit button needs <code>type=\"button\"</code>. Same idea: <code>&lt;input type={inputType}&gt;</code> switches between <code>\"password\"</code> and <code>\"text\"</code>.",
+    "search": "mdn button type attribute"
+   }
+  ]
  },
  "dc04": {
   "kind": "drill",
   "level": 1,
   "order": 4,
-  "minutes": 12,
-  "changeAt": 8,
+  "minutes": 15,
+  "changeAt": 10,
   "title": "Product page tabs",
   "focus": "src/App.tsx",
   "summary": "A coffee-gear product page. Turn the details section into Description / Specs / Reviews tabs.",
@@ -293,16 +391,16 @@
    "reusing components",
    "lifting state"
   ],
-  "brief": "<p>A product page for <b>Kettle &amp; Co.</b> <code>ProductPage</code> already loads the product from <code>api.ts</code> (<code>getProduct</code> waits 0.4–1.2 s) and shows \"Loading product…\" first. Below the summary it only shows the description.</p><p>Read <code>components/Panels.tsx</code>: <code>DescriptionPanel</code>, <code>SpecsTable</code> and <code>ReviewList</code> are already built. Your job is the tab bar that switches between them.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One piece of state: which tab is active, as an id string, default <code>\"description\"</code>. I'll make a <code>ProductTabs</code> component with an array of <code>{ id, label }</code> and map it to buttons. The panel is chosen above the return with an if/else. If anything outside the tabs ever needs to switch tab, the state moves up to <code>ProductPage</code>.\"</p></div></details>",
+  "brief": "<p>A product page for <b>Kettle &amp; Co.</b> <code>ProductPage</code> already loads the product from <code>api.ts</code> (<code>getProduct</code> waits 0.4–1.2 s) and shows \"Loading product…\" first. Below the summary it only shows the description.</p><p>Read <code>components/Panels.tsx</code>: <code>DescriptionPanel</code>, <code>SpecsTable</code> and <code>ReviewList</code> are already built. Your job is the tab bar that switches between them.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One piece of state: which tab is active, as an id string, default <code>\"description\"</code>. I'll make a <code>ProductTabs</code> component with an array of <code>{ id, label }</code> and map it to buttons. The panel is chosen above the return with an if/else. If anything outside the tabs ever needs to switch tab, the state moves up to <code>ProductPage</code>.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
    "Next"
   ],
   "requirements": [
-   "A tab bar with <b>Description</b>, <b>Specs</b> and <b>Reviews (3)</b> (the count comes from the data). Description is active on load",
-   "Clicking a tab shows only that panel (reuse the three panel components). The active tab is dark, weight 600, with a 2px <code>--accent</code> underline sitting on the bar's bottom border",
-   "Tabs are <code>&lt;button&gt;</code>s with <code>role=\"tab\"</code> and <code>aria-selected</code>; the bar has <code>role=\"tablist\"</code>"
+   "A tab bar (<code>.tabs</code> of <code>&lt;button class=\"tab\"&gt;</code>) with <b>Description</b>, <b>Specs</b> and <b>Reviews (3)</b> (the count comes from the data). Description is active on load",
+   "Clicking a tab shows only that panel (reuse the three panel components). The active tab gets <code>is-active</code> (dark, weight 600, 2px <code>--accent</code> underline: already in the CSS)",
+   "Tab semantics: the bar has <code>role=\"tablist\"</code>, each tab has <code>role=\"tab\"</code> and <code>aria-selected</code>, the panel wrapper has <code>role=\"tabpanel\"</code>"
   ],
   "change": {
    "title": "Rating link jumps to reviews",
@@ -310,12 +408,13 @@
   },
   "hints": [
    "State: <code>const [activeTab, setActiveTab] = useState&lt;TabId&gt;(\"description\");</code> with <code>type TabId = \"description\" | \"specs\" | \"reviews\";</code>",
-   "Choose the panel above the return: <code>let panel = &lt;DescriptionPanel ... /&gt;; if (activeTab === \"specs\") { panel = ...; }</code>",
-   "The underline: <code>position: relative</code> on the tab and an <code>::after</code> at <code>bottom: -1px</code>, 2px high. Search: <b>mdn ::after pseudo-element</b>.",
-   "For the change, lift <code>activeTab</code> to <code>ProductPage</code> and pass <code>activeTab</code> + <code>onChange</code> down to the tabs, and an <code>onReviewsClick</code> to the summary."
+   "Labels as data: <code>const tabs = [{ id: \"description\", label: \"Description\" }, …, { id: \"reviews\", label: \"Reviews (\" + product.reviews.length + \")\" }];</code> then <code>tabs.map(...)</code> to buttons.",
+   "Choose the panel above the return: <code>let panel = &lt;DescriptionPanel ... /&gt;; if (activeTab === \"specs\") { panel = ...; } else if ...</code>",
+   "Change: lift <code>activeTab</code> to <code>ProductPage</code> and pass <code>activeTab</code> + <code>onChange</code> down to the tabs, and an <code>onReviewsClick</code> to the summary. Search: <b>react lifting state up</b>."
   ],
   "rubric": [
    "Active tab stored as an id, not three booleans",
+   "Tabs rendered from an array with map",
    "Panel chosen above the return",
    "Reused the existing panel components",
    "Review count derived from data",
@@ -359,52 +458,89 @@
      "14 · underline offset 3"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "String literal union type",
+    "syntax": "type TabId = 'description' | 'specs' | 'reviews';",
+    "example": "let t: TabId = 'specs';    // ok\nt = 'photos';              // error: not one of the three",
+    "note": "A type that only allows these exact strings. Catches typos at compile time and documents every option in one line.",
+    "search": "typescript literal types union"
+   },
+   {
+    "cat": "React",
+    "name": "useState<Type>(initial)",
+    "syntax": "useState<TabId>('description')",
+    "example": "const [activeTab, setActiveTab] = useState<TabId>('description');\nsetActiveTab('reviews');   // ok",
+    "note": "The <code>&lt;Type&gt;</code> tells TypeScript what the state may hold when it can't guess from the initial value (unions, <code>null</code>, empty arrays).",
+    "search": "react typescript useState generic"
+   },
+   {
+    "cat": "React",
+    "name": "Array.map() to elements, with key",
+    "syntax": "items.map((x) => { return <li key={x.id}>{x.label}</li>; })",
+    "example": "[{ id: 'a', label: 'A' }].map((t) => { return <button key={t.id}>{t.label}</button>; })\n// [<button>A</button>]",
+    "note": "Returns a <b>new array</b> of elements React can render. Each needs a stable, unique <code>key</code> (an id, not the index).",
+    "search": "react rendering lists key"
+   },
+   {
+    "cat": "React",
+    "name": "Passing a setter down",
+    "syntax": "<Child onChange={setActiveTab} />",
+    "example": "function ProductTabs({ onChange }: { onChange: (t: TabId) => void }) { … onChange('specs'); }",
+    "note": "When two siblings need the same state, put it in their parent and pass the value and a callback down. A setter is just a function, so it can be the callback.",
+    "search": "react lifting state up"
+   }
+  ]
  },
  "dc05": {
   "kind": "drill",
   "level": 1,
   "order": 5,
-  "minutes": 12,
-  "changeAt": 8,
+  "minutes": 15,
+  "changeAt": 10,
   "title": "FAQ accordion",
   "focus": "src/App.tsx",
-  "summary": "A hosting pricing page. Make the FAQ an accordion: one item open at a time, chevron rotates.",
+  "summary": "A hosting pricing page. Make the FAQ an accordion: one item open at a time, click again to close.",
   "skills": [
    "single selected id",
    "toggle off",
    "conditional render",
    "object map state"
   ],
-  "brief": "<p>The pricing page for <b>Skyport</b>, a deploy platform. <code>FaqSection</code> maps <code>FAQS</code> (in <code>data/faqs.ts</code>) to <code>FaqItem</code>s. Each question is already a button with a <code>ChevronIcon</code> (points down). Nothing opens yet. No API.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One item open at a time means the state is a single <code>openId</code> (string or null) in <code>FaqSection</code>, not a boolean in each item. Each <code>FaqItem</code> gets <code>isOpen</code> and <code>onToggle(id)</code>. Toggle: if the clicked id is already open, set null, otherwise set it. The chevron rotation is pure CSS on an <code>is-open</code> class.\"</p></div></details>",
+  "brief": "<p>The pricing page for <b>Skyport</b>, a deploy platform. <code>FaqSection</code> maps <code>FAQS</code> (in <code>data/faqs.ts</code>) to <code>FaqItem</code>s. Each question is already a button with a <code>ChevronIcon</code> (points down). Nothing opens yet. No API.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3 (Stretch 4 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One item open at a time means the state is a single <code>openId</code> (string or null) in <code>FaqSection</code>, not a boolean in each item. Each <code>FaqItem</code> gets <code>isOpen</code> and <code>onToggle(id)</code>. Toggle: if the clicked id is already open, set null, otherwise set it. The chevron rotation is already CSS on an <code>is-open</code> class.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Clicking a question shows its answer below it. Opening another question closes the one that was open",
-   "Clicking the open question closes it. The open item's chevron rotates 180° (animated)",
-   "The open item has a highlighted background and its question turns <code>--primary</code>. The question button has <code>aria-expanded</code>"
+   "Clicking a question shows its answer below it (<code>&lt;div class=\"faq-answer\"&gt;&lt;p&gt;…</code>). Opening another question closes the one that was open",
+   "Clicking the open question closes it. The open item has <code>is-open</code> on its <code>&lt;li&gt;</code> (the CSS then rotates the chevron and highlights it)",
+   "The question button has <code>aria-expanded</code> (true while open)",
+   "Under each open answer: \"Was this helpful?\" with <b>Yes</b> / <b>No</b> pill buttons (<code>.feedback</code>, <code>.vote-btn</code>). After a vote they are replaced by \"Thanks for the feedback!\" (<code>.thanks</code>) for that question, and it stays that way after closing and reopening it"
   ],
   "change": {
-   "title": "Was this helpful?",
-   "html": "<p>\"Support wants to know which answers work.\"</p><ul><li>Under each open answer: \"Was this helpful?\" with <b>Yes</b> and <b>No</b> pill buttons.</li><li>After a vote, the buttons are replaced by \"Thanks for the feedback!\" for that question. It stays that way after closing and reopening it.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one object keyed by question id, e.g. <code>{ q2: \"yes\" }</code>, living next to <code>openId</code>.</p>"
+   "title": "Collapse button",
+   "html": "<p>\"On mobile, people can't find how to close an answer.\"</p><ul><li>Put the FAQ title in a <code>.faq-head</code> row with a <b>Collapse</b> link-button (<code>.collapse-btn</code>) on the right.</li><li>It only shows while a question is open, and clicking it closes it.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>openId</code> already lives in <code>FaqSection</code>, the same component as the title.</p>"
   },
   "hints": [
    "<code>const [openId, setOpenId] = useState&lt;string | null&gt;(null);</code> in <code>FaqSection</code>.",
    "Toggle: <code>setOpenId((prev) =&gt; { if (prev === id) { return null; } return id; });</code>",
-   "In the map: <code>const isOpen = faq.id === openId;</code> then pass it down.",
-   "Rotate: <code>.faq-item.is-open .chevron { transform: rotate(180deg); }</code> plus a <code>transition</code> on <code>.chevron</code>. Search: <b>mdn css transform rotate</b>.",
-   "Change: <code>setVotes((prev) =&gt; { return { ...prev, [id]: vote }; });</code> Search: <b>mdn computed property names</b> for <code>[id]</code>."
+   "In the map: <code>const isOpen = faq.id === openId;</code> then pass <code>isOpen</code> and <code>onToggle</code> down. In the item: <code>let answer = null; if (isOpen) { answer = &lt;div className=\"faq-answer\"&gt;…&lt;/div&gt;; }</code>",
+   "Change: <code>let collapseBtn = null; if (openId !== null) { collapseBtn = &lt;button …&gt;Collapse&lt;/button&gt;; }</code>",
+   "Stretch: <code>setVotes((prev) =&gt; { return { ...prev, [id]: vote }; });</code> Search: <b>mdn computed property names</b> for <code>[id]</code>."
   ],
   "rubric": [
    "Single openId instead of per-item booleans",
    "Clicking the open item closes it",
    "Items are dumb: isOpen + onToggle props",
-   "Rotation done in CSS from one class",
-   "Votes keyed by id, immutable update",
-   "aria-expanded on the button"
+   "Answer and class decided above the return",
+   "Collapse reuses the same state (no new state)",
+   "aria-expanded on the button",
+   "Votes keyed by id, immutable update (stretch)"
   ],
   "spec": {
    "colors": [
@@ -453,56 +589,89 @@
     [
      "Vote pills",
      "h 28 · pad 0 12 · pill"
+    ],
+    [
+     "Collapse",
+     "13/600 · --accent · baseline with title"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "TypeScript",
+    "name": "Nullable state: string | null",
+    "syntax": "useState<string | null>(null)",
+    "example": "const [openId, setOpenId] = useState<string | null>(null);\nsetOpenId('q2');   // ok\nsetOpenId(null);   // ok",
+    "note": "<code>null</code> means \"nothing selected\". Without the <code>&lt;string | null&gt;</code>, TypeScript infers the type <code>null</code> only and rejects <code>\"q2\"</code>.",
+    "search": "typescript union null useState"
+   },
+   {
+    "cat": "React",
+    "name": "Updater with a condition",
+    "syntax": "setX((prev) => { if (prev === id) { return null; } return id; })",
+    "example": "// prev 'q2', click 'q2' -> null (closes)\n// prev 'q2', click 'q4' -> 'q4'",
+    "note": "An updater can contain any logic, as long as it <b>returns</b> the next value. This one makes \"click again to close\" a single function.",
+    "search": "react useState updater function"
+   },
+   {
+    "cat": "React",
+    "name": "null renders nothing",
+    "syntax": "let el = null; if (cond) { el = <div>…</div>; }  …  {el}",
+    "example": "{null}        // renders nothing\n{answer}      // renders the div when it was set",
+    "note": "React skips <code>null</code>, <code>undefined</code> and <code>false</code>. Deciding into a variable above the return keeps JSX free of <code>&amp;&amp;</code> and ternaries.",
+    "search": "react conditional rendering"
+   }
+  ]
  },
  "dc06": {
   "kind": "drill",
   "level": 1,
   "order": 6,
-  "minutes": 15,
-  "changeAt": 10,
+  "minutes": 14,
+  "changeAt": 9,
   "title": "Study planner todos",
   "focus": "src/App.tsx",
-  "summary": "A student planner loads tasks from a slow API. Add, toggle, delete, and show how many are left.",
+  "summary": "A student weekly planner. Wire up adding and completing tasks with immutable array updates.",
   "skills": [
    "add/toggle/delete in an array",
    "form submit",
    "immutable updates",
    "derived count"
   ],
-  "brief": "<p>A weekly planner, <b>studyhall</b>. <code>Planner</code> already loads tasks from <code>api.ts</code> (<code>getTasks</code> waits 0.5–1.2 s) with a loading state, and renders <code>TaskRow</code>s. The checkbox is read-only, the × does nothing, and the add input is not wired.</p><p>Read <code>utils/id.ts</code>: new tasks need ids.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list lives in <code>Planner</code> (it's already there). <code>AddTask</code> owns only its draft text and calls <code>onAdd(title)</code>. <code>TaskRow</code> gets <code>onToggle(id)</code> and <code>onDelete(id)</code>. All three updates use the updater form: spread to add, map to toggle, filter to delete. The 'left' count is derived with filter.\"</p></div></details>",
+  "brief": "<p>A weekly planner, <b>studyhall</b>. <code>Planner</code> already loads tasks from <code>api.ts</code> (<code>getTasks</code> waits 0.5–1.2 s) with a loading state, and renders <code>TaskRow</code>s. <code>TaskRow</code> is already wired: it calls <code>onToggle(id)</code> / <code>onDelete(id)</code> and shows <code>is-done</code>, but the two handlers in <code>Planner</code> are empty. The add input is not wired at all.</p><p>Read <code>utils/id.ts</code>: new tasks need ids.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4 (Stretch 5 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The list lives in <code>Planner</code> (it's already there). <code>AddTask</code> owns only its draft text and calls <code>onAdd(title)</code>. Every update uses the updater form and returns a <b>new</b> array: spread to add, map + object spread to toggle, filter to delete. The 'left' count is derived with filter.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Typing a title and pressing <b>Enter</b> or clicking <b>Add</b> adds it to the <b>bottom</b> of the list (not done, subject \"Inbox\") and clears the input. Blank / spaces-only input adds nothing, and Add is disabled while blank",
-   "Clicking a checkbox toggles that task: done tasks are struck through and muted",
-   "The <b>×</b> button deletes that task",
-   "The header shows a yellow pill <b>\"3 left\"</b> (count of not-done tasks), updating live; <b>\"All done\"</b> (green) at 0. Nothing shows while loading"
+   "Typing a title and pressing <b>Enter</b> or clicking <b>Add</b> adds it to the <b>bottom</b> of the list (not done, subject \"Inbox\", id from <code>makeId(\"t\")</code>) and clears the input. Blank / spaces-only input adds nothing",
+   "Clicking a checkbox toggles that task (fill in <code>handleToggle</code>): done tasks are struck through and muted. Update immutably",
+   "The <b>×</b> button deletes that task (fill in <code>handleDelete</code>), and <b>Add</b> is disabled while the input is blank",
+   "The header shows a yellow pill <b>\"3 left\"</b> (<code>.left-badge</code>, count of not-done tasks), updating live; <b>\"All done\"</b> (<code>is-done</code>, green) at 0. Nothing shows while loading",
+   "Below the list, a right-aligned <b>Clear completed (2)</b> button (<code>.planner-foot</code> &gt; <code>.clear-btn</code>) with the number of done tasks. It only appears when at least one task is done, and removes all done tasks"
   ],
   "change": {
-   "title": "Clear completed",
-   "html": "<p>\"Done tasks pile up all week.\"</p><ul><li>Below the list, a right-aligned <b>Clear completed (2)</b> button with the number of done tasks.</li><li>It only appears when at least one task is done, and removes all done tasks.</li></ul>"
+   "title": "Newest first",
+   "html": "<p>\"Students add the urgent thing last, then can't find it.\"</p><ul><li>New tasks now go to the <b>top</b> of the list instead of the bottom.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: it's the order inside one spread.</p>"
   },
   "hints": [
    "Wrap the input and button in a <code>&lt;form onSubmit&gt;</code> and you get Enter for free. Call <code>e.preventDefault()</code>. Search: <b>mdn submit event preventDefault</b>.",
-   "Add: <code>setTasks((prev) =&gt; { return [...prev, task]; });</code> with <code>id: makeId(\"t\")</code>.",
+   "<code>AddTask</code> keeps <code>draft</code> state and calls <code>onAdd(draft.trim())</code>; the list is updated in <code>Planner</code>: <code>setTasks((prev) =&gt; { return [...prev, task]; });</code> with <code>id: makeId(\"t\")</code>.",
    "Toggle: <code>prev.map((t) =&gt; { if (t.id !== id) { return t; } return { ...t, done: !t.done }; })</code>. Never set <code>t.done</code> directly.",
-   "Delete / clear: <code>prev.filter(...)</code>. Count: <code>tasks.filter((t) =&gt; { return !t.done; }).length</code>."
+   "Delete / clear: <code>prev.filter(...)</code>. Count: <code>tasks.filter((t) =&gt; { return !t.done; }).length</code>.",
+   "Change: <code>[task, ...prev]</code> puts it first."
   ],
   "rubric": [
    "List state stays in Planner; AddTask owns only the draft",
    "Form submit with preventDefault (Enter works)",
    "Trimmed empty input ignored",
    "map / filter / spread, no mutation",
-   "Count derived, not stored",
    "Reused makeId",
-   "Change only renders when needed"
+   "Count derived, not stored",
+   "Clear completed only renders when needed (stretch)"
   ],
   "spec": {
    "colors": [
@@ -553,14 +722,48 @@
      "13/700 · muted → danger on hover"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Events",
+    "name": "Form submit + e.preventDefault()",
+    "syntax": "<form onSubmit={handleSubmit}> … <button type=\"submit\">",
+    "example": "function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n  e.preventDefault();   // stop the page reload\n}",
+    "note": "A form fires <code>submit</code> on Enter in any input <b>and</b> on its submit button, so one handler covers both. Without <code>preventDefault()</code> the browser reloads the page.",
+    "search": "mdn submit event preventDefault"
+   },
+   {
+    "cat": "Strings",
+    "name": "String.trim()",
+    "syntax": "str.trim()",
+    "example": "'  Lab report  '.trim()   // 'Lab report'\n'   '.trim() === ''         // true",
+    "note": "Returns a <b>new</b> string without spaces at both ends. The usual way to ignore blank input.",
+    "search": "mdn string trim"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Spread to add: [...arr, x]",
+    "syntax": "[...prev, item]   /   [item, ...prev]",
+    "example": "const a = [1, 2];\n[...a, 3]   // [1, 2, 3]\n[0, ...a]   // [0, 1, 2]   (a is unchanged)",
+    "note": "Builds a <b>new</b> array. Never <code>push</code> into state: React compares by reference and would not see the change.",
+    "search": "mdn spread syntax array"
+   },
+   {
+    "cat": "Objects",
+    "name": "Object spread to update one field",
+    "syntax": "{ ...obj, field: newValue }",
+    "example": "const t = { id: 't1', done: false };\n{ ...t, done: !t.done }   // { id: 't1', done: true }  (t unchanged)",
+    "note": "Copies every property, then overrides the ones after it. Use it inside <code>.map</code> to change one item immutably.",
+    "search": "mdn spread syntax object"
+   }
+  ]
  },
  "dc07": {
   "kind": "drill",
   "level": 1,
   "order": 7,
-  "minutes": 15,
-  "changeAt": 11,
+  "minutes": 13,
+  "changeAt": 9,
   "title": "Searchable staff directory",
   "focus": "src/App.tsx",
   "summary": "A hospital care-team directory. Load staff from a slow API, then filter by name or role as you type.",
@@ -571,35 +774,37 @@
    "derived filter",
    "empty state"
   ],
-  "brief": "<p>The staff directory for <b>Cedar Health</b>. The page, toolbar and search box exist, and <code>StaffCard</code> (in <code>components/</code>) renders one person. But <code>staff</code> is an empty array: you load it.</p><p>Read <code>api.ts</code> first. <code>getStaff()</code> returns a Promise and takes a random 0.4–1.3 s, so you need <code>useEffect</code> + <code>.then</code> + a loading state.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Directory</code>: <code>staff</code>, <code>loading</code> and <code>query</code>. Load once in a <code>useEffect</code> with a cancelled guard. The visible list is derived: lowercase the trimmed query and keep people whose name or role includes it. Then one if/else chain above the return for loading / no matches / list.\"</p></div></details>",
+  "brief": "<p>The staff directory for <b>Cedar Health</b>. The page, toolbar and search box exist, and <code>StaffCard</code> (in <code>components/</code>) renders one person. But <code>staff</code> is an empty array: you load it.</p><p>Read <code>api.ts</code> first. <code>getStaff()</code> returns a Promise and takes a random 0.4–1.3 s, so you need <code>useEffect</code> + <code>.then</code>.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4 (Stretch 5 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"State in <code>Directory</code>: <code>staff</code> and <code>query</code> (and <code>loading</code> for Next). Load once in a <code>useEffect</code> with a cancelled guard. The visible list is derived: lowercase the trimmed query and keep people whose name or role includes it. Later, one if/else chain above the return for loading / no matches / list.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "On load, show <b>\"Loading care team…\"</b> until <code>getStaff()</code> resolves, then the list of <code>StaffCard</code>s",
+   "On mount, load the list with <code>getStaff()</code> inside a <code>useEffect</code> (with a cancelled guard) and render it with the existing <code>StaffCard</code>s",
    "The search input is controlled and filters by <b>name or role</b>, case-insensitive, ignoring surrounding spaces (\"nurse\" finds both nurses, \"  PRIYA \" finds Dr. Priya Nair)",
-   "Above the list (after loading): <b>\"Showing 2 of 9\"</b>",
-   "When nothing matches: <b>No matches for “xyz”.</b> and a <b>Clear search</b> link-button that empties the input"
+   "Show <b>\"Loading care team…\"</b> (in a <code>.message</code>) until the data arrives, then above the list: <b>\"Showing 2 of 9\"</b> (<code>.count</code>)",
+   "When nothing matches: <b>No matches for “xyz”.</b> and a <b>Clear search</b> link-button (<code>.link-btn</code>) that empties the input",
+   "An <b>On call now</b> pill button (<code>.chip</code>) to the right of the search. When on (<code>is-on</code>, <code>aria-pressed</code>), only on-call staff show. It combines with the search, and the count stays right"
   ],
   "change": {
-   "title": "On call now",
-   "html": "<p>\"At night, people only want who's on call.\"</p><ul><li>Add an <b>On call now</b> pill button to the right of the search.</li><li>When on (green, <code>aria-pressed</code>), only on-call staff show. It combines with the search, and the count stays right.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one more boolean, one more condition in the same <code>filter</code>.</p>"
+   "title": "Search departments too",
+   "html": "<p>\"Nurses type the ward, not the job title.\"</p><ul><li>The search also matches the person's <b>department</b>: \"pediatrics\" now finds Dr. Sofia Marquez and Ethan Brooks.</li><li>Update the placeholder to <b>\"Search name, role or department\"</b>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: one more <code>||</code> in the same <code>filter</code>.</p>"
   },
   "hints": [
-   "Copy the loading shape: <code>useEffect(() =&gt; { let cancelled = false; getStaff().then((data) =&gt; { if (cancelled) { return; } setStaff(data); setLoading(false); }); return () =&gt; { cancelled = true; }; }, []);</code>",
+   "Copy the loading shape: <code>useEffect(() =&gt; { let cancelled = false; getStaff().then((data) =&gt; { if (cancelled) { return; } setStaff(data); }); return () =&gt; { cancelled = true; }; }, []);</code>",
    "Type the state: <code>useState&lt;Staff[]&gt;([])</code>, and <code>import type { Staff } from \"./api\";</code>",
-   "Normalize once above the filter: <code>const q = query.trim().toLowerCase();</code>. Search: <b>mdn String includes</b>.",
-   "Decide the body above the return: <code>let body; if (loading) { ... } else if (visible.length === 0) { ... } else { ... }</code>"
+   "Normalize once above the filter: <code>const q = query.trim().toLowerCase();</code> then <code>person.name.toLowerCase().includes(q) || person.role.toLowerCase().includes(q)</code>. Search: <b>mdn String includes</b>.",
+   "Next: decide the body above the return: <code>let body; if (loading) { ... } else if (visible.length === 0) { ... } else { ... }</code>"
   ],
   "rubric": [
    "Loading pattern with a cancelled guard",
    "Filtered list derived, not stored",
-   "Case-insensitive, trimmed match on two fields",
-   "Loading, empty and list states all handled",
+   "Case-insensitive, trimmed match on several fields",
    "Reused StaffCard",
+   "Loading, empty and list states all handled",
    "Filters combine in one pass"
   ],
   "spec": {
@@ -647,14 +852,48 @@
      "h 40 · pill · pad 0 14"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "React",
+    "name": "useEffect + cleanup (load once)",
+    "syntax": "useEffect(() => { …; return () => { … }; }, []);",
+    "example": "useEffect(() => {\n  let cancelled = false;\n  getStaff().then((data) => { if (cancelled) { return; } setStaff(data); });\n  return () => { cancelled = true; };\n}, []);",
+    "note": "<code>[]</code> = run once after the first render. The returned function runs on unmount; the <code>cancelled</code> flag stops a late response from setting state.",
+    "search": "react useEffect fetch data cleanup"
+   },
+   {
+    "cat": "Promises & async",
+    "name": "Promise.then()",
+    "syntax": "promise.then((value) => { … })",
+    "example": "getStaff().then((data) => { console.log(data.length); });   // 9 (after ~1s)",
+    "note": "Runs the callback <b>later</b>, when the promise resolves, with its value. The line after <code>.then(...)</code> runs immediately, before the data arrives.",
+    "search": "mdn promise then"
+   },
+   {
+    "cat": "Strings",
+    "name": "includes() + toLowerCase()",
+    "syntax": "text.toLowerCase().includes(q)",
+    "example": "'Charge Nurse'.toLowerCase().includes('nurse')   // true\n'Charge Nurse'.includes('nurse')                 // false (case!)",
+    "note": "<code>includes</code> returns <b>true/false</b> and is case-sensitive, so lowercase both sides. <code>'abc'.includes('')</code> is true, so an empty search shows everyone.",
+    "search": "mdn string includes"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Array.filter()",
+    "syntax": "arr.filter((x) => { return keep; })",
+    "example": "[{ n: 'A', onCall: true }, { n: 'B', onCall: false }].filter((p) => { return p.onCall; })\n// [{ n: 'A', onCall: true }]",
+    "note": "Returns a <b>new array</b> with the items where the callback returned true. Derive it on each render; don't store the filtered list in state.",
+    "search": "mdn array filter"
+   }
+  ]
  },
  "dc08": {
   "kind": "drill",
   "level": 1,
   "order": 8,
-  "minutes": 10,
-  "changeAt": 7,
+  "minutes": 12,
+  "changeAt": 8,
   "title": "Ticket quantity stepper",
   "focus": "src/App.tsx",
   "summary": "A concert checkout panel. Make the − / + stepper work between 1 and 8 and keep the totals right.",
@@ -664,35 +903,35 @@
    "disabled at bounds",
    "reusing a formatter"
   ],
-  "brief": "<p>A ticket checkout for <b>gigbox</b>. <code>TicketPanel</code> shows the tier, a static stepper showing \"1\", a subtotal and Checkout. The event data is in <code>data/event.ts</code>. No API.</p><p>Read <code>utils/money.ts</code>: <code>formatPrice(cents)</code> already formats every price on the page. All prices are in <b>cents</b>.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One number in state, <code>qty</code>, starting at 1 in <code>TicketPanel</code>. − and + use the updater form and clamp with <code>Math.max</code> / <code>Math.min</code>, so they can't go out of range even with fast clicks. <code>atMin</code>, <code>atMax</code> and the totals are all derived from <code>qty</code>.\"</p></div></details>",
+  "brief": "<p>A ticket checkout for <b>gigbox</b>. <code>TicketPanel</code> shows the tier, a static stepper showing \"1\", a subtotal and Checkout. The event data is in <code>data/event.ts</code>. No API.</p><p>Read <code>utils/money.ts</code>: <code>formatPrice(cents)</code> already formats every price on the page. All prices are in <b>cents</b>.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3 (Stretch 4 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"One number in state, <code>qty</code>, starting at 1 in <code>TicketPanel</code>. − and + use the updater form and clamp with <code>Math.max</code> / <code>Math.min</code>, so they can't go out of range even with fast clicks. The subtotal (and later <code>atMin</code>, <code>atMax</code>, fees) are all derived from <code>qty</code>.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Stretch"
   ],
   "requirements": [
    "<b>−</b> and <b>+</b> change the quantity by 1. It starts at 1, never goes below 1 or above 8",
-   "<b>−</b> is disabled (faded, not-allowed cursor) at 1 and <b>+</b> is disabled at 8",
    "The subtotal row reads <b>\"Subtotal (3 × $48.00)\"</b> and <b>$144.00</b>, using <code>formatPrice</code>",
-   "At 8, an amber note under the stepper: <b>\"Max 8 tickets per order\"</b>. The buttons have <code>aria-label</code>s \"Decrease quantity\" / \"Increase quantity\""
+   "<b>−</b> is disabled at 1 and <b>+</b> is disabled at 8 (faded: <code>.step-btn:disabled</code> is styled). At 8, an amber note under the stepper: <b>\"Max 8 tickets per order\"</b> (<code>.max-note</code>). The buttons have <code>aria-label</code>s \"Decrease quantity\" / \"Increase quantity\"",
+   "Under the subtotal, a muted <b>Service fees</b> row (<code>.summary-row.is-muted</code>, <code>event.feeCents</code> × quantity) and a bold <b>Total</b> row (<code>.summary-row.is-total</code>, subtotal + fees)"
   ],
   "change": {
-   "title": "Fees and total",
-   "html": "<p>\"Legal says the fees must be shown before checkout.\"</p><ul><li>Add a muted <b>Service fees</b> row: <code>event.feeCents</code> × quantity.</li><li>Add a bold <b>Total</b> row (subtotal + fees) with a top border.</li><li>The button reads <b>\"Checkout · $105.00\"</b> (for 2 tickets).</li></ul>"
+   "title": "Show the real price on the button",
+   "html": "<p>\"Legal says the fees must be shown before checkout.\"</p><ul><li>The button reads <b>\"Checkout · $105.00\"</b> for 2 tickets: subtotal plus service fees (<code>event.feeCents</code> × quantity).</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: two more derived numbers and one label, all above the return.</p>"
   },
   "hints": [
    "<code>const [qty, setQty] = useState(1);</code>. Pull 1 and 8 into <code>MIN_QTY</code> / <code>MAX_QTY</code> constants.",
-   "Clamp in the updater: <code>setQty((prev) =&gt; { return Math.min(MAX_QTY, prev + 1); });</code> Search: <b>mdn Math.min</b>.",
-   "<code>disabled={atMin}</code> where <code>const atMin = qty === MIN_QTY;</code>. Style it with <code>.step-btn:disabled</code>.",
-   "Do math in cents, format once at the end: <code>formatPrice(event.priceCents * qty)</code>."
+   "Clamp in the updater: <code>setQty((prev) =&gt; { return Math.min(MAX_QTY, prev + 1); });</code> and <code>Math.max(MIN_QTY, prev - 1)</code> for −. Search: <b>mdn Math.min</b>.",
+   "Do math in cents, format once at the end: <code>formatPrice(event.priceCents * qty)</code>. Build the label above the return: <code>\"Subtotal (\" + qty + \" × \" + formatPrice(event.priceCents) + \")\"</code>.",
+   "Next: <code>disabled={atMin}</code> where <code>const atMin = qty === MIN_QTY;</code>."
   ],
   "rubric": [
    "One number in state; everything else derived",
    "Clamped inside the updater",
-   "Disabled at both bounds, styled",
    "Reused formatPrice; math in cents",
    "Labels built above the return",
+   "Disabled at both bounds",
    "Accessible button labels"
   ],
   "spec": {
@@ -740,51 +979,82 @@
      "17/800 · 1px top --line"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Numbers",
+    "name": "Clamp with Math.max / Math.min",
+    "syntax": "Math.max(min, Math.min(max, n))",
+    "example": "Math.min(8, 8 + 1)   // 8   (never above 8)\nMath.max(1, 1 - 1)   // 1   (never below 1)",
+    "note": "<code>Math.min</code> returns the smallest argument (a ceiling); <code>Math.max</code> the largest (a floor). Together they keep a number in range.",
+    "search": "mdn math max"
+   },
+   {
+    "cat": "React",
+    "name": "Updater for counters",
+    "syntax": "setQty((prev) => { return prev + 1; })",
+    "example": "// two clicks in the same tick:\nsetQty(qty + 1); setQty(qty + 1);                 // +1 only\nsetQty((p) => { return p + 1; }); (twice)          // +2",
+    "note": "With the updater, each call gets the <b>latest</b> value, so fast clicks and the clamp both stay correct.",
+    "search": "react useState updater function"
+   },
+   {
+    "cat": "Numbers",
+    "name": "Number.toFixed()",
+    "syntax": "n.toFixed(digits)",
+    "example": "(14400 / 100).toFixed(2)   // \"144.00\"  (a string)",
+    "note": "Returns a <b>string</b> with exactly that many decimals. It is what <code>formatPrice</code> uses: keep money in cents (integers) and only format at the end.",
+    "search": "mdn number tofixed"
+   }
+  ]
  },
  "dc09": {
   "kind": "drill",
   "level": 1,
   "order": 9,
   "minutes": 15,
-  "changeAt": 11,
+  "changeAt": 10,
   "title": "Sort-by dropdown",
   "focus": "src/App.tsx",
-  "summary": "A vacation-stays listing. Build a \"Sort by\" dropdown that re-sorts the results and closes on outside click.",
+  "summary": "A vacation-stays listing. Build the \"Sort by\" dropdown menu, then make it re-sort the grid and close on outside click.",
   "skills": [
    "open/close state",
    "useRef + contains",
    "document listener cleanup",
    "copy before sort"
   ],
-  "brief": "<p>Search results for <b>staybird</b>. <code>StaysPage</code> already loads stays from <code>api.ts</code> (<code>getStays</code> waits 0.3–1.0 s, in \"Recommended\" order) and renders <code>StayCard</code>s. The <code>SortMenu</code> button is there but does nothing.</p><p><code>useRef</code> is already imported. You will need it.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Two pieces of state in two places. <code>sortKey</code> goes in <code>StaysPage</code> because the list needs it. <code>open</code> stays inside <code>SortMenu</code> because nobody else cares. The menu takes <code>value</code> + <code>onChange</code>. Sorting is a pure function that copies first, and Recommended returns the API order untouched. For outside click: a ref on the wrapper and a document <code>mousedown</code> listener only while open.\"</p></div></details>",
+  "brief": "<p>Search results for <b>staybird</b>. <code>StaysPage</code> already loads stays from <code>api.ts</code> (<code>getStays</code> waits 0.3–1.0 s, in \"Recommended\" order) and renders <code>StayCard</code>s. It already holds <code>sortKey</code> and passes it to <code>SortMenu</code> as <code>value</code> + <code>onChange</code>, and <code>SortMenu</code> already shows the current label. But the button does nothing, and the grid ignores <code>sortKey</code>.</p><p><code>useRef</code> and <code>useEffect</code> are already imported. You will need them for Next.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4 (Stretch 5 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"Two pieces of state in two places. <code>sortKey</code> is already in <code>StaysPage</code> because the grid needs it. <code>open</code> goes inside <code>SortMenu</code> because nobody else cares. Picking an option calls <code>onChange(key)</code> and closes. Sorting is a pure function that copies first, and Recommended returns the API order untouched. For outside click: a ref on the wrapper and a document <code>mousedown</code> listener only while open.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Clicking the button opens a menu below it, right-aligned: <b>Recommended</b>, <b>Price: low to high</b>, <b>Price: high to low</b>, <b>Top rated</b>. Clicking the button again closes it",
-   "Choosing an option closes the menu, shows it in the button (\"Sort by: <b>Top rated</b>\"), and re-sorts the grid. Recommended restores the original API order. Do not mutate the loaded array",
-   "Clicking anywhere outside the menu closes it (the listener is removed when it closes)"
+   "Clicking the button opens a menu below it, right-aligned (<code>&lt;ul class=\"sort-menu\"&gt;</code> of <code>&lt;button class=\"sort-option\"&gt;</code>): <b>Recommended</b>, <b>Price: low to high</b>, <b>Price: high to low</b>, <b>Top rated</b> (from <code>SORT_OPTIONS</code>). Clicking the button again closes it",
+   "Choosing an option closes the menu and calls <code>onChange</code>, so the button shows it (\"Sort by: <b>Top rated</b>\")",
+   "The grid re-sorts by <code>sortKey</code>. Recommended restores the original API order. Do not mutate the loaded array",
+   "Clicking anywhere outside the menu closes it (the document listener is removed when it closes)",
+   "The selected option is highlighted (<code>is-selected</code>: <code>--primary-soft</code>, primary text) with a <b>✓</b> on the right (<code>.check</code>)"
   ],
   "change": {
-   "title": "Escape + checkmark",
-   "html": "<p>\"QA filed two bugs against the dropdown.\"</p><ul><li>Pressing <b>Escape</b> closes the menu.</li><li>The selected option is highlighted (<code>--primary-soft</code>, primary text) with a <b>✓</b> on the right.</li></ul>"
+   "title": "Escape closes it",
+   "html": "<p>\"QA filed a keyboard bug against the dropdown.\"</p><ul><li>Pressing <b>Escape</b> closes the menu.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: if you have the outside-click effect, it's a second listener in the same effect (and the same cleanup).</p>"
   },
   "hints": [
-   "<code>.sort()</code> sorts in place. Copy first: <code>const copy = [...stays]; copy.sort((a, b) =&gt; { return a.pricePerNight - b.pricePerNight; });</code>",
-   "Find the label: <code>SORT_OPTIONS.find((o) =&gt; { return o.key === value; })</code>.",
+   "<code>const [open, setOpen] = useState(false);</code> inside <code>SortMenu</code>. Build <code>let menu = null; if (open) { menu = &lt;ul className=\"sort-menu\"&gt;…&lt;/ul&gt;; }</code> above the return and render <code>{menu}</code> after the button.",
+   "Select: <code>function handleSelect(key: SortKey) { onChange(key); setOpen(false); }</code>",
+   "Next: <code>.sort()</code> sorts in place. Copy first: <code>const copy = [...stays]; copy.sort((a, b) =&gt; { return a.pricePerNight - b.pricePerNight; });</code> Search: <b>mdn array sort compare function</b>.",
    "Outside click: <code>const wrapRef = useRef&lt;HTMLDivElement&gt;(null);</code> on the wrapper, then in the listener <code>if (wrapRef.current &amp;&amp; !wrapRef.current.contains(e.target as Node)) { setOpen(false); }</code>. Search: <b>mdn Node contains</b>.",
-   "Add the listener in a <code>useEffect</code> that depends on <code>[open]</code>, return early when closed, and remove it in the cleanup."
+   "Add the listeners in a <code>useEffect</code> that depends on <code>[open]</code>, return early when closed, and remove them in the cleanup. Escape: <code>if (e.key === \"Escape\") { setOpen(false); }</code>"
   ],
   "rubric": [
    "sortKey in the page, open in the menu",
+   "Menu built above the return, closes on select",
    "Copied before sorting; recommended = original order",
    "Sorted list derived, not stored",
    "Outside click via ref.contains",
-   "Listener cleaned up",
-   "Menu closes on select",
+   "Listeners cleaned up",
    "Escape handled in the same effect"
   ],
   "spec": {
@@ -824,54 +1094,91 @@
      "600 · --primary · ✓ right"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "DOM",
+    "name": "document.addEventListener + cleanup",
+    "syntax": "document.addEventListener('keydown', fn); … document.removeEventListener('keydown', fn);",
+    "example": "useEffect(() => {\n  if (!open) { return; }\n  function onKey(e: KeyboardEvent) { … }\n  document.addEventListener('keydown', onKey);\n  return () => { document.removeEventListener('keydown', onKey); };\n}, [open]);",
+    "note": "For events outside your component (anywhere on the page). Remove with the <b>same function</b> in the effect cleanup, or listeners pile up on every open.",
+    "search": "mdn addEventListener removeEventListener"
+   },
+   {
+    "cat": "Events",
+    "name": "KeyboardEvent.key",
+    "syntax": "e.key === 'Escape'",
+    "example": "// pressing Esc  -> e.key is 'Escape'\n// pressing Enter -> 'Enter',  arrow down -> 'ArrowDown'",
+    "note": "A readable string for the key pressed. Use <code>e.key</code>, not the old <code>keyCode</code> numbers.",
+    "search": "mdn keyboardevent key"
+   },
+   {
+    "cat": "Arrays",
+    "name": "Copy, then sort",
+    "syntax": "[...arr].sort((a, b) => { return a.x - b.x; })",
+    "example": "[3, 1, 2].sort((a, b) => { return a - b; })   // [1, 2, 3]\n// b - a for descending",
+    "note": "<code>sort</code> <b>mutates</b> the array it is called on (and returns it). Copy state first with spread. The compare function returns negative (a first), positive (b first) or 0.",
+    "search": "mdn array sort compare function"
+   },
+   {
+    "cat": "DOM",
+    "name": "useRef + Node.contains()",
+    "syntax": "ref.current.contains(e.target as Node)",
+    "example": "const wrapRef = useRef<HTMLDivElement>(null);\n<div ref={wrapRef}>…</div>\nwrapRef.current.contains(e.target as Node)   // true if the click was inside",
+    "note": "Returns <b>true</b> if the node is the element itself or anywhere inside it. <code>ref.current</code> is <code>null</code> until mounted, so check it first.",
+    "search": "mdn node contains"
+   }
+  ]
  },
  "dc10": {
   "kind": "drill",
   "level": 1,
   "order": 10,
   "minutes": 15,
-  "changeAt": 11,
+  "changeAt": 10,
   "title": "Star rating input",
   "focus": "src/App.tsx",
-  "summary": "A food-delivery review form. Build interactive stars with hover preview, a label, and a clear button.",
+  "summary": "A food-delivery review form. Make the five stars clickable with a word label, then add a hover preview and Clear.",
   "skills": [
    "hover state",
    "controlled component",
    "value vs preview",
    "multi-select array"
   ],
-  "brief": "<p>The \"rate your order\" screen of <b>forkful</b>. <code>ReviewForm</code> has the order summary, a comment box and Submit (which shows <code>ThankYou</code>). <code>StarRating</code> is five grey static stars. No API.</p><p>Read <code>data/order.ts</code>: <code>LABELS</code> maps a star count to a word.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–3 working. <b>Strong:</b> plus Next.</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The rating is submitted, so <code>rating</code> lives in <code>ReviewForm</code> and <code>StarRating</code> is controlled with <code>value</code> + <code>onChange</code>. Hover is purely visual, so <code>hover</code> is local state in <code>StarRating</code>. What I show is <code>hover</code> if hovering, otherwise <code>value</code>. Leaving the whole stars row resets hover to 0.\"</p></div></details>",
+  "brief": "<p>The \"rate your order\" screen of <b>forkful</b>. <code>ReviewForm</code> has the order summary, a comment box and Submit (which shows <code>ThankYou</code>). <code>StarRating</code> is five grey static stars. No API.</p><p>Read <code>data/order.ts</code>: <code>LABELS</code> maps a star count to a word.</p><p><b>The CSS for the new UI is already in <code>styles.css</code></b> (bottom block, marked CORE / NEXT / CHANGE). Today is about React: just use those class names.</p><div style=\"border:1px solid var(--ide-line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px\"><b>Pass bar:</b> Core 1–2 working. <b>Strong:</b> plus 3–4 (Stretch 5 is optional).</div><details class=\"details\"><summary>Reference \"plan out loud\" (open after saying yours)</summary><div style=\"font-size:13px\"><p>\"The rating is submitted, so <code>rating</code> lives in <code>ReviewForm</code> and <code>StarRating</code> is controlled with <code>value</code> + <code>onChange</code>. Stars come from <code>[1, 2, 3, 4, 5].map</code>, and star N is on when <code>n &lt;= value</code>. The label is <code>LABELS[value]</code>. Later, hover is purely visual, so <code>hover</code> is local state in <code>StarRating</code>, and what I show is <code>hover</code> if hovering, otherwise <code>value</code>.\"</p></div></details>",
   "tiers": [
    "Core",
    "Core",
-   "Core",
-   "Next"
+   "Next",
+   "Next",
+   "Stretch"
   ],
   "requirements": [
-   "Hovering star N fills stars 1..N gold (<code>--star</code>) as a preview. Moving the mouse off the stars restores the saved rating",
-   "Clicking star N sets the rating to N. Under the stars, the label shows the word for what is shown (<b>Terrible / Poor / Okay / Good / Excellent</b>), or muted <b>\"Tap a star to rate\"</b> when 0",
+   "The five stars are <code>&lt;button class=\"star\"&gt;</code>s. Clicking star N sets the rating to N and fills stars 1..N gold (<code>is-on</code>). Under the stars, the label shows the word (<b>Terrible / Poor / Okay / Good / Excellent</b>), or muted <b>\"Tap a star to rate\"</b> when 0 (<code>.rating-label</code>, <code>is-empty</code>)",
    "<b>Submit review</b> is disabled until a rating is set",
-   "A <b>Clear</b> link-button appears under the label once rated and resets to 0. Each star is a button with <code>aria-label</code> \"Rate 3 out of 5\""
+   "Hovering star N previews it: stars 1..N fill and the label shows that word. Moving the mouse off the stars restores the saved rating",
+   "A <b>Clear</b> link-button (<code>.clear-btn</code>) appears under the label once rated and resets to 0. Each star has <code>aria-label</code> \"Rate 3 out of 5\"",
+   "When the rating is 1 or 2, show \"What went wrong?\" with pill chips (<code>.chip</code>): <b>Late</b>, <b>Cold food</b>, <b>Missing item</b>, <b>Wrong order</b>. Several can be on (<code>is-on</code>). With 1–2 stars, Submit stays disabled until at least one chip is on. At 3+ stars the chips disappear and are not required"
   ],
   "change": {
-   "title": "What went wrong?",
-   "html": "<p>\"For 1–2 stars we need a reason.\"</p><ul><li>When the rating is 1 or 2, show \"What went wrong?\" with pill chips: <b>Late</b>, <b>Cold food</b>, <b>Missing item</b>, <b>Wrong order</b>. Several can be selected (tinted red when on).</li><li>With 1–2 stars, Submit stays disabled until at least one chip is on. At 3+ stars the chips disappear and are not required.</li></ul>"
+   "title": "Echo the rating",
+   "html": "<p>\"People aren't sure their rating went through.\"</p><ul><li>The thank-you card shows a line above the paragraph: <b>\"You rated it ★★★★ Good\"</b> (one ★ per star, then the word), in <code>.thanks-rating</code>.</li></ul><p style=\"font-size:12px;color:var(--ide-muted)\">Hint: <code>ThankYou</code> is rendered by <code>App</code>, not by the form. How does the rating get there?</p>"
   },
   "hints": [
-   "Controlled component: <code>function StarRating({ value, onChange }: { value: number; onChange: (n: number) =&gt; void })</code>.",
-   "Preview: <code>let shown = value; if (hover &gt; 0) { shown = hover; }</code> then star N is on when <code>n &lt;= shown</code>.",
-   "Use <code>onMouseEnter</code> on each star and one <code>onMouseLeave</code> on the row. Search: <b>mdn mouseenter vs mouseover</b>.",
-   "Stars are buttons inside a form, so <code>type=\"button\"</code> or they submit it.",
-   "Change: <code>problems: string[]</code>. Toggle with <code>includes</code> then <code>filter</code> or spread."
+   "Controlled component: <code>function StarRating({ value, onChange }: { value: number; onChange: (n: number) =&gt; void })</code>, with <code>const [rating, setRating] = useState(0);</code> in <code>ReviewForm</code>.",
+   "Stars: <code>[1, 2, 3, 4, 5].map((n) =&gt; { let cls = \"star\"; if (n &lt;= value) { cls = \"star is-on\"; } return &lt;button key={n} type=\"button\" …&gt;★&lt;/button&gt;; })</code>. Stars are buttons inside a form, so <code>type=\"button\"</code> or they submit it.",
+   "Label: <code>let label = \"Tap a star to rate\"; if (value &gt; 0) { label = LABELS[value]; }</code>. Submit: <code>disabled={rating === 0}</code>.",
+   "Next: <code>let shown = value; if (hover &gt; 0) { shown = hover; }</code>. Use <code>onMouseEnter</code> on each star and one <code>onMouseLeave</code> on the row. Search: <b>mdn mouseenter vs mouseover</b>.",
+   "Change: give <code>onSubmit</code> an argument, <code>(rating: number) =&gt; void</code>, keep it in state in <code>App</code>, and pass it to <code>ThankYou</code>. Search: <b>mdn string repeat</b> for the stars."
   ],
   "rubric": [
-   "rating in the form, hover local to the stars",
-   "Shown value derived from hover ?? value",
+   "rating in the form; StarRating controlled with value + onChange",
    "Stars mapped from [1..5], not copy-pasted",
    "type=\"button\" on stars",
+   "Label from LABELS, decided above the return",
    "Submit gate derived",
-   "Multi-select chips updated immutably"
+   "Hover local to the stars, shown = hover or value",
+   "Rating passed up through the callback for the change"
   ],
   "spec": {
    "colors": [
@@ -912,8 +1219,46 @@
     [
      "Chips",
      "h 34 · pill · gap 8 · wrap"
+    ],
+    [
+     "Thanks rating",
+     "15/700 · --text"
     ]
    ]
-  }
+  },
+  "primitives": [
+   {
+    "cat": "Arrays",
+    "name": "Look up by index: arr[n]",
+    "syntax": "LABELS[n]",
+    "example": "const LABELS = ['', 'Terrible', 'Poor', 'Okay', 'Good', 'Excellent'];\nLABELS[4]   // 'Good'\nLABELS[9]   // undefined",
+    "note": "Arrays start at 0, so a dummy <code>''</code> at index 0 lets the star count be the index. Out of range returns <code>undefined</code>, not an error.",
+    "search": "mdn array index access"
+   },
+   {
+    "cat": "Events",
+    "name": "onMouseEnter / onMouseLeave",
+    "syntax": "<button onMouseEnter={() => { setHover(n); }}>  <div onMouseLeave={() => { setHover(0); }}>",
+    "example": "// enter star 3 -> hover = 3\n// leave the whole row -> hover = 0",
+    "note": "Fire once when the pointer enters / leaves the element (they don't bubble from children like mouseover/mouseout). Put leave on the row, not each star, so moving between stars doesn't flicker.",
+    "search": "mdn mouseenter vs mouseover"
+   },
+   {
+    "cat": "React",
+    "name": "Callback with an argument (child to parent)",
+    "syntax": "onSubmit: (rating: number) => void   …   onSubmit(rating)",
+    "example": "function App() {\n  function handleSubmit(rating: number) { setFinalRating(rating); }\n  return <ReviewForm onSubmit={handleSubmit} />;\n}",
+    "note": "Data flows down as props and back <b>up</b> as callback arguments. The parent decides what to do with the value.",
+    "search": "react pass data from child to parent"
+   },
+   {
+    "cat": "Strings",
+    "name": "String.repeat()",
+    "syntax": "str.repeat(count)",
+    "example": "'★'.repeat(4)   // '★★★★'\n'★'.repeat(0)   // ''",
+    "note": "Returns a <b>new</b> string with the original repeated <code>count</code> times.",
+    "search": "mdn string repeat"
+   }
+  ]
  }
 }

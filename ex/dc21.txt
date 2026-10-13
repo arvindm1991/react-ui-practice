@@ -95,7 +95,10 @@ export default function ActivityItem({ item }: { item: Activity }) {
   );
 }
 @@@ starter src/App.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getActivity } from './api';
+import type { Activity } from './api';
+import ActivityItem from './components/ActivityItem';
 
 const NAV = ['Overview', 'Deployments', 'Services', 'Incidents', 'Settings'];
 
@@ -126,16 +129,47 @@ function StatCard({ label, value, note }: { label: string; value: string; note: 
   );
 }
 
-// TODO: load the first page of activity from getActivity(1) when this mounts,
-// render each item with <ActivityItem />, and add a "Load more" button.
+// TODO: add a "Load more" button that fetches the NEXT page and appends it.
+// getActivity(page) also returns nextPage (null = no more pages).
 function ActivityFeed() {
+  const [items, setItems] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // First page on mount.
+  useEffect(() => {
+    let cancelled = false;
+    getActivity(1).then((page) => {
+      if (cancelled) {
+        return;
+      }
+      setItems(page.items);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let body;
+  if (items.length === 0 && loading) {
+    body = <p className="feed-message">Loading activity…</p>;
+  } else {
+    body = (
+      <ul className="activity-list">
+        {items.map((item) => {
+          return <ActivityItem key={item.id} item={item} />;
+        })}
+      </ul>
+    );
+  }
+
   return (
     <section className="card">
       <div className="card-head">
         <h2>Recent activity</h2>
         <span className="card-sub">All services</span>
       </div>
-      <p className="feed-message">Activity will appear here.</p>
+      {body}
     </section>
   );
 }
@@ -212,6 +246,25 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .activity-text { margin: 0; font-size: 14px; line-height: 1.45; }
 .activity-text code { font-size: 12.5px; background: #F2F4F7; padding: 1px 6px; border-radius: 4px; }
 .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* Load more button + end-of-feed line (already styled: use these classes) */
+.feed-footer { padding: 14px 18px; display: flex; justify-content: center; }
+.load-more {
+  height: 34px;
+  min-width: 120px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.load-more:hover:not(:disabled) { background: var(--primary-soft); border-color: #C7C7F5; color: var(--primary); }
+.load-more:disabled { color: var(--muted); cursor: progress; }
+.feed-end { margin: 0; padding: 16px 18px; text-align: center; font-size: 13px; color: var(--muted); }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getActivity } from './api';
@@ -249,11 +302,11 @@ function StatCard({ label, value, note }: { label: string; value: string; note: 
 
 function ActivityFeed() {
   const [items, setItems] = useState<Activity[]>([]);
-  // The API tells us the next page. null = no more pages.
+  // CORE: remember the next page. The API tells us; null = no more pages.
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // First page on mount.
+  // First page on mount (already in the starter).
   useEffect(() => {
     let cancelled = false;
     getActivity(1).then((page) => {
@@ -261,6 +314,7 @@ function ActivityFeed() {
         return;
       }
       setItems(page.items);
+      // CORE: store nextPage from the first response too
       setNextPage(page.nextPage);
       setLoading(false);
     });
@@ -269,14 +323,15 @@ function ActivityFeed() {
     };
   }, []);
 
+  // CORE: Load more fetches nextPage and APPENDS it
   function handleLoadMore() {
-    // Guard: a second click while loading must not fetch the same page twice.
+    // NEXT: guard: a second click while loading must not fetch the same page twice.
     if (loading || nextPage === null) {
       return;
     }
     setLoading(true);
+    // CORE: fetch + append with the updater form (never replace what's shown)
     getActivity(nextPage).then((page) => {
-      // Append with the updater form: never replace what's already shown.
       setItems((prev) => {
         return [...prev, ...page.items];
       });
@@ -285,7 +340,6 @@ function ActivityFeed() {
     });
   }
 
-  // decisions
   let body;
   if (items.length === 0 && loading) {
     body = <p className="feed-message">Loading activity…</p>;
@@ -299,12 +353,15 @@ function ActivityFeed() {
     );
   }
 
+  // CORE: the Load more button, only while there is a next page
   let footer = null;
   if (items.length > 0 && nextPage !== null) {
+    // NEXT: "Loading…" label + disabled while a page loads
     let label = 'Load more';
     if (loading) {
       label = 'Loading…';
     }
+    // CORE: the button
     footer = (
       <div className="feed-footer">
         <button type="button" className="load-more" disabled={loading} onClick={() => { handleLoadMore(); }}>
@@ -313,9 +370,11 @@ function ActivityFeed() {
       </div>
     );
   } else if (items.length > 0) {
+    // NEXT: all caught up line after the last page
     footer = <p className="feed-end">You're all caught up · {items.length} events</p>;
   }
 
+  // CORE: render the footer under the list
   return (
     <section className="card">
       <div className="card-head">
@@ -401,7 +460,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .activity-text code { font-size: 12.5px; background: #F2F4F7; padding: 1px 6px; border-radius: 4px; }
 .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-/* ---- Added: load more ---- */
+/* Load more button + end-of-feed line (already styled: use these classes) */
 .feed-footer { padding: 14px 18px; display: flex; justify-content: center; }
 .load-more {
   height: 34px;

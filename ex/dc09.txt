@@ -67,6 +67,15 @@ import { getStays } from './api';
 import type { Stay } from './api';
 import { StayCard } from './components/StayCard';
 
+type SortKey = 'recommended' | 'price-asc' | 'price-desc' | 'rating';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recommended', label: 'Recommended' },
+  { key: 'price-asc', label: 'Price: low to high' },
+  { key: 'price-desc', label: 'Price: high to low' },
+  { key: 'rating', label: 'Top rated' },
+];
+
 function Header() {
   return (
     <header className="header">
@@ -76,11 +85,27 @@ function Header() {
   );
 }
 
-function SortMenu() {
-  // TODO: open/close, options, selected label
+type SortMenuProps = {
+  value: SortKey;
+  onChange: (key: SortKey) => void;
+};
+
+function SortMenu({ value, onChange }: SortMenuProps) {
+  // TODO: open/close a menu of SORT_OPTIONS. Picking one calls onChange(key).
+
+  const current = SORT_OPTIONS.find((o) => {
+    return o.key === value;
+  });
+  let currentLabel = 'Recommended';
+  if (current) {
+    currentLabel = current.label;
+  }
+
   return (
     <div className="sort">
-      <button type="button" className="sort-btn">Sort by: <b>Recommended</b> <span className="caret">▾</span></button>
+      <button type="button" className="sort-btn">
+        Sort by: <b>{currentLabel}</b> <span className="caret">▾</span>
+      </button>
     </div>
   );
 }
@@ -88,6 +113,8 @@ function SortMenu() {
 function StaysPage() {
   const [stays, setStays] = useState<Stay[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lives here because the grid will need it. The grid ignores it for now.
+  const [sortKey, setSortKey] = useState<SortKey>('recommended');
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +145,7 @@ function StaysPage() {
     <main className="page">
       <div className="toolbar">
         <h1>{stays.length} stays</h1>
-        <SortMenu />
+        <SortMenu value={sortKey} onChange={setSortKey} />
       </div>
       {body}
     </main>
@@ -172,6 +199,15 @@ body { margin: 0; font-family: 'Gill Sans', 'Segoe UI', system-ui, sans-serif; c
 .stay-rating { white-space: nowrap; }
 .stay-loc { color: var(--muted); }
 .stay-price { margin-top: 4px !important; }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: <ul class="sort-menu"> inside .sort, each option a <button class="sort-option"> */
+.sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 210px; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 28px rgba(31, 42, 36, 0.14); }
+.sort-option { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.sort-option:hover { background: var(--bg); }
+/* STRETCH: highlight the current option */
+.sort-option.is-selected { color: var(--primary); font-weight: 600; background: var(--primary-soft); }
+.check { font-size: 13px; }
 @@@ solution src/App.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { getStays } from './api';
@@ -201,12 +237,13 @@ type SortMenuProps = {
   onChange: (key: SortKey) => void;
 };
 
-// open is local UI state: nothing else on the page cares whether the menu is open.
 function SortMenu({ value, onChange }: SortMenuProps) {
+  // CORE: open is local UI state: nothing else on the page cares whether the menu is open.
   const [open, setOpen] = useState(false);
+  // NEXT: a ref on the wrapper for the outside-click check
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click (and Escape, from the change). Only listen while open.
+  // NEXT: close on outside click (CHANGE: and Escape). Only listen while open.
   useEffect(() => {
     if (!open) {
       return;
@@ -216,6 +253,7 @@ function SortMenu({ value, onChange }: SortMenuProps) {
         setOpen(false);
       }
     }
+    // CHANGE: Escape (plus the keydown add/remove lines below)
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setOpen(false);
@@ -229,6 +267,7 @@ function SortMenu({ value, onChange }: SortMenuProps) {
     };
   }, [open]);
 
+  // CORE
   function handleToggle() {
     setOpen((prev) => {
       return !prev;
@@ -248,6 +287,7 @@ function SortMenu({ value, onChange }: SortMenuProps) {
     currentLabel = current.label;
   }
 
+  // CORE: the menu (STRETCH: is-selected + ✓ on the current option)
   let menu = null;
   if (open) {
     menu = (
@@ -283,7 +323,7 @@ function SortMenu({ value, onChange }: SortMenuProps) {
   );
 }
 
-// Pure: returns a NEW array. .sort() mutates, so copy first.
+// NEXT: pure, returns a NEW array. .sort() mutates, so copy first.
 function sortStays(stays: Stay[], key: SortKey): Stay[] {
   if (key === 'recommended') {
     return stays;
@@ -304,6 +344,7 @@ function sortStays(stays: Stay[], key: SortKey): Stay[] {
 function StaysPage() {
   const [stays, setStays] = useState<Stay[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lives here because the grid will need it.
   const [sortKey, setSortKey] = useState<SortKey>('recommended');
 
   useEffect(() => {
@@ -320,7 +361,7 @@ function StaysPage() {
     };
   }, []);
 
-  // derived: never stored in state (stays keeps the API's recommended order)
+  // NEXT: derived, never stored in state (stays keeps the API's recommended order)
   const sorted = sortStays(stays, sortKey);
 
   let body = <p className="loading">Finding stays…</p>;
@@ -393,9 +434,11 @@ body { margin: 0; font-family: 'Gill Sans', 'Segoe UI', system-ui, sans-serif; c
 .stay-loc { color: var(--muted); }
 .stay-price { margin-top: 4px !important; }
 
-/* ---- Added: sort dropdown ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: <ul class="sort-menu"> inside .sort, each option a <button class="sort-option"> */
 .sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 210px; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 28px rgba(31, 42, 36, 0.14); }
 .sort-option { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
 .sort-option:hover { background: var(--bg); }
+/* STRETCH: highlight the current option */
 .sort-option.is-selected { color: var(--primary); font-weight: 600; background: var(--primary-soft); }
 .check { font-size: 13px; }

@@ -211,6 +211,7 @@ import type { Photo } from './api';
 import PhotoCard from './components/PhotoCard';
 import Spinner from './components/Spinner';
 
+// CHANGE: back-to-top threshold
 const SHOW_TOP_AFTER = 800; // px scrolled before "Back to top" appears
 
 function TopBar() {
@@ -226,21 +227,27 @@ function TopBar() {
 }
 
 function Feed() {
+  // CORE: feed state (photos, cursor, loading) + refs for the scroll root, sentinel and in-flight guard
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [nextCursor, setNextCursor] = useState<number | null>(0); // null = reached the end
   const [loading, setLoading] = useState(false);
+  // CHANGE: back-to-top visibility
   const [showTop, setShowTop] = useState(false);
+  // CORE: refs for the scroll root, the sentinel, and the in-flight guard
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   // A ref, not state: the observer callback must see the latest value immediately.
   const inFlight = useRef(false);
 
+  // CORE: IntersectionObserver on the sentinel, root = scroll container; inFlight ref prevents duplicates
   // A new observer per cursor. When a page arrives, nextCursor changes, the observer is
   // recreated, and if the sentinel is still visible it fires again (fills tall screens).
   useEffect(() => {
+    // NEXT: stop observing at the end of the feed
     if (nextCursor === null) {
       return; // end of feed: stop observing
     }
+    // CORE
     const root = scrollRef.current;
     const sentinel = sentinelRef.current;
     if (!root || !sentinel) {
@@ -273,6 +280,7 @@ function Feed() {
     };
   }, [nextCursor]);
 
+  // CHANGE: track scroll position + smooth scroll to top
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const scrolled = e.currentTarget.scrollTop > SHOW_TOP_AFTER;
     setShowTop(scrolled); // React skips the re-render when the value didn't change
@@ -284,6 +292,7 @@ function Feed() {
     }
   }
 
+  // CORE: loading row (reuse Spinner); NEXT: the "all caught up" end row
   // decisions
   let status = null;
   if (loading) {
@@ -292,6 +301,7 @@ function Feed() {
     status = <p className="feed-end">You're all caught up · {photos.length} photos</p>;
   }
 
+  // CHANGE: floating back-to-top button
   let topButton = null;
   if (showTop) {
     topButton = (
@@ -301,6 +311,7 @@ function Feed() {
     );
   }
 
+  // CORE: sentinel after the last card + status row (CHANGE: the .feed-wrap wrapper and {topButton})
   return (
     <div className="feed-wrap">
       <div className="feed-scroll" ref={scrollRef} onScroll={handleScroll}>
@@ -368,24 +379,12 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---- Added: infinite scroll + back to top ---- */
+/* CHANGE: non-scrolling positioned wrapper for the floating button */
 .feed-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+/* CORE */
 .sentinel { height: 1px; margin-top: -20px; }
+/* NEXT */
 .feed-end { margin: 0; padding: 18px; text-align: center; color: var(--muted); font-size: 14px; }
-.back-to-top {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 36px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--text);
-  color: var(--bg);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-}
+/* CHANGE */
+.back-to-top { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); cursor: pointer; }
 .back-to-top:hover { background: #fff; }

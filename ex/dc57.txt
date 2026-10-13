@@ -108,6 +108,32 @@ export default function Presence() {
     </div>
   );
 }
+@@@ shared src/utils/state.ts
+// Small pure helpers for immutable state updates. They never mutate their input.
+
+// Replace the item with the same id. Use inside a state updater:
+// setTasks((prev) => { return replaceById(prev, saved); });
+export function replaceById<T extends { id: string }>(list: T[], next: T): T[] {
+  return list.map((item) => {
+    if (item.id !== next.id) {
+      return item;
+    }
+    return next;
+  });
+}
+
+// A copy of a per-id flag map with one id turned on or off (off removes the key).
+// withFlag({ a: true }, 'b', true) -> { a: true, b: true }
+// withFlag({ a: true }, 'a', false) -> {}
+export function withFlag(flags: Record<string, boolean>, id: string, on: boolean): Record<string, boolean> {
+  const next = { ...flags };
+  if (on) {
+    next[id] = true;
+  } else {
+    delete next[id];
+  }
+  return next;
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getTasks } from './api';
@@ -251,7 +277,9 @@ import React, { useEffect, useState } from 'react';
 import { getTasks, getTask, updateTask, deleteTask, ConflictError } from './api';
 import type { Task } from './api';
 import Presence from './components/Presence';
+import { replaceById, withFlag } from './utils/state';
 
+// CORE
 type Patch = { title?: string; done?: boolean };
 
 function ProgressHeader({ tasks }: { tasks: Task[] }) {
@@ -272,6 +300,7 @@ function ProgressHeader({ tasks }: { tasks: Task[] }) {
   );
 }
 
+// CORE: saving/conflict flags + callbacks (NEXT: onRename, onDelete)
 type TaskRowProps = {
   task: Task;
   saving: boolean;
@@ -283,6 +312,7 @@ type TaskRowProps = {
 };
 
 function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReload }: TaskRowProps) {
+  // NEXT: inline rename is local to the row
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
 
@@ -307,6 +337,7 @@ function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReloa
     }
   }
 
+  // CORE
   let cls = 'task';
   if (task.done) {
     cls += ' is-done';
@@ -318,6 +349,7 @@ function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReloa
     cls += ' has-conflict';
   }
 
+  // NEXT: title becomes an input while editing
   let title = (
     <button type="button" className="task-title" disabled={saving} onClick={() => { startEdit(); }} title="Click to rename">
       {task.title}
@@ -337,6 +369,7 @@ function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReloa
     );
   }
 
+  // CORE: Saving… / conflict message
   let meta = <span className="task-meta">Last edited by {task.updatedBy}</span>;
   if (saving) {
     meta = <span className="task-meta">Saving…</span>;
@@ -375,9 +408,10 @@ function TaskRow({ task, saving, conflict, onToggle, onRename, onDelete, onReloa
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  // Per-task flags, keyed by id. Kept out of Task because they're client-only.
+  // CORE: per-task flags, keyed by id. Kept out of Task because they're client-only.
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [conflicts, setConflicts] = useState<Record<string, boolean>>({});
+  // CHANGE
   const [summary, setSummary] = useState('');
 
   useEffect(() => {
@@ -394,30 +428,20 @@ export default function App() {
     };
   }, []);
 
+  // CORE: small wrappers so every write path reads the same (pure helpers in utils/state.ts)
   function replaceTask(next: Task) {
     setTasks((prev) => {
-      return prev.map((t) => {
-        if (t.id !== next.id) {
-          return t;
-        }
-        return next;
-      });
+      return replaceById(prev, next);
     });
   }
 
   function setFlag(setter: typeof setSaving, id: string, on: boolean) {
     setter((prev) => {
-      const next = { ...prev };
-      if (on) {
-        next[id] = true;
-      } else {
-        delete next[id];
-      }
-      return next;
+      return withFlag(prev, id, on);
     });
   }
 
-  // Optimistic write. Resolves true/false and never rejects, so callers can batch it.
+  // CORE: optimistic write. Resolves true/false and never rejects, so callers can batch it.
   function saveTask(task: Task, patch: Patch): Promise<boolean> {
     replaceTask({ ...task, ...patch });
     setFlag(setSaving, task.id, true);
@@ -443,10 +467,12 @@ export default function App() {
     saveTask(task, { done: !task.done });
   }
 
+  // NEXT
   function handleRename(task: Task, title: string) {
     saveTask(task, { title });
   }
 
+  // NEXT: delete, re-insert at the old index on failure
   function handleDelete(task: Task) {
     const index = tasks.findIndex((t) => {
       return t.id === task.id;
@@ -470,6 +496,7 @@ export default function App() {
     });
   }
 
+  // CORE: fetch the latest copy and clear the flag
   function handleReload(id: string) {
     getTask(id).then((latest) => {
       replaceTask(latest);
@@ -477,32 +504,26 @@ export default function App() {
     });
   }
 
-  // Change: one optimistic save per open task; each one rolls back on its own.
+  // CHANGE: one optimistic save per open task; each one rolls back on its own.
   function handleMarkAllDone() {
     const targets = tasks.filter((t) => {
       return !t.done && !saving[t.id];
     });
-    if (targets.length === 0) {
-      return;
-    }
-    setSummary('Saving ' + targets.length + ' tasks…');
+    // saveTask resolves true/false and never rejects, so Promise.all waits for every one
     Promise.all(targets.map((t) => {
       return saveTask(t, { done: true });
     })).then((results) => {
       const ok = results.filter(Boolean).length;
-      const failed = targets.length - ok;
-      let msg = 'Marked ' + ok + ' of ' + targets.length + ' tasks done.';
-      if (failed > 0) {
-        msg += ' ' + failed + " couldn't be saved.";
-      }
-      setSummary(msg);
+      setSummary('Marked ' + ok + ' of ' + targets.length + ' tasks done.');
     });
   }
 
+  // CHANGE
   const openCount = tasks.filter((t) => {
     return !t.done;
   }).length;
 
+  // CORE
   let list;
   if (loading) {
     list = <p className="loading">Loading checklist…</p>;
@@ -527,6 +548,7 @@ export default function App() {
     );
   }
 
+  // CHANGE
   let summaryEl = null;
   if (summary) {
     summaryEl = <p className="batch-summary" role="status">{summary}</p>;
@@ -544,6 +566,7 @@ export default function App() {
       <section className="card">
         <div className="card-top">
           <ProgressHeader tasks={tasks} />
+          {/* CHANGE */}
           <button type="button" className="btn-secondary" disabled={loading || openCount === 0} onClick={() => { handleMarkAllDone(); }}>Mark all done</button>
         </div>
         {summaryEl}
@@ -601,11 +624,14 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 sys
 .icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ---- Added: optimistic edits, conflicts, batch ---- */
+/* CORE: saving + conflict states */
 .task { align-items: flex-start; }
 .task-check { margin-top: 3px; cursor: pointer; }
+/* NEXT: rename */
 button.task-title { padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: inherit; text-align: left; cursor: text; border-radius: 4px; }
 button.task-title:hover { background: #FAF5EE; }
 .task-input { font: inherit; font-weight: 500; padding: 2px 6px; margin: -3px -7px 0; border: 1px solid var(--accent); border-radius: 6px; outline: 3px solid var(--accent-soft); color: var(--text); }
+/* CORE */
 .task.is-saving { opacity: 0.6; }
 .task.is-saving .task-meta { font-style: italic; }
 .task.has-conflict { background: #FFFBF2; }
@@ -613,8 +639,10 @@ button.task-title:hover { background: #FAF5EE; }
 .conflict { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 5px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--warn-text); font-size: 12.5px; font-weight: 500; width: fit-content; }
 .conflict-btn { padding: 0; border: 0; background: none; color: var(--warn-text); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
+/* CHANGE: Mark all done + summary */
 .btn-secondary { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .btn-secondary:hover:not(:disabled) { border-color: var(--success); color: var(--success); }
 .btn-secondary:disabled { opacity: 0.45; cursor: default; }
 .batch-summary { margin: 0; padding: 9px 18px; background: #F2FAF6; border-bottom: 1px solid var(--border); color: #1F6B49; font-size: 13px; }
+/* NEXT */
 .icon-btn:disabled { opacity: 0.3; cursor: default; }

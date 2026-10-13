@@ -220,7 +220,7 @@ type CityInputProps = {
   placeholder: string;
 };
 
-// Wraps the part of `text` that matches `query` in <mark>.
+// CHANGE: wraps the part of `text` that matches `query` in <mark>.
 function Highlight({ text, query }: { text: string; query: string }) {
   const q = query.trim().toLowerCase();
   const start = text.toLowerCase().indexOf(q);
@@ -239,14 +239,17 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 export function CityInput({ label, placeholder }: CityInputProps) {
   const [query, setQuery] = useState('');
+  // CORE: results, loading, open
   const [results, setResults] = useState<City[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  // NEXT: the one highlighted row (keyboard + mouse) and the chosen city (code badge)
   const [activeIndex, setActiveIndex] = useState(-1);
   const [selected, setSelected] = useState<City | null>(null);
+  // STRETCH: recent searches
   const [recent, setRecent] = useState<City[]>([]);
 
-  // Search on every query change. The cancelled flag throws away responses
+  // CORE: search on every query change. The cancelled flag throws away responses
   // for older queries that arrive late (the API's delay is random).
   useEffect(() => {
     if (query.trim() === '') {
@@ -268,7 +271,7 @@ export function CityInput({ label, placeholder }: CityInputProps) {
     };
   }, [query]);
 
-  // Change: recent searches, loaded once.
+  // STRETCH: recent searches, loaded once.
   useEffect(() => {
     let cancelled = false;
     getRecentSearches().then((data) => {
@@ -282,18 +285,21 @@ export function CityInput({ label, placeholder }: CityInputProps) {
     };
   }, []);
 
-  // derived: the list the keyboard moves through
+  // STRETCH: derived, the list the keyboard moves through (Core just uses `results`)
   const showingRecent = query.trim() === '';
   let options = results;
   if (showingRecent) {
     options = recent;
   }
 
+  // CORE: pick a city
   function choose(city: City) {
     setQuery(formatCity(city));
-    setSelected(city);
     setOpen(false);
+    // NEXT
+    setSelected(city);
     setActiveIndex(-1);
+    // STRETCH: move it to the top of recents (no duplicates, max 5)
     setRecent((prev) => {
       const rest = prev.filter((c) => {
         return c.id !== city.id;
@@ -302,13 +308,16 @@ export function CityInput({ label, placeholder }: CityInputProps) {
     });
   }
 
+  // CORE: typing opens the dropdown
   function handleChange(value: string) {
     setQuery(value);
-    setSelected(null);
     setOpen(true);
+    // NEXT
+    setSelected(null);
     setActiveIndex(-1);
   }
 
+  // NEXT: keyboard
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault(); // stop the cursor jumping to the end
@@ -339,32 +348,40 @@ export function CityInput({ label, placeholder }: CityInputProps) {
     }
   }
 
+  // CORE: dropdown decisions
   let dropdown = null;
   if (open) {
     let content = null;
     if (showingRecent) {
+      // STRETCH
       if (recent.length > 0) {
         content = <p className="ac-heading">Recent searches</p>;
       }
+      // NEXT: "Searching…" / no matches
     } else if (results.length === 0 && loading) {
       content = <p className="ac-message">Searching…</p>;
     } else if (results.length === 0) {
       content = <p className="ac-message">No cities match "{query.trim()}"</p>;
     }
 
+    // CORE: the list
     let list = null;
     if (options.length > 0) {
       list = (
         <ul className="ac-list" role="listbox" id="city-options">
           {options.map((city, i) => {
+            // NEXT: highlighted row
             let cls = 'ac-option';
             if (i === activeIndex) {
               cls = 'ac-option is-active';
             }
+            // STRETCH: clock icon for recents
             let icon = '📍';
             if (showingRecent) {
               icon = '🕘';
             }
+            // CORE (NEXT: id/role/aria-selected/onMouseEnter. CHANGE: <Highlight>)
+            // onMouseDown + preventDefault keeps focus in the input, so blur doesn't close the list before the click lands.
             return (
               <li
                 key={city.id}
@@ -386,6 +403,7 @@ export function CityInput({ label, placeholder }: CityInputProps) {
       );
     }
 
+    // CORE
     if (content || list) {
       dropdown = (
         <div className="ac-dropdown">
@@ -396,16 +414,19 @@ export function CityInput({ label, placeholder }: CityInputProps) {
     }
   }
 
+  // NEXT: ARIA active descendant
   let activeId: string | undefined = undefined;
   if (open && activeIndex >= 0 && options[activeIndex]) {
     activeId = 'city-' + options[activeIndex].id;
   }
 
+  // NEXT: code badge
   let codeBadge = null;
   if (selected) {
     codeBadge = <span className="code-badge">{selected.code}</span>;
   }
 
+  // CORE: render (NEXT: role/aria-*, onKeyDown, codeBadge)
   return (
     <div className="field city-field">
       <span className="field-label">{label}</span>
@@ -474,17 +495,27 @@ body { margin: 0; font-family: Manrope, system-ui, -apple-system, 'Segoe UI', sa
 .dest-price b { color: var(--text); }
 
 /* ---- Added: city autocomplete ---- */
+/* NEXT: code badge */
 .city-input-row { display: flex; align-items: center; gap: 8px; }
 .code-badge { padding: 2px 6px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
 
+/* CORE: dropdown */
 .ac-dropdown { position: absolute; top: calc(100% + 10px); left: 0; width: 340px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 40px rgba(11, 27, 63, 0.18); z-index: 10; }
+/* STRETCH */
 .ac-heading { margin: 6px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+/* NEXT */
 .ac-message { margin: 0; padding: 12px 10px; color: var(--muted); }
+/* CORE */
 .ac-list { list-style: none; margin: 0; padding: 0; }
 .ac-option { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+/* NEXT */
 .ac-option.is-active { background: var(--primary-soft); }
+/* CORE */
 .ac-icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--bg); font-size: 13px; }
 .ac-name { flex: 1; min-width: 0; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* CHANGE */
 .ac-name mark { background: none; color: var(--primary); font-weight: 800; }
+/* CORE */
 .ac-code { font-size: 12px; font-weight: 800; color: var(--muted); }
+/* NEXT */
 .ac-option.is-active .ac-code { color: var(--primary); }

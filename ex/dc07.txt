@@ -153,6 +153,20 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, san
 .on-call { font-size: 11px; font-weight: 700; color: var(--oncall); }
 .on-call::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--oncall); }
 .ext { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: <p class="count">, and <div class="message"> for loading / no matches */
+.count { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.message { padding: 32px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
+.message p { margin: 0 0 8px; }
+/* NEXT: Clear search */
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
+/* STRETCH: on-call chip (add is-on while active) */
+.chip { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: inherit; font-size: 14px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.chip:hover { border-color: var(--oncall); }
+.chip.is-on { background: #E4F6EC; border-color: var(--oncall); color: var(--oncall); font-weight: 600; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getStaff } from './api';
@@ -170,11 +184,14 @@ function TopBar() {
 }
 
 function Directory() {
+  // CORE: staff + query state (NEXT: loading)
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  // STRETCH
   const [onCallOnly, setOnCallOnly] = useState(false);
 
+  // CORE: load once, with a cancelled guard
   useEffect(() => {
     let cancelled = false;
     getStaff().then((data) => {
@@ -189,30 +206,38 @@ function Directory() {
     };
   }, []);
 
+  // NEXT
   function handleClear() {
     setQuery('');
   }
 
+  // STRETCH
   function handleToggleOnCall() {
     setOnCallOnly((prev) => {
       return !prev;
     });
   }
 
-  // derived: never stored in state
+  // CORE: derived, never stored in state (STRETCH: the onCall condition)
   const q = query.trim().toLowerCase();
   const visible = staff.filter((person) => {
     if (onCallOnly && !person.onCall) {
       return false;
     }
-    return person.name.toLowerCase().includes(q) || person.role.toLowerCase().includes(q);
+    const name = person.name.toLowerCase();
+    const role = person.role.toLowerCase();
+    // CHANGE: department matches too
+    const department = person.department.toLowerCase();
+    return name.includes(q) || role.includes(q) || department.includes(q);
   });
 
+  // STRETCH
   let chipCls = 'chip';
   if (onCallOnly) {
     chipCls = 'chip is-on';
   }
 
+  // CORE: the list. NEXT: loading message and the empty state
   let body;
   if (loading) {
     body = <p className="message">Loading care team…</p>;
@@ -233,6 +258,7 @@ function Directory() {
     );
   }
 
+  // NEXT
   let count = null;
   if (!loading) {
     count = <p className="count">Showing {visible.length} of {staff.length}</p>;
@@ -248,7 +274,7 @@ function Directory() {
         <input
           className="search"
           type="search"
-          placeholder="Search name or role"
+          placeholder="Search name, role or department"
           value={query}
           onChange={(e) => { setQuery(e.target.value); }}
         />
@@ -312,14 +338,16 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, san
 .on-call::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--oncall); }
 .ext { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* ---- Added: search + states ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* NEXT: <p class="count">, and <div class="message"> for loading / no matches */
 .count { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .message { padding: 32px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
 .message p { margin: 0 0 8px; }
+/* NEXT: Clear search */
 .link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--primary); cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 
-/* Change: on-call chip */
+/* STRETCH: on-call chip (add is-on while active) */
 .chip { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: inherit; font-size: 14px; color: var(--muted); white-space: nowrap; cursor: pointer; }
 .chip:hover { border-color: var(--oncall); }
 .chip.is-on { background: #E4F6EC; border-color: var(--oncall); color: var(--oncall); font-weight: 600; }

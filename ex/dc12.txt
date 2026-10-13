@@ -189,6 +189,7 @@ import { formatPrice } from './utils/formatPrice';
 
 const VISIBLE_FEATURES = 3;
 
+// CORE: the two billing options as a type
 type Billing = 'monthly' | 'yearly';
 
 function TopBar() {
@@ -204,6 +205,7 @@ function TopBar() {
   );
 }
 
+// CORE: the toggle becomes controlled (value + onChange from the parent)
 type BillingToggleProps = {
   billing: Billing;
   onChange: (next: Billing) => void;
@@ -235,7 +237,7 @@ type PlanCardProps = {
 };
 
 function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
-  // Only this card cares whether its list is open, so the state lives here.
+  // STRETCH: only this card cares whether its list is open, so the state lives here.
   const [expanded, setExpanded] = useState(false);
 
   let badge = null;
@@ -243,7 +245,7 @@ function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
     badge = <span className="popular">Most popular</span>;
   }
 
-  // derived price: yearly = 10 months (2 months free)
+  // CORE: derived price. Yearly = 10 months (2 months free), never stored
   const isFree = plan.monthlyCents === 0;
   let amount = formatPrice(plan.monthlyCents);
   let period = null;
@@ -255,9 +257,11 @@ function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
     const yearlyCents = plan.monthlyCents * 10;
     amount = formatPrice(yearlyCents);
     period = <span className="period">/year</span>;
+    // NEXT: the per-month note under the yearly price
     note = <p className="price-note">{formatPrice(Math.round(yearlyCents / 12))}/mo, billed yearly</p>;
   }
 
+  // STRETCH: expanded list
   let shown = plan.features.slice(0, VISIBLE_FEATURES);
   let moreLabel = 'Show all ' + plan.features.length + ' features';
   if (expanded) {
@@ -265,6 +269,7 @@ function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
     moreLabel = 'Show less';
   }
 
+  // NEXT: selected plan
   let cls = 'plan';
   let chooseLabel = 'Choose ' + plan.name;
   if (selected) {
@@ -296,8 +301,9 @@ function PlanCard({ plan, billing, selected, onChoose }: PlanCardProps) {
 }
 
 export default function App() {
-  // Shared by the toggle and every card, so it lives in the parent.
+  // CORE: shared by the toggle and every card, so it lives in the parent.
   const [billing, setBilling] = useState<Billing>('monthly');
+  // NEXT: which plan is chosen
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
@@ -376,6 +382,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 .more-btn:hover { color: var(--text); }
 
 /* ---- Added: billing toggle, selected plan, expandable features ---- */
+/* NEXT */
 .price-note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .plan { transition: border-color 0.15s, box-shadow 0.15s; }
 .plan.is-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 12px 40px rgba(166, 107, 255, 0.25); }

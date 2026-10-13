@@ -225,9 +225,10 @@ function DoNotDisturbCard() {
 }
 
 function NotificationsCard() {
-  // The list is the single source of truth. Copy the defaults into state once.
+  // CORE: the list becomes state. It is the single source of truth. Copy the defaults in once.
   const [settings, setSettings] = useState<NotificationSetting[]>(DEFAULT_SETTINGS);
 
+  // CORE: flip one row (map returns a new object only for the matching id)
   function handleToggle(id: string, next: boolean) {
     setSettings((prev) => {
       return prev.map((s) => {
@@ -239,6 +240,7 @@ function NotificationsCard() {
     });
   }
 
+  // NEXT: bulk on/off
   function setAll(enabled: boolean) {
     setSettings((prev) => {
       return prev.map((s) => {
@@ -247,12 +249,12 @@ function NotificationsCard() {
     });
   }
 
-  // derived: never stored in state
+  // CORE: derived count, never stored in state
   const enabledCount = settings.filter((s) => {
     return s.enabled;
   }).length;
 
-  // Change: when everything is off, the same button turns everything back on.
+  // CHANGE: when everything is off, the same button turns everything back on.
   let bulkLabel = 'Turn all off';
   let bulkNext = false;
   if (enabledCount === 0) {
@@ -271,6 +273,7 @@ function NotificationsCard() {
       </header>
       <ul className="setting-list">
         {settings.map((s) => {
+          // NEXT: muted label for disabled rows
           let cls = 'setting-row';
           if (!s.enabled) {
             cls = 'setting-row is-off';
@@ -360,5 +363,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 }
 
 /* ---- Added: notification toggles ---- */
+/* CORE */
 .enabled-count { font-variant-numeric: tabular-nums; }
+/* NEXT */
 .setting-row.is-off .setting-label { color: var(--muted); }

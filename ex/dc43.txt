@@ -68,6 +68,14 @@ export function formatTotal(seconds: number): string {
   }
   return h + ' hr ' + m + ' min';
 }
+@@@ shared src/utils/array.ts
+// moveItem(['a','b','c'], 0, 2) -> ['b','c','a']. Pure: returns a new array, never mutates.
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
 @@@ shared src/components/Cover.tsx
 import React from 'react';
 
@@ -80,7 +88,7 @@ export default function Cover({ color, size, label }: CoverProps) {
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
-import { getPlaylist } from './api';
+import { getPlaylist, savePlaylistOrder } from './api';
 import type { Playlist, Track } from './api';
 import { formatDuration } from './utils/time';
 import Cover from './components/Cover';
@@ -124,6 +132,8 @@ function TrackList({ tracks }: { tracks: Track[] }) {
 
 export default function App() {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
+  const [tracks, setTracks] = useState<Track[]>([]); // our own copy, so the order can change
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,14 +142,30 @@ export default function App() {
         return;
       }
       setPlaylist(data);
+      setTracks(data.tracks);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  function handleSave() {
+    const ids = tracks.map((t) => {
+      return t.id;
+    });
+    setSaving(true);
+    savePlaylistOrder(ids).then(() => {
+      setSaving(false);
+    });
+  }
+
   if (!playlist) {
     return <div className="app"><p className="loading">Loading playlist…</p></div>;
+  }
+
+  let saveLabel = 'Save order';
+  if (saving) {
+    saveLabel = 'Saving…';
   }
 
   return (
@@ -148,8 +174,9 @@ export default function App() {
       <div className="actions">
         <button type="button" className="play-btn" aria-label="Play">▶</button>
         <span className="actions-spacer" />
+        <button type="button" className="save-btn" disabled={saving} onClick={() => { handleSave(); }}>{saveLabel}</button>
       </div>
-      <TrackList tracks={playlist.tracks} />
+      <TrackList tracks={tracks} />
     </div>
   );
 }
@@ -191,24 +218,21 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .track-title { font-size: 15px; font-weight: 600; }
 .track-artist { font-size: 13px; color: var(--muted); }
 .track-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.save-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getPlaylist, savePlaylistOrder } from './api';
 import type { Playlist, Track } from './api';
 import { formatDuration, formatTotal } from './utils/time';
+import { moveItem } from './utils/array';
 import Cover from './components/Cover';
 
+// CORE: the row being dragged over (NEXT: before / after for the indicator)
 type DropTarget = { id: string; position: 'before' | 'after' };
 
-// Pure helper: returns a new array with the item at `from` moved to `to`.
-function moveItem<T>(list: T[], from: number, to: number): T[] {
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
-  return next;
-}
-
 function PlaylistHeader({ playlist, tracks }: { playlist: Playlist; tracks: Track[] }) {
+  // STRETCH: running time total (formatTotal)
   // derived: never stored in state
   const totalSeconds = tracks.reduce((sum, t) => {
     return sum + t.seconds;
@@ -225,14 +249,18 @@ function PlaylistHeader({ playlist, tracks }: { playlist: Playlist; tracks: Trac
   );
 }
 
+// CORE: row props (NEXT: count + onMove; STRETCH: startsAt)
 type TrackRowProps = {
   track: Track;
   index: number;
   count: number;
   startsAt: number;
+  // CORE: drag props (NEXT: dropPosition)
   isDragging: boolean;
   dropPosition: 'before' | 'after' | null;
+  // NEXT: move up / down buttons
   onMove: (from: number, to: number) => void;
+  // CORE
   onDragStart: (e: React.DragEvent<HTMLLIElement>, id: string) => void;
   onDragOver: (e: React.DragEvent<HTMLLIElement>, id: string) => void;
   onDrop: (e: React.DragEvent<HTMLLIElement>) => void;
@@ -240,6 +268,7 @@ type TrackRowProps = {
 };
 
 function TrackRow({ track, index, count, startsAt, isDragging, dropPosition, onMove, onDragStart, onDragOver, onDrop, onDragEnd }: TrackRowProps) {
+  // CORE: faded row class, built above the return (NEXT: drop-before / drop-after)
   let cls = 'track';
   if (isDragging) {
     cls = cls + ' is-dragging';
@@ -267,8 +296,10 @@ function TrackRow({ track, index, count, startsAt, isDragging, dropPosition, onM
         <p className="track-title">{track.title}</p>
         <p className="track-artist">{track.artist}</p>
       </div>
+      {/* STRETCH: start time */}
       <span className="track-start">starts {formatDuration(startsAt)}</span>
       <span className="track-time">{formatDuration(track.seconds)}</span>
+      {/* NEXT: ▲ / ▼ buttons */}
       <div className="move-btns">
         <button type="button" className="move-btn" aria-label={'Move ' + track.title + ' up'} disabled={index === 0} onClick={() => { onMove(index, index - 1); }}>▲</button>
         <button type="button" className="move-btn" aria-label={'Move ' + track.title + ' down'} disabled={index === count - 1} onClick={() => { onMove(index, index + 1); }}>▼</button>
@@ -280,10 +311,13 @@ function TrackRow({ track, index, count, startsAt, isDragging, dropPosition, onM
 export default function App() {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
+  // CHANGE: the order the server has, for the dirty check
   const [savedIds, setSavedIds] = useState<string[]>([]); // order the server has
   const [saving, setSaving] = useState(false);
+  // CORE: drag state
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  // NEXT: aria-live text
   const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
@@ -303,6 +337,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: one move path (reuses moveItem from utils/array) for drop and the buttons
   function handleMove(from: number, to: number) {
     if (to < 0 || to >= tracks.length) {
       return;
@@ -314,6 +349,7 @@ export default function App() {
     setAnnouncement(moved.title + ' moved to position ' + (to + 1) + ' of ' + tracks.length);
   }
 
+  // CORE: drag and drop handlers
   function handleDragStart(e: React.DragEvent<HTMLLIElement>, id: string) {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id); // Firefox needs data to start a drag
@@ -322,6 +358,7 @@ export default function App() {
 
   function handleDragOver(e: React.DragEvent<HTMLLIElement>, id: string) {
     e.preventDefault(); // required, or drop never fires
+    // NEXT: before / after from the pointer's half of the row (Core can just target the row)
     const rect = e.currentTarget.getBoundingClientRect();
     let position: 'before' | 'after' = 'before';
     if (e.clientY > rect.top + rect.height / 2) {
@@ -332,6 +369,7 @@ export default function App() {
     }
   }
 
+  // CORE: drop -> from / to indexes -> handleMove
   function handleDrop(e: React.DragEvent<HTMLLIElement>) {
     e.preventDefault();
     if (dragId && dropTarget && dragId !== dropTarget.id) {
@@ -357,6 +395,7 @@ export default function App() {
     setDropTarget(null);
   }
 
+  // CHANGE: remember what was saved (NEXT: announce it)
   function handleSave() {
     const ids = tracks.map((t) => {
       return t.id;
@@ -369,6 +408,7 @@ export default function App() {
     });
   }
 
+  // STRETCH: Discard restores the saved order
   function handleDiscard() {
     setTracks((prev) => {
       return savedIds.map((id) => {
@@ -383,6 +423,7 @@ export default function App() {
     return <div className="app"><p className="loading">Loading playlist…</p></div>;
   }
 
+  // CHANGE
   // derived
   const currentIds = tracks.map((t) => {
     return t.id;
@@ -394,16 +435,19 @@ export default function App() {
     saveLabel = 'Saving…';
   }
 
+  // CHANGE: saved / unsaved status
   let statusEl = <span className="save-state is-saved">✓ All changes saved</span>;
   if (dirty) {
     statusEl = <span className="save-state is-dirty">● Unsaved changes</span>;
   }
 
+  // STRETCH
   let discardBtn = null;
   if (dirty && !saving) {
     discardBtn = <button type="button" className="ghost-btn" onClick={() => { handleDiscard(); }}>Discard</button>;
   }
 
+  // STRETCH: running start times
   // derived: each track's start time in the playlist (recalculates on every reorder)
   const starts: number[] = [];
   let running = 0;
@@ -412,6 +456,7 @@ export default function App() {
     running = running + t.seconds;
   });
 
+  // CORE: rows rendered inline so each gets the drag props (CHANGE: status + Save disabled when clean; STRETCH: Discard, header total)
   return (
     <div className="app">
       <PlaylistHeader playlist={playlist} tracks={tracks} />
@@ -488,26 +533,33 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .track-title { font-size: 15px; font-weight: 600; }
 .track-artist { font-size: 13px; color: var(--muted); }
 .track-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.save-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---- Added: reorder + save ---- */
+/* STRETCH: running time */
 .pl-total { color: var(--plum); font-weight: 600; }
+/* CORE */
 .track { position: relative; cursor: grab; }
 .track.is-dragging { opacity: 0.4; }
+/* NEXT: drop indicator */
 .track.drop-before { box-shadow: inset 0 3px 0 var(--coral); }
 .track.drop-after { box-shadow: inset 0 -3px 0 var(--coral); }
+/* CORE */
 .drag-handle { color: #C9BBC9; font-size: 12px; letter-spacing: -2px; }
+/* STRETCH */
 .track-start { font-size: 12px; color: #B3A6B8; font-variant-numeric: tabular-nums; }
+/* NEXT: move buttons */
 .move-btns { display: flex; gap: 4px; }
 .move-btn { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--plum); font-size: 10px; cursor: pointer; }
 .move-btn:hover:not(:disabled) { border-color: var(--plum); }
 .move-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .move-btn:focus-visible, .save-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
 
+/* CHANGE (ghost-btn: STRETCH; sr-only: NEXT) */
 .save-state { font-size: 13px; font-weight: 600; }
 .save-state.is-dirty { color: var(--coral); }
 .save-state.is-saved { color: #4E9B7A; }
-.save-btn { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-.save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .ghost-btn { height: 36px; padding: 0 12px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
 .ghost-btn:hover { color: var(--text); }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

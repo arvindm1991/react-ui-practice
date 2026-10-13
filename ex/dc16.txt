@@ -229,6 +229,7 @@ function OrderRow({ order }: { order: Order }) {
   );
 }
 
+// CORE: Prev / Next (NEXT: the numbered buttons and the `disabled` prop)
 type PaginationProps = {
   page: number;
   pageCount: number;
@@ -237,11 +238,12 @@ type PaginationProps = {
 };
 
 function Pagination({ page, pageCount, disabled, onChange }: PaginationProps) {
-  // [1, 2, ..., pageCount]
+  // NEXT: [1, 2, ..., pageCount]
   const pages = Array.from({ length: pageCount }, (_, i) => {
     return i + 1;
   });
 
+  // CORE: no Prev on page 1, no Next on the last page
   const prevDisabled = disabled || page === 1;
   const nextDisabled = disabled || page === pageCount;
 
@@ -270,11 +272,12 @@ function OrdersTable() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  // CORE: the current page, in the effect's dependencies so changing it refetches
   const [page, setPage] = useState(1);
 
-  // Re-runs whenever the page changes. The old rows stay on screen (dimmed) until the new ones arrive.
   useEffect(() => {
     let cancelled = false;
+    // NEXT: the old rows stay on screen (dimmed) until the new ones arrive
     setLoading(true);
     getOrders(page, PAGE_SIZE).then((data) => {
       if (cancelled) {
@@ -293,7 +296,7 @@ function OrdersTable() {
     setPage(next);
   }
 
-  // derived
+  // CORE: derived, never stored
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const first = (page - 1) * PAGE_SIZE + 1;
   const last = Math.min(page * PAGE_SIZE, total);
@@ -302,6 +305,7 @@ function OrdersTable() {
     return <p className="msg">Loading orders…</p>;
   }
 
+  // NEXT: dim the old rows while the next page loads
   let tableCls = 'table';
   if (loading) {
     tableCls = 'table is-loading';
@@ -388,12 +392,14 @@ body { margin: 0; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', 
 .badge.is-done { background: #ECFDF3; color: #067647; }
 
 /* ---- Added: pagination ---- */
-.table.is-loading tbody { opacity: 0.45; transition: opacity 0.15s; }
+/* CORE */
 .table-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); }
 .range { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pager { display: flex; align-items: center; gap: 4px; }
 .pager-btn, .page-num { height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
 .pager-btn:hover:not(:disabled), .page-num:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
-.page-num.is-current { background: var(--primary); border-color: var(--primary); color: #fff; }
 .pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* NEXT */
+.table.is-loading tbody { opacity: 0.45; transition: opacity 0.15s; }
+.page-num.is-current { background: var(--primary); border-color: var(--primary); color: #fff; }
 .page-num:disabled:not(.is-current) { opacity: 0.6; cursor: wait; }

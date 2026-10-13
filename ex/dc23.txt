@@ -158,9 +158,20 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Aveni
 .task label { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 15px; cursor: pointer; }
 .task input { width: 18px; height: 18px; accent-color: var(--tomato); }
 .task.is-done label { color: var(--muted); text-decoration: line-through; }
+
+/* Break mode + progress bar (already styled: toggle .mode-break on .timer) */
+.timer.mode-break { border-top-color: var(--leaf); box-shadow: 0 10px 30px rgba(47, 158, 107, 0.14); }
+.mode-break .mode-pill { background: var(--leaf-soft); color: var(--leaf); }
+.mode-break .btn-primary { background: var(--leaf); }
+.progress { width: 100%; max-width: 260px; height: 6px; border-radius: 999px; background: var(--tomato-soft); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--tomato); border-radius: inherit; transition: width 0.3s linear; }
+.mode-break .progress { background: var(--leaf-soft); }
+.mode-break .progress-fill { background: var(--leaf); }
 @@@ solution src/App.tsx
+// CORE: hooks
 import React, { useEffect, useState } from 'react';
 import TaskList from './components/TaskList';
+// NEXT: BREAK_SECONDS + Mode are for the break switch
 import { formatTime, FOCUS_SECONDS, BREAK_SECONDS } from './utils/time';
 
 const DAILY_GOAL = 4;
@@ -193,12 +204,14 @@ function SessionDots({ completed }: { completed: number }) {
   );
 }
 
+// NEXT: onFocusComplete prop + mode state
 function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
   const [mode, setMode] = useState<Mode>('focus');
+  // CORE: time left + running flag
   const [secondsLeft, setSecondsLeft] = useState(FOCUS_SECONDS);
   const [running, setRunning] = useState(false);
 
-  // One interval while running. The cleanup clears it when we pause,
+  // CORE: one interval while running. The cleanup clears it when we pause,
   // reset or unmount, so there can never be two intervals at once.
   useEffect(() => {
     if (!running) {
@@ -215,7 +228,7 @@ function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
     };
   }, [running]);
 
-  // Reaching 00:00 switches the mode.
+  // NEXT: reaching 00:00 switches the mode.
   useEffect(() => {
     if (secondsLeft > 0) {
       return;
@@ -231,19 +244,21 @@ function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
     }
   }, [secondsLeft, mode]);
 
+  // CORE: Start / Pause toggles running
   function handleStartPause() {
     setRunning((r) => {
       return !r;
     });
   }
 
+  // NEXT: Reset
   function handleReset() {
     setRunning(false);
     setMode('focus');
     setSecondsLeft(FOCUS_SECONDS);
   }
 
-  // derived
+  // NEXT: label + class for Break mode
   let total = FOCUS_SECONDS;
   let modeLabel = 'Focus';
   let cls = 'timer mode-focus';
@@ -252,13 +267,16 @@ function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
     modeLabel = 'Break';
     cls = 'timer mode-break';
   }
+  // STRETCH: progress is derived from secondsLeft
   const progress = ((total - secondsLeft) / total) * 100;
 
+  // CORE: button label
   let startLabel = 'Start';
   if (running) {
     startLabel = 'Pause';
   }
 
+  // CORE: render the live time (NEXT: mode pill/class, STRETCH: progress bar)
   return (
     <section className={cls}>
       <span className="mode-pill">{modeLabel}</span>
@@ -274,6 +292,7 @@ function Timer({ onFocusComplete }: { onFocusComplete: () => void }) {
   );
 }
 
+// NEXT: count completed focus sessions
 export default function App() {
   const [completed, setCompleted] = useState(0);
 
@@ -338,7 +357,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Aveni
 .task input { width: 18px; height: 18px; accent-color: var(--tomato); }
 .task.is-done label { color: var(--muted); text-decoration: line-through; }
 
-/* ---- Added: running timer ---- */
+/* Break mode + progress bar (already styled: toggle .mode-break on .timer) */
 .timer.mode-break { border-top-color: var(--leaf); box-shadow: 0 10px 30px rgba(47, 158, 107, 0.14); }
 .mode-break .mode-pill { background: var(--leaf-soft); color: var(--leaf); }
 .mode-break .btn-primary { background: var(--leaf); }

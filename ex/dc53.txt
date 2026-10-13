@@ -78,37 +78,6 @@ export async function moveCard(cardId: string, toColumn: ColumnId, toIndex: numb
   }
   DB = moveCardInBoard(DB, cardId, toColumn, toIndex);
 }
-@@@ shared src/utils/board.ts
-import type { Board, ColumnId } from '../api';
-
-// Where is a card? findCard(board, 'ORB-41') -> { columnId: 'backlog', index: 0 }
-export function findCard(board: Board, cardId: string): { columnId: ColumnId; index: number } | null {
-  const ids = Object.keys(board) as ColumnId[];
-  for (const columnId of ids) {
-    const index = board[columnId].findIndex((c) => c.id === cardId);
-    if (index !== -1) {
-      return { columnId, index };
-    }
-  }
-  return null;
-}
-
-// Pure: returns a NEW board with the card moved.
-// toIndex is the index in the destination column after the card has been removed from its old spot.
-export function moveCardInBoard(board: Board, cardId: string, toColumn: ColumnId, toIndex: number): Board {
-  const from = findCard(board, cardId);
-  if (!from) {
-    return board;
-  }
-  const card = board[from.columnId][from.index];
-  const next: Board = { ...board };
-  next[from.columnId] = board[from.columnId].filter((c) => c.id !== cardId);
-  const dest = [...next[toColumn]];
-  const at = Math.max(0, Math.min(toIndex, dest.length));
-  dest.splice(at, 0, card);
-  next[toColumn] = dest;
-  return next;
-}
 @@@ shared src/components/Avatar.tsx
 import React from 'react';
 
@@ -155,6 +124,52 @@ export default function Toast({ message, onDismiss }: ToastProps) {
       <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => { onDismiss(); }}>✕</button>
     </div>
   );
+}
+@@@ shared src/utils/board.ts
+import type { Board, ColumnId } from '../api';
+
+// Where is a card? findCard(board, 'ORB-41') -> { columnId: 'backlog', index: 0 }
+export function findCard(board: Board, cardId: string): { columnId: ColumnId; index: number } | null {
+  const ids = Object.keys(board) as ColumnId[];
+  for (const columnId of ids) {
+    const index = board[columnId].findIndex((c) => c.id === cardId);
+    if (index !== -1) {
+      return { columnId, index };
+    }
+  }
+  return null;
+}
+
+// Pure: returns a NEW board with the card moved.
+// toIndex is the index in the destination column after the card has been removed from its old spot.
+export function moveCardInBoard(board: Board, cardId: string, toColumn: ColumnId, toIndex: number): Board {
+  const from = findCard(board, cardId);
+  if (!from) {
+    return board;
+  }
+  const card = board[from.columnId][from.index];
+  const next: Board = { ...board };
+  next[from.columnId] = board[from.columnId].filter((c) => c.id !== cardId);
+  const dest = [...next[toColumn]];
+  const at = Math.max(0, Math.min(toIndex, dest.length));
+  dest.splice(at, 0, card);
+  next[toColumn] = dest;
+  return next;
+}
+
+// Drag helper: where would a drop at this pointer Y land inside `container`?
+// Returns the index of the first card (element with data-card-id) whose vertical middle
+// is below clientY, or the number of cards if there is none.
+// Note: if the dragged card is in this container, it is counted too.
+export function getInsertIndex(container: HTMLElement, clientY: number): number {
+  const cardEls = Array.from(container.querySelectorAll<HTMLElement>('[data-card-id]'));
+  for (let i = 0; i < cardEls.length; i++) {
+    const r = cardEls[i].getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) {
+      return i;
+    }
+  }
+  return cardEls.length;
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
@@ -300,40 +315,36 @@ import { getBoard, moveCard, COLUMNS } from './api';
 import type { Board, Card, ColumnId } from './api';
 import Avatar from './components/Avatar';
 import Toast from './components/Toast';
-import { findCard, moveCardInBoard } from './utils/board';
+import { findCard, moveCardInBoard, getInsertIndex } from './utils/board';
 
+// NEXT: where a drop would land (drives the indicator)
 type DropTarget = { columnId: ColumnId; index: number };
 
+// CORE: drag props (NEXT: dragging, CHANGE: onKeyDown)
 type CardViewProps = {
   card: Card;
   dragging: boolean;
-  selected: boolean;
   onDragStart: (e: React.DragEvent<HTMLElement>, cardId: string) => void;
   onDragEnd: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLElement>, cardId: string) => void;
-  onSelect: (cardId: string) => void;
 };
 
-function CardView({ card, dragging, selected, onDragStart, onDragEnd, onKeyDown, onSelect }: CardViewProps) {
+function CardView({ card, dragging, onDragStart, onDragEnd, onKeyDown }: CardViewProps) {
+  // NEXT: fade the card being dragged
   let cls = 'card';
   if (dragging) {
-    cls += ' is-dragging';
+    cls = 'card is-dragging';
   }
-  if (selected) {
-    cls += ' is-selected';
-  }
+  // CORE: draggable (CHANGE: tabIndex + onKeyDown)
   return (
     <article
       className={cls}
       data-card-id={card.id}
       draggable
       tabIndex={0}
-      aria-pressed={selected}
-      aria-describedby="kb-help"
       onDragStart={(e) => { onDragStart(e, card.id); }}
       onDragEnd={() => { onDragEnd(); }}
       onKeyDown={(e) => { onKeyDown(e, card.id); }}
-      onClick={() => { onSelect(card.id); }}
     >
       <div className="card-top">
         <span className={'tag tag-' + card.tag.toLowerCase()}>{card.tag}</span>
@@ -348,21 +359,22 @@ function CardView({ card, dragging, selected, onDragStart, onDragEnd, onKeyDown,
   );
 }
 
+// CORE: each column is a drop zone (NEXT: indicatorAt, dragId, onDragLeave)
 type ColumnProps = {
   id: ColumnId;
   title: string;
   cards: Card[];
   indicatorAt: number | null;
   dragId: string | null;
-  selectedId: string | null;
   onDragOver: (e: React.DragEvent<HTMLElement>, columnId: ColumnId) => void;
   onDragLeave: (e: React.DragEvent<HTMLElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLElement>) => void;
-  cardHandlers: Pick<CardViewProps, 'onDragStart' | 'onDragEnd' | 'onKeyDown' | 'onSelect'>;
+  onDrop: (e: React.DragEvent<HTMLElement>, columnId: ColumnId) => void;
+  cardHandlers: Pick<CardViewProps, 'onDragStart' | 'onDragEnd' | 'onKeyDown'>;
 };
 
-function Column({ id, title, cards, indicatorAt, dragId, selectedId, onDragOver, onDragLeave, onDrop, cardHandlers }: ColumnProps) {
-  // Build the list with the insert indicator spliced in at its index.
+function Column({ id, title, cards, indicatorAt, dragId, onDragOver, onDragLeave, onDrop, cardHandlers }: ColumnProps) {
+  // NEXT: build the list with the insert indicator spliced in at its index
+  // (Core alone can just map the cards).
   const items: React.ReactNode[] = [];
   const indicator = <div key="drop-indicator" className="drop-indicator" />;
   cards.forEach((card, i) => {
@@ -370,24 +382,26 @@ function Column({ id, title, cards, indicatorAt, dragId, selectedId, onDragOver,
       items.push(indicator);
     }
     items.push(
-      <CardView key={card.id} card={card} dragging={card.id === dragId} selected={card.id === selectedId} {...cardHandlers} />
+      <CardView key={card.id} card={card} dragging={card.id === dragId} {...cardHandlers} />
     );
   });
   if (indicatorAt === cards.length) {
     items.push(indicator);
   }
 
+  // NEXT: tint the column under the pointer
   let cls = 'column column-' + id;
   if (indicatorAt !== null) {
     cls += ' is-over';
   }
 
+  // CORE: drop zone handlers
   return (
     <section
       className={cls}
       onDragOver={(e) => { onDragOver(e, id); }}
       onDragLeave={(e) => { onDragLeave(e); }}
-      onDrop={(e) => { onDrop(e); }}
+      onDrop={(e) => { onDrop(e, id); }}
     >
       <header className="column-head">
         <span className="column-dot" />
@@ -403,12 +417,17 @@ function Column({ id, title, cards, indicatorAt, dragId, selectedId, onDragOver,
 
 export default function App() {
   const [board, setBoard] = useState<Board | null>(null);
+  // CORE: drag state lives next to the board
   const [dragId, setDragId] = useState<string | null>(null);
+  // NEXT: drives the indicator and the tint
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  // NEXT: the rollback toast
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
+  // STRETCH: which card to keep focused after a keyboard move
+  const [focusId, setFocusId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  // STRETCH: screen reader announcement
+  const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -423,7 +442,7 @@ export default function App() {
     };
   }, []);
 
-  // The toast hides itself after 4 s. A new message restarts the timer.
+  // NEXT: the toast hides itself after 4 s. A new message restarts the timer.
   useEffect(() => {
     if (!toast) {
       return;
@@ -436,18 +455,18 @@ export default function App() {
     };
   }, [toast]);
 
-  // Keyboard moves can remount the card in another column: put focus back on it.
+  // STRETCH: a card moved to another column is a NEW DOM node, so focus is lost. Put it back.
   useEffect(() => {
-    if (!selectedId || !boardRef.current) {
+    if (!focusId || !boardRef.current) {
       return;
     }
-    const el = boardRef.current.querySelector<HTMLElement>('[data-card-id="' + selectedId + '"]');
+    const el = boardRef.current.querySelector<HTMLElement>('[data-card-id="' + focusId + '"]');
     if (el) {
       el.focus();
     }
-  }, [board, selectedId]);
+  }, [board, focusId]);
 
-  // Optimistic: move now, save in the background, put it back if the server says no.
+  // CORE: optimistic: move now, save in the background, put it back if the server says no.
   function commitMove(cardId: string, toColumn: ColumnId, toIndex: number) {
     if (!board) {
       return;
@@ -462,12 +481,14 @@ export default function App() {
       }
       return moveCardInBoard(prev, cardId, toColumn, toIndex);
     });
+    // STRETCH: announce the move
     const col = COLUMNS.find((c) => { return c.id === toColumn; });
     let colTitle: string = toColumn;
     if (col) {
       colTitle = col.title;
     }
-    setAnnouncement('Moved ' + cardId + ' to ' + colTitle + ', position ' + (toIndex + 1) + '.');
+    setAnnouncement('Moved ' + cardId + ' to ' + colTitle + '.');
+    // CORE: save, roll back on failure
     moveCard(cardId, toColumn, toIndex).catch((err: Error) => {
       // Roll back only THIS card, so other moves made meanwhile survive.
       setBoard((prev) => {
@@ -476,17 +497,16 @@ export default function App() {
         }
         return moveCardInBoard(prev, cardId, from.columnId, from.index);
       });
-      setToast(err.message);
-      setAnnouncement(err.message);
+      setToast(err.message); // NEXT: say why
     });
   }
 
-  // ---- mouse drag and drop ----
+  // CORE: mouse drag and drop
   function handleDragStart(e: React.DragEvent<HTMLElement>, cardId: string) {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', cardId);
     setDragId(cardId);
-    setSelectedId(null);
+    setFocusId(null); // STRETCH
   }
 
   function handleDragOver(e: React.DragEvent<HTMLElement>, columnId: ColumnId) {
@@ -494,105 +514,70 @@ export default function App() {
       return;
     }
     e.preventDefault(); // without this, drop never fires
-    // Insert before the first card whose vertical middle is below the pointer.
-    const cardEls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-card-id]'));
-    let index = cardEls.length;
-    for (let i = 0; i < cardEls.length; i++) {
-      const r = cardEls[i].getBoundingClientRect();
-      if (e.clientY < r.top + r.height / 2) {
-        index = i;
-        break;
-      }
-    }
-    // dragover fires constantly: only set state when the target changes
+    // NEXT: show where it will land. dragover fires constantly: only set state when the target changes
+    const index = getInsertIndex(e.currentTarget, e.clientY);
     if (!dropTarget || dropTarget.columnId !== columnId || dropTarget.index !== index) {
       setDropTarget({ columnId, index });
     }
   }
 
+  // NEXT: ignore leaving into a child of the same column
   function handleDragLeave(e: React.DragEvent<HTMLElement>) {
-    // Ignore leaving into a child of the same column.
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setDropTarget(null);
     }
   }
 
+  // CORE
   function endDrag() {
     setDragId(null);
     setDropTarget(null);
   }
 
-  function handleDrop(e: React.DragEvent<HTMLElement>) {
+  function handleDrop(e: React.DragEvent<HTMLElement>, columnId: ColumnId) {
     e.preventDefault();
-    if (!board || !dragId || !dropTarget) {
+    if (!board || !dragId) {
       endDrag();
       return;
     }
+    let index = getInsertIndex(e.currentTarget, e.clientY);
+    // NEXT: the insert index counts the dragged card itself; the API index doesn't.
     const from = findCard(board, dragId);
-    let index = dropTarget.index;
-    // The indicator index counts the dragged card itself; the API index doesn't.
-    if (from && from.columnId === dropTarget.columnId && from.index < index) {
+    if (from && from.columnId === columnId && from.index < index) {
       index -= 1;
     }
-    commitMove(dragId, dropTarget.columnId, index);
+    // CORE
+    commitMove(dragId, columnId, index);
     endDrag();
   }
 
-  // ---- change: keyboard alternative ----
-  function handleSelect(cardId: string) {
-    setSelectedId((prev) => {
-      if (prev === cardId) {
-        return null;
-      }
-      return cardId;
-    });
-  }
-
+  // CHANGE: ← / → on a focused card moves it one column, same position (clamped)
   function handleCardKeyDown(e: React.KeyboardEvent<HTMLElement>, cardId: string) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleSelect(cardId);
-      return;
-    }
-    if (e.key === 'Escape') {
-      setSelectedId(null);
-      return;
-    }
-    if (selectedId !== cardId || !board) {
+    if (!board || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) {
       return;
     }
     const from = findCard(board, cardId);
     if (!from) {
       return;
     }
+    e.preventDefault();
     const colIndex = COLUMNS.findIndex((c) => { return c.id === from.columnId; });
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      let step = 1;
-      if (e.key === 'ArrowLeft') {
-        step = -1;
-      }
-      const target = COLUMNS[colIndex + step];
-      if (target) {
-        commitMove(cardId, target.id, Math.min(from.index, board[target.id].length));
-      }
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      let to = from.index + 1;
-      if (e.key === 'ArrowUp') {
-        to = from.index - 1;
-      }
-      if (to >= 0 && to < board[from.columnId].length) {
-        commitMove(cardId, from.columnId, to);
-      }
+    let step = 1;
+    if (e.key === 'ArrowLeft') {
+      step = -1;
+    }
+    const target = COLUMNS[colIndex + step];
+    if (target) {
+      setFocusId(cardId); // STRETCH: keep focus on it
+      commitMove(cardId, target.id, Math.min(from.index, board[target.id].length));
     }
   }
 
+  // CORE: one object so Column can spread it onto every card
   const cardHandlers = {
     onDragStart: handleDragStart,
     onDragEnd: endDrag,
     onKeyDown: handleCardKeyDown,
-    onSelect: handleSelect,
   };
 
   let content;
@@ -602,10 +587,12 @@ export default function App() {
     content = (
       <div className="board" ref={boardRef}>
         {COLUMNS.map((col) => {
+          // NEXT: indicator only in the column under the pointer
           let indicatorAt: number | null = null;
           if (dropTarget && dropTarget.columnId === col.id) {
             indicatorAt = dropTarget.index;
           }
+          // CORE
           return (
             <Column
               key={col.id}
@@ -614,7 +601,6 @@ export default function App() {
               cards={board[col.id]}
               indicatorAt={indicatorAt}
               dragId={dragId}
-              selectedId={selectedId}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -626,14 +612,10 @@ export default function App() {
     );
   }
 
+  // NEXT: rollback toast
   let toastEl = null;
   if (toast) {
     toastEl = <Toast message={toast} onDismiss={() => { setToast(null); }} />;
-  }
-
-  let help = 'Drag cards, or focus one and press Enter to pick it up.';
-  if (selectedId) {
-    help = 'Moving ' + selectedId + ' · ← → change column · ↑ ↓ reorder · Enter or Esc to drop';
   }
 
   return (
@@ -642,10 +624,11 @@ export default function App() {
         <span className="logo">◆ Orbit</span>
         <h1>Sprint 24</h1>
         <span className="sprint-dates">Oct 6 – Oct 17</span>
-        <span className="kb-help" id="kb-help">{help}</span>
       </header>
       {content}
-      <p className="sr-only" aria-live="assertive">{announcement}</p>
+      {/* STRETCH: visually hidden live region */}
+      <p className="sr-only" aria-live="polite">{announcement}</p>
+      {/* NEXT */}
       {toastEl}
     </div>
   );
@@ -705,15 +688,18 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 syst
 .toast-close { border: 0; background: none; color: #A8A397; cursor: pointer; font-size: 13px; }
 
 /* ---- Added: drag and drop + keyboard moves ---- */
+/* CORE: drag feedback */
 .card { cursor: grab; transition: box-shadow 0.15s, opacity 0.15s; }
-.card:hover { box-shadow: 0 2px 6px rgba(31, 30, 27, 0.12), 0 0 0 1px rgba(31, 30, 27, 0.08); }
-.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card.is-dragging { opacity: 0.4; }
-.card.is-selected { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 8px 20px rgba(91, 91, 214, 0.25); }
-
 .column { transition: background 0.15s; }
 .column.is-over { background: #E2E0F5; }
+
+/* NEXT: insert indicator */
 .drop-indicator { height: 3px; margin: -2px 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.18); }
 
-.kb-help { margin-left: auto; font-size: 12px; color: var(--muted); }
+/* CHANGE: focus ring for keyboard moves */
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* STRETCH: hover lift, visually hidden live region */
+.card:hover { box-shadow: 0 2px 6px rgba(31, 30, 27, 0.12), 0 0 0 1px rgba(31, 30, 27, 0.08); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

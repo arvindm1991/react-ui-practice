@@ -241,7 +241,9 @@ function TopBar() {
 
 function PollWidget() {
   const [poll, setPoll] = useState<Poll | null>(null);
+  // CHANGE: saving flag
   const [saving, setSaving] = useState(false);
+  // STRETCH: change-vote mode
   const [changing, setChanging] = useState(false);
 
   useEffect(() => {
@@ -257,16 +259,19 @@ function PollWidget() {
     };
   }, []);
 
+  // CORE: optimistic vote
   function handleVote(optionId: string) {
     if (!poll) {
       return;
     }
+    // STRETCH: same option while changing -> nothing to send
     if (poll.myVote === optionId) {
       // Picked the same option again while changing: nothing to send.
       setChanging(false);
       return;
     }
-    // Optimistic: move the vote locally now so the bars animate immediately.
+    // CORE: optimistic. Move the vote locally now so the bars animate immediately.
+    // (The "-1 on the old option" line is only needed for the STRETCH change-vote.)
     setPoll((prev) => {
       if (!prev) {
         return prev;
@@ -284,10 +289,12 @@ function PollWidget() {
       return { ...prev, options, myVote: optionId };
     });
     setChanging(false);
+    // CHANGE: saving on
     setSaving(true);
-    // Then trust the server's numbers (other people may have voted meanwhile).
+    // CORE: then trust the server's numbers (other people may have voted meanwhile).
     vote(optionId).then((fresh) => {
       setPoll(fresh);
+      // CHANGE: saving off
       setSaving(false);
     });
   }
@@ -296,12 +303,13 @@ function PollWidget() {
     return <div className="poll poll-loading">Loading poll…</div>;
   }
 
-  // derived
+  // CORE: derived
   const total = poll.options.reduce((sum, o) => {
     return sum + o.votes;
   }, 0);
   const showResults = poll.myVote !== null && !changing;
 
+  // CORE: meta line with the total (CHANGE: "Saving your vote…"; STRETCH: Change vote / Cancel links)
   let meta = <p className="poll-meta">Closes in {poll.closesIn}</p>;
   if (showResults) {
     let status = 'Closes in ' + poll.closesIn;
@@ -317,6 +325,7 @@ function PollWidget() {
       </p>
     );
   } else if (changing) {
+    // STRETCH: picking a new option
     meta = (
       <p className="poll-meta">
         <span>Pick a new option</span>
@@ -325,6 +334,7 @@ function PollWidget() {
     );
   }
 
+  // CORE: render options as results
   return (
     <div className="poll">
       <p className="poll-question">{poll.question}</p>
@@ -341,9 +351,11 @@ function PollWidget() {
             pctEl = <span className="poll-pct">{pct}%</span>;
           }
           if (o.id === poll.myVote) {
+            // NEXT: ✓ + stronger bar on your option
             cls = cls + ' is-mine';
             check = <span className="poll-check" aria-label="Your vote">✓</span>;
           }
+          // CORE
           return (
             <li key={o.id}>
               <button type="button" className={cls} disabled={showResults || saving} onClick={() => { handleVote(o.id); }}>
@@ -438,15 +450,18 @@ body { margin: 0; font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe
 .poll-meta { margin: 12px 0 0; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
 
 /* ---- Added: poll results ---- */
-/* The bar is always rendered; only its width changes, so the transition animates 0% -> pct. */
+/* CORE: bar, pct, total. CHANGE: the transition. The bar is always rendered; only its width changes, so the transition animates 0% -> pct. */
 .poll-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(167, 139, 250, 0.16); transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* NEXT: your option */
 .poll-option.is-mine .poll-bar { background: linear-gradient(90deg, rgba(139, 92, 246, 0.55), rgba(34, 211, 238, 0.35)); }
-.poll-option.is-result { cursor: default; }
 .poll-option.is-mine { border-color: var(--primary); }
-.poll-option:disabled { color: var(--text); }
 .poll-check { position: relative; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--primary); color: var(--bg); }
+/* CORE */
+.poll-option.is-result { cursor: default; }
+.poll-option:disabled { color: var(--text); }
 .poll-pct { position: relative; margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 .poll-total { color: var(--text); font-weight: 600; }
+/* STRETCH: change-vote links */
 .poll-link { margin-left: auto; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 700; color: var(--primary); cursor: pointer; }
 .poll-link:disabled { opacity: 0.4; cursor: default; }
 .poll-link:hover:not(:disabled) { text-decoration: underline; }

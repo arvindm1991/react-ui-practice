@@ -183,6 +183,26 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .status-paid { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
 .status-due { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .status-overdue { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+
+/* Dark theme: ready to use. Set data-theme="dark" on .app and every color flips. */
+/* Variables inherit, so redefining them on the app root re-colors everything inside. */
+.app[data-theme="dark"] {
+  --bg: #0B1120;
+  --surface: #131B2E;
+  --surface-2: #0F172A;
+  --border: #23304A;
+  --text: #E2E8F0;
+  --muted: #94A3B8;
+  --accent: #60A5FA;
+  --accent-soft: #1E3A8A;
+  --good: #4ADE80;
+  --bad: #F87171;
+  --warn: #FBBF24;
+  color-scheme: dark;
+}
+.app[data-theme="dark"] .segment.is-selected { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.theme-picker { display: flex; align-items: center; gap: 8px; }
+.theme-note { font-size: 12px; color: var(--muted); }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import SegmentedControl from './components/SegmentedControl';
@@ -194,10 +214,13 @@ const RANGES = [
   { value: '12m', label: '12m' },
 ];
 
+// CORE: theme types + options
 type ThemeChoice = 'light' | 'dark' | 'system';
 type Theme = 'light' | 'dark';
 
+// NEXT: storage key
 const THEME_KEY = 'northwind-theme';
+// CORE: the three options
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -205,7 +228,7 @@ const THEME_OPTIONS = [
 ];
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
-// localStorage can throw (private mode, blocked storage), so wrap every access.
+// NEXT: localStorage can throw (private mode, blocked storage), so wrap every access.
 function readStoredChoice(): ThemeChoice {
   try {
     const saved = localStorage.getItem(THEME_KEY);
@@ -226,6 +249,7 @@ function saveChoice(choice: ThemeChoice) {
   }
 }
 
+// CORE: what the OS prefers right now
 function getSystemTheme(): Theme {
   if (window.matchMedia(DARK_QUERY).matches) {
     return 'dark';
@@ -280,6 +304,7 @@ function InvoiceTable() {
 
 export default function App() {
   const [range, setRange] = useState('30d');
+  // CORE: the user's choice (NEXT: lazy initial value from storage)
   // Lazy initial state: read storage once, not on every render.
   const [choice, setChoice] = useState<ThemeChoice>(() => {
     return readStoredChoice();
@@ -288,7 +313,7 @@ export default function App() {
     return getSystemTheme();
   });
 
-  // Follow the OS setting live while "System" could be in use.
+  // STRETCH: follow the OS setting live while "System" could be in use.
   useEffect(() => {
     const mq = window.matchMedia(DARK_QUERY);
     function handleChange() {
@@ -300,23 +325,26 @@ export default function App() {
     };
   }, []);
 
+  // CORE: choose a theme (NEXT: and save it)
   function handleThemeChange(value: string) {
     const next = value as ThemeChoice;
     setChoice(next);
     saveChoice(next);
   }
 
-  // derived: the theme actually applied. Never stored in state.
+  // CORE: derived: the theme actually applied. Never stored in state.
   let theme: Theme = systemTheme;
   if (choice !== 'system') {
     theme = choice;
   }
 
+  // STRETCH: "Using dark" note while System is chosen
   let systemNote = null;
   if (choice === 'system') {
     systemNote = <span className="theme-note">Using {theme}</span>;
   }
 
+  // CORE: data-theme on the root + the second SegmentedControl
   return (
     <div className="app" data-theme={theme}>
       <header className="topbar">
@@ -393,7 +421,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .status-due { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .status-overdue { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
 
-/* ---- Added: dark theme + theme picker ---- */
+/* Dark theme: ready to use. Set data-theme="dark" on .app and every color flips. */
 /* Variables inherit, so redefining them on the app root re-colors everything inside. */
 .app[data-theme="dark"] {
   --bg: #0B1120;

@@ -277,11 +277,13 @@ function ChatHeader() {
   );
 }
 
-// What the UI shows: a server message plus where it is in its journey.
+// CORE: what the UI shows, a server message plus where it is in its journey.
+// (NEXT adds 'failed'.)
 type ChatMessage = Message & { status: 'sent' | 'sending' | 'failed' };
 
 type BubbleProps = {
   message: ChatMessage;
+  // NEXT: retry
   onRetry: (id: string) => void;
 };
 
@@ -290,11 +292,13 @@ function MessageBubble({ message, onRetry }: BubbleProps) {
   if (message.author === 'me') {
     cls = 'bubble-row is-mine';
   }
+  // CORE: time, or "Sending…"
   let meta = <span className="bubble-meta">{formatTime(message.sentAt)}</span>;
   if (message.status === 'sending') {
     cls = cls + ' is-sending';
     meta = <span className="bubble-meta">Sending…</span>;
   }
+  // NEXT: failed + Retry
   if (message.status === 'failed') {
     cls = cls + ' is-failed';
     meta = (
@@ -304,6 +308,7 @@ function MessageBubble({ message, onRetry }: BubbleProps) {
       </span>
     );
   }
+  // CORE: meta moved under the bubble
   return (
     <div className={cls}>
       <div className="bubble">
@@ -318,6 +323,7 @@ function ChatThread() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
+  // NEXT: auto-scroll ref
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -326,6 +332,7 @@ function ChatThread() {
       if (cancelled) {
         return;
       }
+      // CORE: loaded messages are 'sent'
       setMessages(data.map((m): ChatMessage => {
         return { ...m, status: 'sent' };
       }));
@@ -336,7 +343,7 @@ function ChatThread() {
     };
   }, []);
 
-  // Auto-scroll: runs after the DOM updates whenever a message is added (or the first load lands).
+  // NEXT: auto-scroll. Runs after the DOM updates whenever a message is added (or the first load lands).
   useEffect(() => {
     const el = listRef.current;
     if (el) {
@@ -344,6 +351,7 @@ function ChatThread() {
     }
   }, [messages.length]);
 
+  // NEXT: flip one message's status (failed / sending again)
   function setStatus(id: string, status: ChatMessage['status']) {
     setMessages((prev) => {
       return prev.map((m) => {
@@ -355,7 +363,8 @@ function ChatThread() {
     });
   }
 
-  // Shared by first send and retry: swap the temp message for the server's on success.
+  // CORE: shared by first send and retry. Swap the temp message for the server's on success.
+  // (NEXT: the .catch)
   function deliver(tempId: string, text: string) {
     sendMessage(text)
       .then((saved) => {
@@ -373,6 +382,7 @@ function ChatThread() {
       });
   }
 
+  // CORE: optimistic append, clear the input, then deliver
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const text = draft.trim();
@@ -388,6 +398,7 @@ function ChatThread() {
     deliver(tempId, text);
   }
 
+  // NEXT: retry sends the same text again
   function handleRetry(id: string) {
     const failed = messages.find((m) => {
       return m.id === id;
@@ -399,7 +410,8 @@ function ChatThread() {
     deliver(id, failed.text);
   }
 
-  // Change: a separator row whenever the day changes from the previous message.
+  // CHANGE: a separator row whenever the day changes from the previous message.
+  // (Core is the starter's messages.map to MessageBubble.)
   let body;
   if (loading) {
     body = <p className="chat-empty">Loading conversation…</p>;
@@ -417,6 +429,7 @@ function ChatThread() {
     body = rows;
   }
 
+  // CORE: onSubmit + disabled Send (NEXT: ref)
   return (
     <section className="chat">
       <ChatHeader />
@@ -503,17 +516,20 @@ body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'S
 .trip-list li { display: flex; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
 
 /* ---- Added: sending states + day separators ---- */
+/* CORE */
 /* Meta moved outside the bubble so "Failed · Retry" can sit under it. */
 .bubble-row { flex-direction: column; align-items: flex-start; }
 .bubble-row.is-mine { align-items: flex-end; }
 .bubble-row .bubble-meta { margin: 3px 6px 0; color: var(--muted); }
 .bubble-row.is-mine .bubble-meta { color: var(--muted); }
 .bubble-row.is-sending .bubble { opacity: 0.6; }
+/* NEXT: failed */
 .bubble-row.is-failed .bubble { background: #FEE2E2; color: #7F1D1D; }
 .bubble-failed { display: inline-flex; align-items: center; gap: 4px; color: var(--danger); font-weight: 600; }
 .bubble-row.is-mine .bubble-failed { color: var(--danger); }
 .retry-btn { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--danger); text-decoration: underline; cursor: pointer; }
 
+/* CHANGE: day separators */
 .day-sep { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }
 .day-sep::before, .day-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .day-sep span { padding: 3px 10px; border-radius: 999px; background: var(--theirs); }

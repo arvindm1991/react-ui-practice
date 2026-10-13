@@ -254,6 +254,19 @@ body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; color: var(-
   .summary { grid-template-columns: 1fr; }
   .nav-links { display: none; }
 }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: a .tabs row of <button class="tab">, add is-active to the active one */
+.tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
+.tab { position: relative; padding: 12px 0; border: 0; background: none; font: inherit; font-size: 15px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab.is-active { color: var(--text); font-weight: 600; }
+.tab.is-active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* CHANGE: rating line as a <button class="rating-link"> that looks like a link */
+button.rating-link { display: block; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+button.rating-link:hover { color: var(--accent); }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProduct } from './api';
@@ -261,6 +274,7 @@ import type { Product } from './api';
 import { formatPrice } from './utils/format';
 import { DescriptionPanel, SpecsTable, ReviewList } from './components/Panels';
 
+// CORE: the active tab is one id, not three booleans
 type TabId = 'description' | 'specs' | 'reviews';
 
 function Nav() {
@@ -273,6 +287,7 @@ function Nav() {
   );
 }
 
+// CHANGE: the rating line becomes a button that reports clicks up
 type ProductSummaryProps = {
   product: Product;
   onReviewsClick: () => void;
@@ -298,6 +313,7 @@ function ProductSummary({ product, onReviewsClick }: ProductSummaryProps) {
   );
 }
 
+// CORE: the tab bar + the chosen panel
 type ProductTabsProps = {
   product: Product;
   activeTab: TabId;
@@ -318,6 +334,7 @@ function ProductTabs({ product, activeTab, onChange }: ProductTabsProps) {
     panel = <ReviewList reviews={product.reviews} />;
   }
 
+  // NEXT: the ARIA below (role="tablist", role="tab" + aria-selected, role="tabpanel")
   return (
     <section className="details">
       <div className="tabs" role="tablist">
@@ -341,7 +358,7 @@ function ProductTabs({ product, activeTab, onChange }: ProductTabsProps) {
 
 function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
-  // Lives here (not in ProductTabs) because the rating link in the summary changes it too.
+  // CORE: activeTab state. CHANGE: lifted here (not in ProductTabs) because the rating link changes it too.
   const [activeTab, setActiveTab] = useState<TabId>('description');
 
   useEffect(() => {
@@ -357,6 +374,7 @@ function ProductPage() {
     };
   }, []);
 
+  // CHANGE
   function handleReviewsClick() {
     setActiveTab('reviews');
   }
@@ -437,7 +455,8 @@ body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; color: var(-
   .nav-links { display: none; }
 }
 
-/* ---- Added: tabs ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: a .tabs row of <button class="tab">, add is-active to the active one */
 .tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
 .tab { position: relative; padding: 12px 0; border: 0; background: none; font: inherit; font-size: 15px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tab:hover { color: var(--text); }
@@ -445,6 +464,6 @@ body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; color: var(-
 .tab.is-active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent); }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Change: rating line becomes a button that looks like a link */
+/* CHANGE: rating line as a <button class="rating-link"> that looks like a link */
 button.rating-link { display: block; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 button.rating-link:hover { color: var(--accent); }

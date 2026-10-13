@@ -170,12 +170,25 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 @media (max-width: 720px) {
   .brand-panel { display: none; }
 }
+
+/* Password checklist, API banner, success panel (shared with the login page) */
+.rules { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.rule { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.rule-icon { width: 16px; text-align: center; font-weight: 700; }
+.rule.is-met { color: var(--success); }
+
+.api-error { margin-bottom: 16px; padding: 10px 12px; border: 1px solid #FECDCA; border-radius: var(--radius); background: #FEF3F2; color: #B42318; font-size: 14px; }
+
+
+.success { width: 100%; max-width: 380px; text-align: center; }
+.success-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: #E7F8EE; color: var(--success); display: grid; place-items: center; font-size: 26px; font-weight: 800; }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { Field } from './components/Field';
 import { createAccount } from './api';
 import { isValidEmail, PASSWORD_RULES } from './utils/validate';
 
+// NEXT: which fields can be "touched"; submit status
 type FieldName = 'email' | 'password' | 'confirm';
 type Status = 'idle' | 'submitting' | 'success';
 
@@ -192,6 +205,7 @@ function BrandPanel() {
   );
 }
 
+// CORE: live checklist, one line per rule (rule.test does the work)
 function PasswordChecklist({ password }: { password: string }) {
   return (
     <ul className="rules" aria-label="Password requirements">
@@ -212,6 +226,7 @@ function PasswordChecklist({ password }: { password: string }) {
   );
 }
 
+// STRETCH: success panel
 function SuccessPanel({ email }: { email: string }) {
   return (
     <div className="success">
@@ -226,19 +241,22 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  // Which fields the user has left at least once. Errors wait until then (or until submit).
+  // NEXT: which fields the user has left at least once. Errors wait until then (or until submit).
   const [touched, setTouched] = useState<Record<FieldName, boolean>>({ email: false, password: false, confirm: false });
+  // CORE: errors show after the first submit
   const [submitted, setSubmitted] = useState(false);
+  // NEXT: request status. STRETCH: the server's error message
   const [status, setStatus] = useState<Status>('idle');
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // NEXT: show a field's errors once it has been left
   function handleBlur(field: FieldName) {
     setTouched((prev) => {
       return { ...prev, [field]: true };
     });
   }
 
-  // derived: errors are computed from the values every render, never stored
+  // CORE: derived. Errors are computed from the values every render, never stored
   let emailError: string | null = null;
   if (email.trim() === '') {
     emailError = 'Email is required';
@@ -246,6 +264,7 @@ function SignupForm() {
     emailError = 'Enter a valid email address';
   }
 
+  // NEXT: the password's own error line (all rules met?)
   const allRulesMet = PASSWORD_RULES.every((rule) => {
     return rule.test(password);
   });
@@ -254,6 +273,7 @@ function SignupForm() {
     passwordError = 'Password doesn’t meet all the requirements';
   }
 
+  // NEXT: confirm errors
   let confirmError: string | null = null;
   if (confirm === '') {
     confirmError = 'Confirm your password';
@@ -263,6 +283,7 @@ function SignupForm() {
 
   const isValid = !emailError && !passwordError && !confirmError;
 
+  // CORE: hide errors until submit (NEXT: or until that field was touched)
   function visibleError(field: FieldName, error: string | null) {
     if (touched[field] || submitted) {
       return error;
@@ -272,10 +293,12 @@ function SignupForm() {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // CORE: show every error and stop if anything is invalid
     setSubmitted(true);
     if (!isValid || status === 'submitting') {
       return;
     }
+    // NEXT: call the API (STRETCH: the .catch banner and the success swap)
     setStatus('submitting');
     setApiError(null);
     createAccount(email, password)
@@ -288,15 +311,18 @@ function SignupForm() {
       });
   }
 
+  // STRETCH
   if (status === 'success') {
     return <SuccessPanel email={email.trim()} />;
   }
 
+  // STRETCH
   let banner = null;
   if (apiError) {
     banner = <div className="api-error" role="alert">{apiError}</div>;
   }
 
+  // NEXT: busy button
   const submitting = status === 'submitting';
   let submitLabel = 'Create account';
   if (submitting) {
@@ -380,7 +406,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .brand-panel { display: none; }
 }
 
-/* ---- Added: validation, checklist, submit states ---- */
+/* Password checklist, API banner, success panel (shared with the login page) */
 .rules { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .rule { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .rule-icon { width: 16px; text-align: center; font-weight: 700; }
@@ -388,7 +414,10 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 
 .api-error { margin-bottom: 16px; padding: 10px 12px; border: 1px solid #FECDCA; border-radius: var(--radius); background: #FEF3F2; color: #B42318; font-size: 14px; }
 
-.submit:disabled { opacity: 0.7; cursor: progress; }
 
 .success { width: 100%; max-width: 380px; text-align: center; }
 .success-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: #E7F8EE; color: var(--success); display: grid; place-items: center; font-size: 26px; font-weight: 800; }
+
+/* ---- Added: validation, checklist, submit states ---- */
+/* NEXT */
+.submit:disabled { opacity: 0.7; cursor: progress; }

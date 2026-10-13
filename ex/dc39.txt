@@ -112,14 +112,38 @@ function Sidebar() {
   );
 }
 
-function EmployeeRow({ employee }: { employee: Employee }) {
+// One config drives the header and the cells.
+type ColumnKey = 'name' | 'title' | 'department' | 'location' | 'startDate';
+type Column = { key: ColumnKey; label: string };
+
+const COLUMNS: Column[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'title', label: 'Title' },
+  { key: 'department', label: 'Department' },
+  { key: 'location', label: 'Location' },
+  { key: 'startDate', label: 'Start date' },
+];
+
+function renderCell(employee: Employee, key: ColumnKey) {
+  if (key === 'department') {
+    return <DeptBadge department={employee.department} />;
+  }
+  if (key === 'startDate') {
+    return formatDate(employee.startDate);
+  }
+  return employee[key];
+}
+
+function EmployeeRow({ employee, columns }: { employee: Employee; columns: Column[] }) {
   return (
     <tr>
-      <td className="cell-name">{employee.name}</td>
-      <td>{employee.title}</td>
-      <td><DeptBadge department={employee.department} /></td>
-      <td>{employee.location}</td>
-      <td>{formatDate(employee.startDate)}</td>
+      {columns.map((col) => {
+        let cls = '';
+        if (col.key === 'name') {
+          cls = 'cell-name';
+        }
+        return <td key={col.key} className={cls}>{renderCell(employee, col.key)}</td>;
+      })}
     </tr>
   );
 }
@@ -152,16 +176,14 @@ function EmployeeTable() {
       <table className="table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Title</th>
-            <th>Department</th>
-            <th>Location</th>
-            <th>Start date</th>
+            {COLUMNS.map((col) => {
+              return <th key={col.key}>{col.label}</th>;
+            })}
           </tr>
         </thead>
         <tbody>
           {employees.map((e) => {
-            return <EmployeeRow key={e.id} employee={e} />;
+            return <EmployeeRow key={e.id} employee={e} columns={COLUMNS} />;
           })}
         </tbody>
       </table>
@@ -234,6 +256,19 @@ body { margin: 0; font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe
 .page-btn { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
 .page-btn:hover:not(:disabled) { background: var(--head); }
 .page-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Toolbar, buttons and table footer (shared design-system classes) */
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.toolbar-spacer { flex: 1; }
+.search { width: 240px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text); }
+.select { height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text); background: var(--surface); }
+.search:focus, .select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12); }
+.btn { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--head); }
+.btn-link { border-color: transparent; color: var(--primary); }
+.table-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); background: #FCFDFE; }
+.range { font-size: 13px; color: var(--muted); }
+
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { DEPARTMENTS, getEmployees } from './api';
@@ -256,18 +291,17 @@ function Sidebar() {
   );
 }
 
+// One config drives the header and the cells.
 type ColumnKey = 'name' | 'title' | 'department' | 'location' | 'startDate';
-type SortDir = 'asc' | 'desc';
+type Column = { key: ColumnKey; label: string };
 
-// One config drives the header, the cells and the column toggles.
-const COLUMNS: { key: ColumnKey; label: string }[] = [
+const COLUMNS: Column[] = [
   { key: 'name', label: 'Name' },
   { key: 'title', label: 'Title' },
   { key: 'department', label: 'Department' },
   { key: 'location', label: 'Location' },
   { key: 'startDate', label: 'Start date' },
 ];
-const PAGE_SIZE = 8;
 
 function renderCell(employee: Employee, key: ColumnKey) {
   if (key === 'department') {
@@ -279,12 +313,31 @@ function renderCell(employee: Employee, key: ColumnKey) {
   return employee[key];
 }
 
+function EmployeeRow({ employee, columns }: { employee: Employee; columns: Column[] }) {
+  return (
+    <tr>
+      {columns.map((col) => {
+        let cls = '';
+        if (col.key === 'name') {
+          cls = 'cell-name';
+        }
+        return <td key={col.key} className={cls}>{renderCell(employee, col.key)}</td>;
+      })}
+    </tr>
+  );
+}
+
+// CORE
+type SortDir = 'asc' | 'desc';
+// NEXT
+const PAGE_SIZE = 8;
+
+// STRETCH: column visibility. Name is always shown.
 type ColumnMenuProps = {
   visible: Record<ColumnKey, boolean>;
   onToggle: (key: ColumnKey) => void;
 };
 
-// Change: column visibility. Name is always shown.
 function ColumnMenu({ visible, onToggle }: ColumnMenuProps) {
   return (
     <details className="col-menu">
@@ -309,11 +362,14 @@ function ColumnMenu({ visible, onToggle }: ColumnMenuProps) {
 function EmployeeTable() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  // CORE: only the inputs are state
   const [query, setQuery] = useState('');
   const [dept, setDept] = useState('');
   const [sortKey, setSortKey] = useState<ColumnKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  // NEXT: paging
   const [page, setPage] = useState(1);
+  // STRETCH: visible columns
   const [visible, setVisible] = useState<Record<ColumnKey, boolean>>({
     name: true, title: true, department: true, location: true, startDate: true,
   });
@@ -332,7 +388,7 @@ function EmployeeTable() {
     };
   }, []);
 
-  // Every filter change sends you back to page 1 (page 3 of the old list may not exist).
+  // CORE: search + department. NEXT: every change also sends you back to page 1 (page 3 of the old list may not exist).
   function handleQuery(value: string) {
     setQuery(value);
     setPage(1);
@@ -343,12 +399,7 @@ function EmployeeTable() {
     setPage(1);
   }
 
-  function handleClear() {
-    setQuery('');
-    setDept('');
-    setPage(1);
-  }
-
+  // CORE: same column flips the direction, a new column starts ascending
   function handleSort(key: ColumnKey) {
     if (key === sortKey) {
       setSortDir((prev) => {
@@ -364,6 +415,14 @@ function EmployeeTable() {
     setPage(1);
   }
 
+  // CHANGE: clear filters
+  function handleClear() {
+    setQuery('');
+    setDept('');
+    setPage(1);
+  }
+
+  // STRETCH
   function handleToggleColumn(key: ColumnKey) {
     setVisible((prev) => {
       return { ...prev, [key]: !prev[key] };
@@ -374,13 +433,14 @@ function EmployeeTable() {
     return <div className="card"><p className="table-msg">Loading employees…</p></div>;
   }
 
-  // derived pipeline: search -> department -> sort -> page. Nothing here is stored in state.
+  // CORE: derived pipeline, search -> department -> sort -> page. Nothing here is stored in state.
   const q = query.trim().toLowerCase();
   const filtered = employees.filter((e) => {
     const matchesQuery = q === '' || e.name.toLowerCase().includes(q) || e.title.toLowerCase().includes(q);
     const matchesDept = dept === '' || e.department === dept;
     return matchesQuery && matchesDept;
   });
+  // copy before sorting: sort() mutates. Dates are "YYYY-MM-DD", so they compare correctly as strings.
   const sorted = [...filtered].sort((a, b) => {
     const result = a[sortKey].localeCompare(b[sortKey]);
     if (sortDir === 'desc') {
@@ -388,13 +448,16 @@ function EmployeeTable() {
     }
     return result;
   });
+  // NEXT: one page of 8 (Core can render `sorted` directly)
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const start = (page - 1) * PAGE_SIZE;
   const pageRows = sorted.slice(start, start + PAGE_SIZE);
+  // STRETCH: only the visible columns (Core uses COLUMNS directly)
   const visibleColumns = COLUMNS.filter((col) => {
     return visible[col.key];
   });
 
+  // CHANGE: Clear filters button + empty-state row
   let clearBtn = null;
   if (query !== '' || dept !== '') {
     clearBtn = <button type="button" className="btn btn-link" onClick={() => { handleClear(); }}>Clear filters</button>;
@@ -408,26 +471,19 @@ function EmployeeTable() {
       </tr>
     );
   } else {
+    // CORE
     rows = pageRows.map((e) => {
-      return (
-        <tr key={e.id}>
-          {visibleColumns.map((col) => {
-            let cls = '';
-            if (col.key === 'name') {
-              cls = 'cell-name';
-            }
-            return <td key={col.key} className={cls}>{renderCell(e, col.key)}</td>;
-          })}
-        </tr>
-      );
+      return <EmployeeRow key={e.id} employee={e} columns={visibleColumns} />;
     });
   }
 
+  // NEXT: "Showing 9–16 of 28" (and the footer with <Pagination> below)
   let rangeText = '0 of 0';
   if (sorted.length > 0) {
     rangeText = (start + 1) + '–' + (start + pageRows.length) + ' of ' + sorted.length;
   }
 
+  // CORE: toolbar + sortable headers (CHANGE: {clearBtn}; STRETCH: ColumnMenu; NEXT: aria-sort, footer)
   return (
     <div className="card">
       <div className="toolbar">
@@ -545,7 +601,7 @@ body { margin: 0; font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe
 .page-btn:hover:not(:disabled) { background: var(--head); }
 .page-btn:disabled { opacity: 0.45; cursor: default; }
 
-/* ---- Added: toolbar, sorting, paging, column menu ---- */
+/* Toolbar, buttons and table footer (shared design-system classes) */
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .toolbar-spacer { flex: 1; }
 .search { width: 240px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; color: var(--text); }
@@ -554,18 +610,21 @@ body { margin: 0; font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe
 .btn { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
 .btn:hover { background: var(--head); }
 .btn-link { border-color: transparent; color: var(--primary); }
+.table-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); background: #FCFDFE; }
+.range { font-size: 13px; color: var(--muted); }
 
+/* ---- Added: sorting, empty state, column menu ---- */
+/* CORE: sortable headers */
 .table th { padding: 0 6px; }
 .sort-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
 .sort-btn:hover { background: #E2E8F0; color: var(--text); }
 .sort-arrow { font-size: 10px; color: #94A3B8; }
 .sort-btn.is-sorted { color: var(--text); }
 .sort-btn.is-sorted .sort-arrow { color: var(--primary); }
+/* CHANGE */
 .table-empty { padding: 40px 14px; text-align: center; color: var(--muted); }
 
-.table-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); background: #FCFDFE; }
-.range { font-size: 13px; color: var(--muted); }
-
+/* STRETCH: column menu */
 .col-menu { position: relative; }
 .col-menu summary { list-style: none; }
 .col-menu summary::-webkit-details-marker { display: none; }

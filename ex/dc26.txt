@@ -174,6 +174,7 @@ import { searchPeople, TOTAL_PEOPLE } from './api';
 
 const DEBOUNCE_MS = 300;
 
+// CHANGE: highlight the first match
 // Wraps the first case-insensitive match of `query` in <mark>.
 function Highlight({ text, query }: { text: string; query: string }) {
   const index = text.toLowerCase().indexOf(query.toLowerCase());
@@ -192,6 +193,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+// CHANGE: PersonRow gets the query to highlight
 function PersonRow({ person, query }: { person: Person; query: string }) {
   return (
     <li className="person">
@@ -219,18 +221,20 @@ function SearchBox({ value, onChange }: { value: string; onChange: (value: strin
   );
 }
 
+// CORE: results + loading, searched by a debounced effect
 function Directory() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
-  // The query the current results belong to (used for highlighting).
+  // CHANGE: the query the current results belong to (used for highlighting).
   const [resultsFor, setResultsFor] = useState('');
 
+  // CORE: debounce + ignore stale responses
   useEffect(() => {
     const q = query.trim();
     if (q === '') {
       setResults([]);
-      setResultsFor('');
+      setResultsFor(''); // CHANGE
       setLoading(false);
       return;
     }
@@ -244,7 +248,7 @@ function Directory() {
           return;
         }
         setResults(data);
-        setResultsFor(q);
+        setResultsFor(q); // CHANGE
         setLoading(false);
       });
     }, DEBOUNCE_MS);
@@ -254,12 +258,13 @@ function Directory() {
     };
   }, [query]);
 
-  // decisions
+  // CORE: Searching… line
   let status = null;
   if (loading) {
     status = <p className="dir-status" aria-live="polite">Searching…</p>;
   }
 
+  // CORE: empty prompt, then the results (NEXT: no-match message)
   let body;
   if (query.trim() === '') {
     body = <p className="dir-message">Start typing to search {TOTAL_PEOPLE} people.</p>;
@@ -277,11 +282,13 @@ function Directory() {
     );
   }
 
+  // NEXT: dim old results while a newer search loads
   let cls = 'directory';
   if (loading) {
     cls = 'directory is-loading';
   }
 
+  // CORE: render
   return (
     <section className={cls}>
       <SearchBox value={query} onChange={setQuery} />
@@ -348,6 +355,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .person-loc { font-size: 13px; color: var(--muted); }
 
 /* ---- Added: search states + highlight ---- */
+/* CORE */
 .dir-status { margin: 0; padding: 8px 16px; font-size: 13px; color: var(--teal); background: #F0FDFA; border-bottom: 1px solid var(--border); }
+/* NEXT */
 .directory.is-loading .people { opacity: 0.55; }
+/* CHANGE */
 .match { background: var(--teal-soft); color: #115E59; border-radius: 3px; padding: 0 1px; }

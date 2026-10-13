@@ -240,8 +240,11 @@ import type { Level, LogLine } from './api';
 import LogRow, { LogHeader, ROW_HEIGHT } from './components/LogRow';
 import { formatNumber } from './utils/format';
 
+// CORE: virtualization constants
 const OVERSCAN = 8;      // extra rows above and below the viewport, so fast scrolling doesn't flash blank
+// CHANGE: used to centre the jumped-to row
 const HEADER_HEIGHT = 30;
+// CORE: level filter buttons
 const LEVELS: (Level | 'ALL')[] = ['ALL', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
 
 function TopBar({ total }: { total: number }) {
@@ -255,6 +258,7 @@ function TopBar({ total }: { total: number }) {
   );
 }
 
+// CORE: the viewer owns scroll + filter state
 type ViewerProps = {
   logs: LogLine[];
 };
@@ -262,13 +266,17 @@ type ViewerProps = {
 function LogViewer({ logs }: ViewerProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  // CORE: filter state
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState<Level | 'ALL'>('ALL');
+  // CHANGE: jump to line (NEXT: jumpError)
   const [jumpValue, setJumpValue] = useState('');
   const [jumpError, setJumpError] = useState('');
   const [highlightLine, setHighlightLine] = useState<number | null>(null);
+  // CORE: the scroll container
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // CORE: measure the viewport (ResizeObserver re-measures)
   // Measure the scroll container (and re-measure when it resizes).
   useEffect(() => {
     const el = scrollRef.current;
@@ -288,6 +296,7 @@ function LogViewer({ logs }: ViewerProps) {
     };
   }, []);
 
+  // CORE: filter once per change, not per scroll event
   // derived + memoized: filtering 10,000 rows on every scroll event would be wasteful
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -302,6 +311,7 @@ function LogViewer({ logs }: ViewerProps) {
     });
   }, [logs, query, level]);
 
+  // NEXT: a new filter resets the scroll
   function scrollToTop() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
@@ -309,6 +319,7 @@ function LogViewer({ logs }: ViewerProps) {
     setScrollTop(0);
   }
 
+  // CORE: filter handlers
   function handleQuery(value: string) {
     setQuery(value);
     scrollToTop(); // old scroll position means nothing in a new list
@@ -319,10 +330,12 @@ function LogViewer({ logs }: ViewerProps) {
     scrollToTop();
   }
 
+  // CORE
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     setScrollTop(e.currentTarget.scrollTop);
   }
 
+  // CHANGE: compute the scroll position from the index (NEXT: the two error messages)
   function handleJump(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const n = Number(jumpValue);
@@ -333,10 +346,12 @@ function LogViewer({ logs }: ViewerProps) {
     const index = filtered.findIndex((l) => {
       return l.line === n;
     });
+    // NEXT: "hidden by the current filter" (and the range message above)
     if (index === -1) {
       setJumpError('Line ' + n + ' is hidden by the current filter');
       return;
     }
+    // CHANGE: highlight + centre the row
     setJumpError('');
     setHighlightLine(n);
     // Put the row in the middle of the viewport. Pure math: no need to render it first.
@@ -348,6 +363,7 @@ function LogViewer({ logs }: ViewerProps) {
     setScrollTop(top);
   }
 
+  // CORE: start / end window from scrollTop math
   // derived: the window of rows to render
   const totalHeight = filtered.length * ROW_HEIGHT;
   const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
@@ -359,11 +375,13 @@ function LogViewer({ logs }: ViewerProps) {
     empty = <p className="log-message">No lines match the filter.</p>;
   }
 
+  // NEXT
   let jumpErrorEl = null;
   if (jumpError) {
     jumpErrorEl = <span className="jump-error" role="alert">{jumpError}</span>;
   }
 
+  // CORE: toolbar with the text filter + level buttons
   return (
     <div className="viewer">
       <div className="toolbar">
@@ -377,6 +395,7 @@ function LogViewer({ logs }: ViewerProps) {
             return <button key={lv} type="button" className={cls} aria-pressed={lv === level} onClick={() => { handleLevel(lv); }}>{lv}</button>;
           })}
         </div>
+        {/* CHANGE: jump form; NEXT: error + match count */}
         <form className="jump" onSubmit={handleJump}>
           <input className="tb-input jump-input" inputMode="numeric" placeholder="Line #" aria-label="Jump to line" value={jumpValue} onChange={(e) => { setJumpValue(e.target.value); }} />
           <button type="submit" className="jump-btn">Go</button>
@@ -384,8 +403,10 @@ function LogViewer({ logs }: ViewerProps) {
         {jumpErrorEl}
         <span className="match-count">{formatNumber(filtered.length)} / {formatNumber(logs.length)}</span>
       </div>
+      {/* CORE: the scroller with the sticky LogHeader */}
       <div className="log-scroll" ref={scrollRef} onScroll={handleScroll}>
         <LogHeader />
+        {/* CORE: full-height spacer, absolutely positioned visible rows */}
         <div className="log-spacer" style={{ height: totalHeight }}>
           {visible.map((l, i) => {
             const index = start + i;
@@ -481,12 +502,15 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .level-error { background: rgba(240, 113, 120, 0.06); }
 
 /* ---- Added: virtualization, filter, jump to line ---- */
+/* CORE */
 .viewer { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .toolbar { flex-wrap: wrap; }
 .log-spacer { position: relative; }
 .log-spacer .log-row { position: absolute; left: 0; right: 0; }
+/* CHANGE */
 .log-row.is-highlighted { background: rgba(57, 186, 230, 0.18); box-shadow: inset 3px 0 0 var(--accent); animation: flash 1.2s ease-out; }
 @keyframes flash { from { background: rgba(57, 186, 230, 0.5); } }
+/* CORE: toolbar controls (jump: CHANGE; error + count: NEXT) */
 .tb-input { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: 12px var(--mono); }
 .tb-input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 .filter-input { width: 220px; }

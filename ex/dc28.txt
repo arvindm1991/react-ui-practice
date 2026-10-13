@@ -116,7 +116,41 @@ function ReplyItem({ reply }: { reply: Reply }) {
   );
 }
 
-// TODO: "Reply" should open an inline reply box under this comment only.
+type ReplyBoxProps = {
+  onSubmit: (text: string) => void;
+  onCancel: () => void;
+};
+
+// Built by a teammate, not used anywhere yet. Owns its own draft text.
+function ReplyBox({ onSubmit, onCancel }: ReplyBoxProps) {
+  const [text, setText] = useState('');
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (text.trim() === '') {
+      return;
+    }
+    onSubmit(text.trim());
+  }
+
+  return (
+    <form className="reply-box" onSubmit={handleSubmit}>
+      <textarea
+        className="reply-input"
+        placeholder="Write a reply…"
+        value={text}
+        onChange={(e) => { setText(e.target.value); }}
+      />
+      <div className="reply-actions">
+        <button type="button" className="ghost-btn" onClick={() => { onCancel(); }}>Cancel</button>
+        <button type="submit" className="post-btn">Post reply</button>
+      </div>
+    </form>
+  );
+}
+
+// TODO: "Reply" should open an inline <ReplyBox /> under this comment only,
+// and posting should call postReply and add the reply to this thread.
 function CommentItem({ comment }: { comment: Comment }) {
   return (
     <li className="comment">
@@ -232,6 +266,15 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .replies { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .reply { display: flex; gap: 8px; }
 .bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+
+/* Reply box (used by ReplyBox) */
+.reply-box { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.reply-input { width: 100%; min-height: 70px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; font-size: 14px; resize: vertical; color: var(--text); }
+.reply-input:focus { outline: 2px solid var(--green); outline-offset: -1px; }
+.reply-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.ghost-btn, .post-btn { height: 32px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ghost-btn { border: 1px solid var(--border); background: none; color: var(--text); }
+.post-btn { border: 0; background: var(--green); color: #fff; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getComments, postReply } from './api';
@@ -264,32 +307,49 @@ function ReplyItem({ reply }: { reply: Reply }) {
   );
 }
 
+// CHANGE: replies are capped at 280 characters
+const MAX_REPLY = 280;
+
 type ReplyBoxProps = {
+  // NEXT: whose comment (for the placeholder)
   author: string;
-  onSubmit: (text: string) => Promise<void>;
+  onSubmit: (text: string) => void;
   onCancel: () => void;
 };
 
-// Owns its own draft + pending state. The parent unmounts it when the post succeeds.
+// Built by a teammate (starter). Owns its own draft + pending state.
+// The parent unmounts it when the post succeeds.
 function ReplyBox({ author, onSubmit, onCancel }: ReplyBoxProps) {
   const [text, setText] = useState('');
+  // NEXT: pending flag
   const [pending, setPending] = useState(false);
 
+  // NEXT: never post twice (CHANGE: or when too long)
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (text.trim() === '' || pending) {
+    // NEXT: blank, too long or already posting: do nothing
+    if (text.trim() === '' || pending || text.length > MAX_REPLY) {
       return;
     }
     setPending(true);
     onSubmit(text.trim());
   }
 
-  const blocked = pending || text.trim() === '';
+  // CHANGE: characters left (derived), red once it goes below 0
+  const left = MAX_REPLY - text.length;
+  let counterCls = 'char-count';
+  if (left < 0) {
+    counterCls = 'char-count is-over';
+  }
+
+  // NEXT: disabled + "Posting…" while pending (CHANGE: and when too long)
+  const blocked = pending || text.trim() === '' || left < 0;
   let submitLabel = 'Post reply';
   if (pending) {
     submitLabel = 'Posting…';
   }
 
+  // NEXT: autoFocus, placeholder, disabled (CHANGE: the counter span)
   return (
     <form className="reply-box" onSubmit={handleSubmit}>
       <textarea
@@ -301,6 +361,7 @@ function ReplyBox({ author, onSubmit, onCancel }: ReplyBoxProps) {
         onChange={(e) => { setText(e.target.value); }}
       />
       <div className="reply-actions">
+        <span className={counterCls}>{left} left</span>
         <button type="button" className="ghost-btn" disabled={pending} onClick={() => { onCancel(); }}>Cancel</button>
         <button type="submit" className="post-btn" disabled={blocked}>{submitLabel}</button>
       </div>
@@ -308,17 +369,20 @@ function ReplyBox({ author, onSubmit, onCancel }: ReplyBoxProps) {
   );
 }
 
+// CORE: which comment is being replied to comes from the parent
 type CommentItemProps = {
   comment: Comment;
   replying: boolean;
-  expanded: boolean;
   onReplyClick: (id: string) => void;
-  onToggleReplies: (id: string) => void;
-  onPostReply: (id: string, text: string) => Promise<void>;
+  onPostReply: (id: string, text: string) => void;
   onCancelReply: () => void;
+  // STRETCH: collapse / expand
+  expanded: boolean;
+  onToggleReplies: (id: string) => void;
 };
 
 function CommentItem({ comment, replying, expanded, onReplyClick, onToggleReplies, onPostReply, onCancelReply }: CommentItemProps) {
+  // STRETCH: "Show 3 replies" / "Hide replies" link
   const count = comment.replies.length;
 
   let toggle = null;
@@ -334,6 +398,7 @@ function CommentItem({ comment, replying, expanded, onReplyClick, onToggleReplie
     toggle = <button type="button" className="link-btn muted-link" onClick={() => { onToggleReplies(comment.id); }}>{label}</button>;
   }
 
+  // STRETCH: replies only while expanded
   let replies = null;
   if (expanded && count > 0) {
     replies = (
@@ -345,17 +410,19 @@ function CommentItem({ comment, replying, expanded, onReplyClick, onToggleReplie
     );
   }
 
+  // CORE: the reply box only under the comment being replied to
   let box = null;
   if (replying) {
     box = (
       <ReplyBox
         author={comment.author}
-        onSubmit={(text) => { return onPostReply(comment.id, text); }}
+        onSubmit={(text) => { onPostReply(comment.id, text); }}
         onCancel={onCancelReply}
       />
     );
   }
 
+  // CORE: render (STRETCH: toggle + collapsible replies)
   return (
     <li className="comment">
       <Avatar name={comment.author} />
@@ -376,8 +443,9 @@ function CommentItem({ comment, replying, expanded, onReplyClick, onToggleReplie
 function CommentSection() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  // Only one reply box on the page: store WHICH comment, not a boolean per comment.
+  // CORE: only one reply box on the page: store WHICH comment, not a boolean per comment.
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  // STRETCH: which threads are expanded, by comment id
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -394,12 +462,14 @@ function CommentSection() {
     };
   }, []);
 
+  // STRETCH: toggle one thread
   function handleToggleReplies(id: string) {
     setExpanded((prev) => {
       return { ...prev, [id]: !prev[id] };
     });
   }
 
+  // CORE: post, then append the reply immutably and close the box
   function handlePostReply(commentId: string, text: string) {
     return postReply(commentId, text).then((reply) => {
       setComments((prev) => {
@@ -411,7 +481,7 @@ function CommentSection() {
         });
       });
       setReplyingTo(null);
-      // Show the thread so the new reply is visible.
+      // STRETCH: show the thread so the new reply is visible.
       setExpanded((prev) => {
         return { ...prev, [commentId]: true };
       });
@@ -425,6 +495,7 @@ function CommentSection() {
     body = (
       <ul className="comments">
         {comments.map((c) => {
+          // CORE: derive each comment's flags
           const replying = replyingTo === c.id;
           const isExpanded = expanded[c.id] === true;
           return (
@@ -509,14 +580,21 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .reply { display: flex; gap: 8px; }
 .bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
 
-/* ---- Added: reply box + collapsible replies ---- */
-.muted-link { color: var(--muted); }
+/* Reply box (used by ReplyBox) */
 .reply-box { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .reply-input { width: 100%; min-height: 70px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; font-size: 14px; resize: vertical; color: var(--text); }
 .reply-input:focus { outline: 2px solid var(--green); outline-offset: -1px; }
-.reply-input:disabled { background: #F4F1E8; color: var(--muted); }
-.reply-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.reply-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
 .ghost-btn, .post-btn { height: 32px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ghost-btn { border: 1px solid var(--border); background: none; color: var(--text); }
 .post-btn { border: 0; background: var(--green); color: #fff; }
+
+/* ---- Added: pending state, counter, collapsible replies ---- */
+/* NEXT: pending */
+.reply-input:disabled { background: #F4F1E8; color: var(--muted); }
 .post-btn:disabled, .ghost-btn:disabled { opacity: 0.55; cursor: default; }
+/* CHANGE: character counter */
+.char-count { margin-right: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.char-count.is-over { color: #B42318; font-weight: 700; }
+/* STRETCH: the show/hide link */
+.muted-link { color: var(--muted); }

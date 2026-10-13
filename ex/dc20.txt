@@ -106,9 +106,10 @@ function Sidebar() {
 
 type FileRowProps = {
   file: FileItem;
+  onDelete: (id: string) => void;
 };
 
-function FileRow({ file }: FileRowProps) {
+function FileRow({ file, onDelete }: FileRowProps) {
   return (
     <li className="file-row">
       <FileIcon kind={file.kind} />
@@ -116,8 +117,7 @@ function FileRow({ file }: FileRowProps) {
       <span className="file-meta">{file.owner}</span>
       <span className="file-meta">{file.modified}</span>
       <span className="file-meta size">{formatBytes(file.sizeBytes)}</span>
-      {/* TODO: clicking this should ask for confirmation, then delete */}
-      <button type="button" className="icon-btn" aria-label={'Delete ' + file.name}>🗑</button>
+      <button type="button" className="icon-btn" aria-label={'Delete ' + file.name} onClick={() => { onDelete(file.id); }}>🗑</button>
     </li>
   );
 }
@@ -140,6 +140,11 @@ function FileList() {
     };
   }, []);
 
+  // The 🗑 in each row calls this with the file's id.
+  function handleDeleteClick(id: string) {
+    // TODO: ask for confirmation in a modal, then delete with deleteFile(id).
+  }
+
   if (loading) {
     return <p className="msg">Loading files…</p>;
   }
@@ -147,7 +152,7 @@ function FileList() {
   return (
     <ul className="file-list">
       {files.map((f) => {
-        return <FileRow key={f.id} file={f} />;
+        return <FileRow key={f.id} file={f} onDelete={(id) => { handleDeleteClick(id); }} />;
       })}
     </ul>
   );
@@ -242,6 +247,35 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .file-row .file-meta:not(.size), .list-head span:nth-child(2), .list-head span:nth-child(3) { display: none; }
   .list-head { grid-template-columns: minmax(0, 1fr) 72px 36px; }
 }
+
+/* Modal (shared dialog styles) */
+.backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(17, 24, 39, 0.45); }
+.modal { width: 100%; max-width: 400px; padding: 24px; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(17, 24, 39, 0.25); }
+.modal-icon { width: 44px; height: 44px; margin-bottom: 14px; border-radius: 50%; background: #FDECEC; display: grid; place-items: center; font-size: 20px; }
+.modal-title { margin: 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.modal-text { margin: 8px 0 22px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@@@ starter src/components/ConfirmDeleteModal.tsx
+import React from 'react';
+import { Button } from './Button';
+
+// Static markup from the design hand-off. Not rendered anywhere yet, takes no props,
+// and the buttons do nothing. Styles: .backdrop / .modal in styles.css.
+export function ConfirmDeleteModal() {
+  return (
+    <div className="backdrop">
+      <div className="modal">
+        <div className="modal-icon">🗑</div>
+        <h2 className="modal-title">Delete “File name.pdf”?</h2>
+        <p className="modal-text">This file will be permanently deleted for everyone it’s shared with. You can’t undo this.</p>
+        <div className="modal-actions">
+          <Button onClick={() => {}}>Cancel</Button>
+          <Button variant="danger" onClick={() => {}}>Delete</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 @@@ solution src/App.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { deleteFile, getFiles } from './api';
@@ -291,8 +325,9 @@ function FileRow({ file, onDelete }: FileRowProps) {
 function FileList() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  // Which file the modal is asking about. null = modal closed. Store the id, not a copy.
+  // CORE: which file the modal is asking about. null = modal closed. Store the id, not a copy.
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // NEXT: request in flight
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -309,16 +344,19 @@ function FileList() {
     };
   }, []);
 
-  // Stable, because the modal's Escape effect depends on it.
+  // CORE: the row's 🗑 opens the modal for that file
+  function handleDeleteClick(id: string) {
+    setPendingId(id);
+  }
+
+  // CORE: close without deleting.
+  // NEXT: useCallback keeps it stable, because the modal's Escape effect depends on it.
   const handleCancel = useCallback(() => {
     setPendingId(null);
   }, []);
 
-  function handleConfirm() {
-    if (!pendingId) {
-      return;
-    }
-    const id = pendingId;
+  // CORE: delete, then remove the row and close
+  function handleConfirm(id: string) {
     setDeleting(true);
     deleteFile(id).then(() => {
       setFiles((prev) => {
@@ -331,19 +369,21 @@ function FileList() {
     });
   }
 
-  // derived
+  // CORE: derived from the id
   const pendingFile = files.find((f) => {
     return f.id === pendingId;
   });
 
+  // CORE: render the modal only while a file is pending
   let modal = null;
   if (pendingFile) {
+    const id = pendingFile.id;
     modal = (
       <ConfirmDeleteModal
         fileName={pendingFile.name}
         deleting={deleting}
         onCancel={handleCancel}
-        onConfirm={() => { handleConfirm(); }}
+        onConfirm={() => { handleConfirm(id); }}
       />
     );
   }
@@ -352,6 +392,7 @@ function FileList() {
     return <p className="msg">Loading files…</p>;
   }
 
+  // STRETCH: nothing left
   let empty = null;
   if (files.length === 0) {
     empty = <p className="msg empty">No files left. Drop something here to upload.</p>;
@@ -361,7 +402,7 @@ function FileList() {
     <div>
       <ul className="file-list">
         {files.map((f) => {
-          return <FileRow key={f.id} file={f} onDelete={(id) => { setPendingId(id); }} />;
+          return <FileRow key={f.id} file={f} onDelete={(id) => { handleDeleteClick(id); }} />;
         })}
       </ul>
       {empty}
@@ -392,6 +433,7 @@ export default function App() {
 import React, { useEffect } from 'react';
 import { Button } from './Button';
 
+// CORE: the static hand-off markup gets props: the real file name and the two callbacks (NEXT: deleting)
 type ConfirmDeleteModalProps = {
   fileName: string;
   deleting: boolean;
@@ -400,7 +442,7 @@ type ConfirmDeleteModalProps = {
 };
 
 export function ConfirmDeleteModal({ fileName, deleting, onCancel, onConfirm }: ConfirmDeleteModalProps) {
-  // Escape closes (but not halfway through a delete). Always remove the listener.
+  // NEXT: Escape closes (STRETCH: but not halfway through a delete). Always remove the listener.
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !deleting) {
@@ -413,18 +455,21 @@ export function ConfirmDeleteModal({ fileName, deleting, onCancel, onConfirm }: 
     };
   }, [deleting, onCancel]);
 
+  // NEXT: only a click on the backdrop itself closes, not one inside the panel
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget && !deleting) {
       onCancel();
     }
   }
 
-  // Focus starts on Cancel (autoFocus below): the safe choice for a destructive dialog.
+  // STRETCH: focus starts on Cancel (autoFocus below): the safe choice for a destructive dialog.
+  // NEXT: busy label
   let deleteLabel = 'Delete';
   if (deleting) {
     deleteLabel = 'Deleting…';
   }
 
+  // STRETCH: role="alertdialog" + aria-modal, labelled by the title
   return (
     <div className="backdrop" onClick={(e) => { handleBackdropClick(e); }}>
       <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
@@ -511,11 +556,14 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .list-head { grid-template-columns: minmax(0, 1fr) 72px 36px; }
 }
 
-/* ---- Added: confirm delete modal ---- */
+/* Modal (shared dialog styles) */
 .backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(17, 24, 39, 0.45); }
 .modal { width: 100%; max-width: 400px; padding: 24px; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(17, 24, 39, 0.25); }
 .modal-icon { width: 44px; height: 44px; margin-bottom: 14px; border-radius: 50%; background: #FDECEC; display: grid; place-items: center; font-size: 20px; }
 .modal-title { margin: 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
 .modal-text { margin: 8px 0 22px; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ---- Added: confirm delete modal ---- */
+/* STRETCH */
 .empty { padding: 32px 0; text-align: center; }

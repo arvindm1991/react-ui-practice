@@ -63,6 +63,46 @@ export function buildCommands(a: AppActions): Command[] {
     { id: 'sidebar', label: 'Collapse / expand sidebar', section: 'Appearance', run: () => { a.toggleSidebar(); } },
   ];
 }
+@@@ shared src/utils/fuzzy.ts
+// fuzzyMatch('Redeploy production', 'rdp') -> true: every typed letter appears in order,
+// case-insensitive, spaces in the query ignored. fuzzyMatch('Go to Settings', '') -> true.
+export function fuzzyMatch(text: string, query: string): boolean {
+  const t = text.toLowerCase();
+  const q = query.toLowerCase().replace(/\s+/g, '');
+  let pos = 0;
+  for (const ch of q) {
+    const found = t.indexOf(ch, pos);
+    if (found === -1) {
+      return false;
+    }
+    pos = found + 1;
+  }
+  return true;
+}
+@@@ shared src/components/Modal.tsx
+import React from 'react';
+
+type ModalProps = {
+  label: string;            // accessible name of the dialog
+  onClose: () => void;      // called when the dimmed backdrop is clicked
+  children: React.ReactNode;
+};
+
+// Centered panel over a dimmed backdrop. Render it only while open.
+export default function Modal({ label, onClose, children }: ModalProps) {
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      onClose(); // a click on the backdrop itself, not inside the panel
+    }
+  }
+  return (
+    <div className="palette-backdrop" onClick={handleBackdropClick}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label={label}>
+        {children}
+      </div>
+    </div>
+  );
+}
 @@@ shared src/components/Kbd.tsx
 import React from 'react';
 
@@ -283,6 +323,10 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 .status-failed { background: rgba(242, 85, 90, 0.14); color: var(--red); }
 
 .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* components/Modal */
+.palette-backdrop { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: rgba(5, 7, 12, 0.55); backdrop-filter: blur(2px); }
+.palette { width: 100%; max-width: 560px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
 @@@ solution src/App.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { getDeployments } from './api';
@@ -290,21 +334,8 @@ import type { Deployment } from './api';
 import { buildCommands, SECTIONS } from './commands';
 import type { Command, Page } from './commands';
 import Kbd from './components/Kbd';
-
-// "rdp" matches "ReDeploy Production": every typed letter appears in order.
-function fuzzyMatch(text: string, query: string): boolean {
-  const t = text.toLowerCase();
-  const q = query.toLowerCase().replace(/\s+/g, '');
-  let pos = 0;
-  for (const ch of q) {
-    const found = t.indexOf(ch, pos);
-    if (found === -1) {
-      return false;
-    }
-    pos = found + 1;
-  }
-  return true;
-}
+import { fuzzyMatch } from './utils/fuzzy';
+import Modal from './components/Modal';
 
 type SidebarProps = { page: Page; collapsed: boolean; onNavigate: (page: Page) => void };
 
@@ -340,6 +371,7 @@ function Sidebar({ page, collapsed, onNavigate }: SidebarProps) {
   );
 }
 
+// CORE: the search button opens the palette (passes itself for focus return)
 function TopBar({ title, onSearch }: { title: string; onSearch: (el: HTMLElement) => void }) {
   return (
     <header className="topbar">
@@ -369,13 +401,16 @@ function DeploymentList({ deployments }: { deployments: Deployment[] }) {
   );
 }
 
+// CORE: palette component
 type PaletteProps = { commands: Command[]; onClose: () => void };
 
 // Only rendered while open, so query and active index reset on every open.
 function CommandPalette({ commands, onClose }: PaletteProps) {
   const [query, setQuery] = useState('');
+  // NEXT: highlighted index
   const [active, setActive] = useState(0);
 
+  // CORE: derived results with fuzzyMatch (utils/fuzzy); CHANGE: built in SECTIONS order
   // derived: filtered and put in section order, so the arrow keys follow what you see
   const results: Command[] = [];
   SECTIONS.forEach((section) => {
@@ -391,11 +426,13 @@ function CommandPalette({ commands, onClose }: PaletteProps) {
     setActive(0); // the list changed, so start from the top
   }
 
+  // CORE: run + close
   function runCommand(cmd: Command) {
     onClose();
     cmd.run();
   }
 
+  // NEXT: arrows wrap, Enter runs (CORE: the Escape branch)
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault(); // don't move the text cursor
@@ -418,17 +455,13 @@ function CommandPalette({ commands, onClose }: PaletteProps) {
     }
   }
 
-  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
+  // NEXT: aria-activedescendant
   let activeId: string | undefined = undefined;
   if (results[active]) {
     activeId = 'cmd-' + results[active].id;
   }
 
+  // CORE: empty state or list; CHANGE: grouped under section headers
   let body;
   if (results.length === 0) {
     body = <p className="palette-empty">No commands match "{query}"</p>;
@@ -472,29 +505,28 @@ function CommandPalette({ commands, onClose }: PaletteProps) {
     );
   }
 
+  // CORE: reuse Modal (backdrop click already calls onClose)
   return (
-    <div className="palette-backdrop" onClick={handleBackdropClick}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette">
-        <div className="palette-input-row">
-          <span className="palette-icon" aria-hidden="true">⌕</span>
-          <input
-            className="palette-input"
-            autoFocus
-            placeholder="Type a command…"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="palette-list"
-            aria-activedescendant={activeId}
-            value={query}
-            onChange={(e) => { handleQueryChange(e.target.value); }}
-            onKeyDown={handleKeyDown}
-          />
-          <Kbd keys={['esc']} />
-        </div>
-        {body}
-        <div className="palette-foot"><Kbd keys={['↑', '↓']} /> to navigate <Kbd keys={['↵']} /> to run</div>
+    <Modal label="Command palette" onClose={onClose}>
+      <div className="palette-input-row">
+        <span className="palette-icon" aria-hidden="true">⌕</span>
+        <input
+          className="palette-input"
+          autoFocus
+          placeholder="Type a command…"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="palette-list"
+          aria-activedescendant={activeId}
+          value={query}
+          onChange={(e) => { handleQueryChange(e.target.value); }}
+          onKeyDown={handleKeyDown}
+        />
+        <Kbd keys={['esc']} />
       </div>
-    </div>
+      {body}
+      <div className="palette-foot"><Kbd keys={['↑', '↓']} /> to navigate <Kbd keys={['↵']} /> to run</div>
+    </Modal>
   );
 }
 
@@ -504,7 +536,9 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [toast, setToast] = useState('');
+  // CORE: App owns open/closed (button and shortcut both open it)
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // NEXT: focus return
   // The element to give focus back to. A ref: changing it should not re-render.
   const returnFocus = useRef<HTMLElement | null>(null);
 
@@ -521,6 +555,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: global shortcut, listener cleaned up
   // Ctrl/Cmd+K toggles the palette from anywhere.
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -540,6 +575,7 @@ export default function App() {
     };
   }, [paletteOpen]);
 
+  // NEXT: focus return
   // When the palette closes, put focus back where it was.
   useEffect(() => {
     if (!paletteOpen && returnFocus.current) {
@@ -562,6 +598,7 @@ export default function App() {
     showToast('Redeploy queued for production');
   }
 
+  // CORE
   function openPalette(from: HTMLElement) {
     returnFocus.current = from;
     setPaletteOpen(true);
@@ -599,6 +636,7 @@ export default function App() {
     toastEl = <div className="toast" role="status">{toast}</div>;
   }
 
+  // CORE: only rendered while open
   let palette = null;
   if (paletteOpen) {
     palette = <CommandPalette commands={commands} onClose={closePalette} />;
@@ -678,9 +716,12 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 
 .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
 
-/* ---- Added: command palette ---- */
+/* components/Modal */
 .palette-backdrop { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: rgba(5, 7, 12, 0.55); backdrop-filter: blur(2px); }
 .palette { width: 100%; max-width: 560px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+
+/* ---- Added: command palette ---- */
+/* CORE (palette-section: CHANGE; is-active: NEXT) */
 .palette-input-row { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); }
 .palette-icon { color: var(--muted); font-size: 18px; }
 .palette-input { flex: 1; height: 52px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; }

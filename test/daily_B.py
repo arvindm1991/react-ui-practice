@@ -1,5 +1,5 @@
 """Behaviour tests for daily challenges batch B (dc11-dc20). Runs the SOLUTION in the Design tab."""
-import asyncio, os, subprocess, sys, time, pathlib
+import asyncio, os, re, subprocess, sys, time, pathlib
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).parent
@@ -272,6 +272,8 @@ async def t_dc18(page, h):
     await page.wait_for_timeout(900)
     check(ex, 'Daniel chart', (await h.locator('.chart-name').inner_text()) == 'Daniel Reyes')
     check(ex, 'no known allergies', 'No known allergies' in (await h.locator('.chart-pane').inner_text()))
+    meta = await h.locator('.chart-meta').inner_text()
+    check(ex, 'meta uses ageFrom ("NN y · M · MRN")', re.match(r'^\d+ y · M · MRN 00977-14', meta) is not None, meta)
     check(ex, 'vitals 3', await h.locator('.vital').count() == 3)
     # race: Margaret (slow) then Daniel immediately
     ok = True

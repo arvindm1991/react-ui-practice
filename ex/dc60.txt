@@ -1,26 +1,3 @@
-@@@ shared src/utils/date.ts
-// "Now" is fixed so the groups are the same every time you open the app.
-// Use NOW, never new Date() / Date.now(), for anything relative.
-export const NOW = new Date(2026, 5, 15, 14, 0); // Mon, Jun 15 2026, 2:00 pm (months are 0-based)
-
-// Midnight at the start of the same calendar day.
-export function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-// Whole calendar days from `earlier` to `later`: daysBetween(Jun 14 23:00, Jun 15 01:00) -> 1
-export function daysBetween(earlier: Date, later: Date): number {
-  return Math.round((startOfDay(later).getTime() - startOfDay(earlier).getTime()) / 86400000);
-}
-
-// "2:05 pm" for today, "Jun 12" otherwise
-export function formatWhen(iso: string): string {
-  const d = new Date(iso);
-  if (daysBetween(d, NOW) === 0) {
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
-  }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 @@@ shared src/api.ts
 // Fake API. Treat it like a real backend you can't change.
 import { NOW } from './utils/date';
@@ -126,6 +103,46 @@ export default function ChatPane({ conversation }: { conversation: Conversation 
     </main>
   );
 }
+@@@ shared src/utils/date.ts
+// "Now" is fixed so the groups are the same every time you open the app.
+// Use NOW, never new Date() / Date.now(), for anything relative.
+export const NOW = new Date(2026, 5, 15, 14, 0); // Mon, Jun 15 2026, 2:00 pm (months are 0-based)
+
+// Midnight at the start of the same calendar day.
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Whole calendar days from `earlier` to `later`: daysBetween(Jun 14 23:00, Jun 15 01:00) -> 1
+export function daysBetween(earlier: Date, later: Date): number {
+  return Math.round((startOfDay(later).getTime() - startOfDay(earlier).getTime()) / 86400000);
+}
+
+// "2:05 pm" for today, "Jun 12" otherwise
+export function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (daysBetween(d, NOW) === 0) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// The sidebar's date bucket for a timestamp, by calendar days before NOW:
+// 0 -> 'Today', 1 -> 'Yesterday', 2–7 -> 'Previous 7 days', more -> 'Older'
+// dateGroup('2026-06-14T21:10:00') -> 'Yesterday'
+export function dateGroup(iso: string): string {
+  const days = daysBetween(new Date(iso), NOW);
+  if (days <= 0) {
+    return 'Today';
+  }
+  if (days === 1) {
+    return 'Yesterday';
+  }
+  if (days <= 7) {
+    return 'Previous 7 days';
+  }
+  return 'Older';
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getConversations } from './api';
@@ -150,6 +167,11 @@ function ConversationRow({ conversation, selected, onSelect }: RowProps) {
         <span className="conv-title">{conversation.title}</span>
         <span className="conv-when">{formatWhen(conversation.updatedAt)}</span>
       </button>
+      {/* Shown on hover/focus by CSS. TODO: wire them up (see the task) */}
+      <div className="conv-actions">
+        <button type="button" className="conv-action" aria-label={'Rename ' + conversation.title} title="Rename">✎</button>
+        <button type="button" className="conv-action" aria-label={'Delete ' + conversation.title} title="Delete">✕</button>
+      </div>
     </li>
   );
 }
@@ -250,6 +272,14 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-ser
 .conv-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13.5px; }
 .conv-when { font-size: 11px; color: var(--side-muted); white-space: nowrap; }
 
+/* Row actions: hidden until the row is hovered or focused */
+.conv-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; gap: 1px; padding-left: 16px; background: linear-gradient(90deg, transparent, var(--side-hover) 14px); border-radius: 0 8px 8px 0; }
+.conv.is-selected .conv-actions { background: linear-gradient(90deg, transparent, var(--side-active) 14px); }
+.conv:hover .conv-actions, .conv:focus-within .conv-actions { display: flex; }
+.conv-action { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--side-muted); font-size: 12px; cursor: pointer; }
+.conv-action:hover { background: #303038; color: var(--side-text); }
+.conv-main:focus-visible, .conv-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .chat-pane { display: flex; flex-direction: column; min-width: 0; }
 .chat-pane.is-empty { align-items: center; justify-content: center; color: var(--muted); }
 .chat-head { padding: 16px 24px; border-bottom: 1px solid var(--border); }
@@ -263,29 +293,24 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-ser
 import React, { useEffect, useRef, useState } from 'react';
 import { getConversations, createConversation, renameConversation, deleteConversation, setPinned } from './api';
 import type { Conversation } from './api';
-import { NOW, daysBetween, formatWhen } from './utils/date';
+import { dateGroup, formatWhen } from './utils/date';
 import ChatPane from './components/ChatPane';
 
+// CORE (CHANGE: 'Pinned' first in the order)
 const UNDO_MS = 5000;
 const GROUP_ORDER = ['Pinned', 'Today', 'Yesterday', 'Previous 7 days', 'Older'];
 
+// CORE: one function decides the group (date buckets come from utils/date.ts)
 function groupFor(c: Conversation): string {
+  // CHANGE: pinned beats any date
   if (c.pinned) {
     return 'Pinned';
   }
-  const days = daysBetween(new Date(c.updatedAt), NOW);
-  if (days <= 0) {
-    return 'Today';
-  }
-  if (days === 1) {
-    return 'Yesterday';
-  }
-  if (days <= 7) {
-    return 'Previous 7 days';
-  }
-  return 'Older';
+  // CORE
+  return dateGroup(c.updatedAt);
 }
 
+// CORE: onDelete (STRETCH: onRename, CHANGE: onTogglePin)
 type RowProps = {
   conversation: Conversation;
   selected: boolean;
@@ -296,7 +321,7 @@ type RowProps = {
 };
 
 function ConversationRow({ conversation, selected, onSelect, onRename, onDelete, onTogglePin }: RowProps) {
-  // Edit state is local: nothing outside the row needs it.
+  // STRETCH: edit state is local: nothing outside the row needs it.
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -321,11 +346,13 @@ function ConversationRow({ conversation, selected, onSelect, onRename, onDelete,
     }
   }
 
+  // CORE
   let cls = 'conv';
   if (selected) {
     cls += ' is-selected';
   }
 
+  // STRETCH: the row turns into an input
   if (editing) {
     return (
       <li className={cls + ' is-editing'}>
@@ -343,6 +370,7 @@ function ConversationRow({ conversation, selected, onSelect, onRename, onDelete,
     );
   }
 
+  // CHANGE: pin button state
   let pinLabel = 'Pin';
   let pinCls = 'conv-action';
   if (conversation.pinned) {
@@ -350,6 +378,7 @@ function ConversationRow({ conversation, selected, onSelect, onRename, onDelete,
     pinCls = 'conv-action is-pinned';
   }
 
+  // CORE: wire up ✕ (STRETCH: double-click + ✎; CHANGE: pin button)
   return (
     <li className={cls}>
       <button
@@ -371,15 +400,18 @@ function ConversationRow({ conversation, selected, onSelect, onRename, onDelete,
   );
 }
 
+// CORE: the pending delete: conversation + the timer that will commit it
 type PendingDelete = { conv: Conversation; timer: ReturnType<typeof setTimeout> };
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // NEXT
   const [query, setQuery] = useState('');
+  // STRETCH
   const [creating, setCreating] = useState(false);
-  // The toast shows this; the ref holds the timer so Undo can cancel it.
+  // CORE: the toast shows this; the ref holds the timer so Undo can cancel it.
   const [pending, setPending] = useState<Conversation | null>(null);
   const pendingRef = useRef<PendingDelete | null>(null);
 
@@ -397,7 +429,7 @@ export default function App() {
     };
   }, []);
 
-  // Leaving the page with an undo window open: the user meant it, so delete for real.
+  // NEXT: leaving the page with an undo window open: the user meant it, so delete for real.
   useEffect(() => {
     return () => {
       const p = pendingRef.current;
@@ -408,6 +440,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: the real API delete, run by the timer
   function commitPendingDelete() {
     const p = pendingRef.current;
     if (!p) {
@@ -420,16 +453,19 @@ export default function App() {
   }
 
   function handleDelete(conv: Conversation, nextSelectedId: string | null) {
-    commitPendingDelete(); // one undo at a time: a second delete finalizes the first
+    // NEXT: one undo at a time: a second delete finalizes the first
+    commitPendingDelete();
+    // CORE: remove now
     setConversations((prev) => {
       return prev.filter((c) => {
         return c.id !== conv.id;
       });
     });
+    // NEXT: select the neighbour
     if (selectedId === conv.id) {
       setSelectedId(nextSelectedId);
     }
-    // Deferred: the API delete only happens if nobody clicks Undo within 5 s.
+    // CORE: deferred: the API delete only happens if nobody clicks Undo within 5 s.
     const timer = setTimeout(() => {
       commitPendingDelete();
     }, UNDO_MS);
@@ -437,6 +473,7 @@ export default function App() {
     setPending(conv);
   }
 
+  // CORE
   function handleUndo() {
     const p = pendingRef.current;
     if (!p) {
@@ -450,6 +487,7 @@ export default function App() {
     });
   }
 
+  // STRETCH: optimistic rename (CHANGE reuses replaceConversation)
   function replaceConversation(next: Conversation) {
     setConversations((prev) => {
       return prev.map((c) => {
@@ -474,7 +512,7 @@ export default function App() {
     });
   }
 
-  // Change: pinning moves a chat to the Pinned section without touching its date.
+  // CHANGE: pinning moves a chat to the Pinned section without touching its date.
   function handleTogglePin(conv: Conversation) {
     replaceConversation({ ...conv, pinned: !conv.pinned });
     setPinned(conv.id, !conv.pinned).catch(() => {
@@ -482,6 +520,7 @@ export default function App() {
     });
   }
 
+  // STRETCH: New chat
   function handleNewChat() {
     setCreating(true);
     createConversation().then((conv) => {
@@ -494,24 +533,26 @@ export default function App() {
     });
   }
 
-  // derived: search -> sort -> group (never stored)
+  // CORE: derived: sort -> (search) -> group, never stored.
+  // Compare as dates: new chats come back as UTC ISO strings, the seed data as local ones.
+  const sorted = [...conversations].sort((a, b) => {
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+  // NEXT: search
   const q = query.trim().toLowerCase();
-  const sorted = conversations
-    .filter((c) => {
-      return c.title.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
+  const matching = sorted.filter((c) => {
+    return c.title.toLowerCase().includes(q);
+  });
+  // CORE: bucket by group
   const groups: Record<string, Conversation[]> = {};
-  sorted.forEach((c) => {
+  matching.forEach((c) => {
     const g = groupFor(c);
     if (!groups[g]) {
       groups[g] = [];
     }
     groups[g].push(c);
   });
-  // Display order, used to pick a neighbour when the selected chat is deleted.
+  // NEXT: display order, used to pick a neighbour when the selected chat is deleted.
   const ordered: Conversation[] = [];
   GROUP_ORDER.forEach((g) => {
     (groups[g] || []).forEach((c) => {
@@ -531,12 +572,15 @@ export default function App() {
     handleDelete(conv, nextId);
   }
 
+  // CORE
   let list;
   if (loading) {
     list = <p className="side-msg">Loading chats…</p>;
-  } else if (sorted.length === 0 && q !== '') {
+  } else if (matching.length === 0 && q !== '') {
+    // NEXT
     list = <p className="side-msg">No chats match “{query.trim()}”</p>;
   } else {
+    // CORE: fixed group order, skip empty groups
     list = GROUP_ORDER.map((g) => {
       const items = groups[g];
       if (!items) {
@@ -565,6 +609,7 @@ export default function App() {
     });
   }
 
+  // CORE: Undo toast (NEXT: the draining bar)
   let toast = null;
   if (pending) {
     toast = (
@@ -580,11 +625,13 @@ export default function App() {
     return c.id === selectedId;
   }) || null;
 
+  // STRETCH
   let newLabel = '+ New chat';
   if (creating) {
     newLabel = 'Creating…';
   }
 
+  // CORE: list + toast (NEXT: search input value/onChange; STRETCH: New chat button)
   return (
     <div className="app">
       <aside className="sidebar">
@@ -648,6 +695,14 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-ser
 .conv-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13.5px; }
 .conv-when { font-size: 11px; color: var(--side-muted); white-space: nowrap; }
 
+/* Row actions: hidden until the row is hovered or focused */
+.conv-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; gap: 1px; padding-left: 16px; background: linear-gradient(90deg, transparent, var(--side-hover) 14px); border-radius: 0 8px 8px 0; }
+.conv.is-selected .conv-actions { background: linear-gradient(90deg, transparent, var(--side-active) 14px); }
+.conv:hover .conv-actions, .conv:focus-within .conv-actions { display: flex; }
+.conv-action { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--side-muted); font-size: 12px; cursor: pointer; }
+.conv-action:hover { background: #303038; color: var(--side-text); }
+.conv-main:focus-visible, .conv-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .chat-pane { display: flex; flex-direction: column; min-width: 0; }
 .chat-pane.is-empty { align-items: center; justify-content: center; color: var(--muted); }
 .chat-head { padding: 16px 24px; border-bottom: 1px solid var(--border); }
@@ -659,29 +714,31 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-ser
 .chat-input { margin: 0 24px 24px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--muted); }
 
 /* ---- Added: groups, row actions, rename, undo toast ---- */
+/* CORE: group headings + toast */
 .sidebar { position: relative; }
+/* STRETCH */
 .new-chat:disabled { opacity: 0.5; cursor: default; }
+/* CORE */
 .conv-group { margin-bottom: 10px; }
 .group-title { margin: 10px 10px 4px; font-size: 11px; font-weight: 600; color: var(--side-muted); letter-spacing: 0.3px; }
 
-.conv-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: none; gap: 1px; padding-left: 16px; background: linear-gradient(90deg, transparent, var(--side-hover) 14px); border-radius: 0 8px 8px 0; }
-.conv.is-selected .conv-actions { background: linear-gradient(90deg, transparent, var(--side-active) 14px); }
-.conv:hover .conv-actions, .conv:focus-within .conv-actions { display: flex; }
-.conv-action { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--side-muted); font-size: 12px; cursor: pointer; }
-.conv-action:hover { background: #303038; color: var(--side-text); }
+/* CHANGE */
 .conv-action.is-pinned { color: var(--accent); }
-.conv-main:focus-visible, .conv-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* STRETCH: rename input */
 .conv-input { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--accent); border-radius: 8px; background: #18181C; color: var(--side-text); font: inherit; font-size: 13.5px; }
 .conv-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25); }
 
+/* CORE */
 .undo-toast { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; overflow: hidden; border-radius: 10px; background: #F4F4F5; color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: toast-in 0.18s ease; }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
 .undo-text { flex: 1; font-size: 13px; }
 .undo-btn { padding: 4px 10px; border: 0; border-radius: 6px; background: #18181B; color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+/* NEXT: draining bar */
 .undo-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); transform-origin: left; animation: drain 5s linear forwards; }
 @keyframes drain { to { transform: scaleX(0); } }
 
+/* STRETCH: narrow screens */
 @media (max-width: 640px) {
   .app { grid-template-columns: 1fr; }
   .chat-pane { display: none; }

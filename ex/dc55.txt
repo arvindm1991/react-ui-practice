@@ -66,21 +66,6 @@ export async function getCampaigns(): Promise<Campaign[]> {
   await randomDelay(400, 1100);
   return CAMPAIGNS.map((c) => ({ ...c }));
 }
-@@@ shared src/utils/format.ts
-// formatNumber(1234567) -> "1,234,567"
-export function formatNumber(n: number): string {
-  return n.toLocaleString('en-US');
-}
-
-// formatCurrency(1234.5) -> "$1,234.50"
-export function formatCurrency(n: number): string {
-  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-}
-
-// formatPercent(0.0312) -> "3.12%"
-export function formatPercent(n: number): string {
-  return (n * 100).toFixed(2) + '%';
-}
 @@@ shared src/columns.ts
 import type { Campaign } from './api';
 import { formatNumber, formatCurrency, formatPercent } from './utils/format';
@@ -113,6 +98,21 @@ import type { Campaign } from '../api';
 
 export default function StatusPill({ status }: { status: Campaign['status'] }) {
   return <span className={'pill pill-' + status.toLowerCase()}>{status}</span>;
+}
+@@@ shared src/utils/format.ts
+// formatNumber(1234567) -> "1,234,567"
+export function formatNumber(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+// formatCurrency(1234.5) -> "$1,234.50"
+export function formatCurrency(n: number): string {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+// formatPercent(0.0312) -> "3.12%"
+export function formatPercent(n: number): string {
+  return (n * 100).toFixed(2) + '%';
 }
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
@@ -246,12 +246,17 @@ import { COLUMNS } from './columns';
 import type { Column, ColumnKey } from './columns';
 import StatusPill from './components/StatusPill';
 
+// CORE
 const MIN_WIDTH = 70;
+// CHANGE
 const STORAGE_KEY = 'campaigns.columnWidths.v1';
 
+// CORE: widths by column key
 type Widths = Record<string, number>;
+// NEXT: sort state shape
 type Sort = { key: ColumnKey; dir: 'asc' | 'desc' } | null;
 
+// CORE: widths start from columns.ts
 function defaultWidths(): Widths {
   const w: Widths = {};
   COLUMNS.forEach((col) => {
@@ -260,21 +265,14 @@ function defaultWidths(): Widths {
   return w;
 }
 
-// Change: storage can be missing, full, blocked or hold garbage. Never trust it.
+// CHANGE: storage can be missing, blocked or hold broken JSON. Never trust it.
 function loadWidths(): Widths {
-  const widths = defaultWidths();
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    COLUMNS.forEach((col) => {
-      const v = saved[col.key];
-      if (typeof v === 'number' && v >= MIN_WIDTH && v < 2000) {
-        widths[col.key] = v;
-      }
-    });
+    return { ...defaultWidths(), ...saved }; // saved widths win, missing keys keep defaults
   } catch (e) {
-    // corrupted JSON or storage disabled: fall back to defaults
+    return defaultWidths(); // corrupted JSON or storage disabled
   }
-  return widths;
 }
 
 function saveWidths(widths: Widths) {
@@ -285,6 +283,7 @@ function saveWidths(widths: Widths) {
   }
 }
 
+// NEXT: numbers numerically, strings with localeCompare
 function compareRows(a: Campaign, b: Campaign, key: ColumnKey): number {
   const x = a[key];
   const y = b[key];
@@ -294,6 +293,7 @@ function compareRows(a: Campaign, b: Campaign, key: ColumnKey): number {
   return String(x).localeCompare(String(y));
 }
 
+// CORE: first column gets the sticky class
 function Cell({ column, row }: { column: Column; row: Campaign }) {
   let cls = '';
   if (column.align === 'right') {
@@ -308,6 +308,7 @@ function Cell({ column, row }: { column: Column; row: Campaign }) {
   return <td className={cls} title={column.render(row)}>{column.render(row)}</td>;
 }
 
+// CORE: header cell with a resize handle (NEXT: sort button)
 type HeaderCellProps = {
   column: Column;
   sort: Sort;
@@ -320,6 +321,7 @@ type HeaderCellProps = {
 };
 
 function HeaderCell({ column, sort, resizing, onSort, onResizeStart, onResizeMove, onResizeEnd, onResetWidth }: HeaderCellProps) {
+  // NEXT: sort arrow + aria-sort
   let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
   let arrow = '↕';
   if (sort && sort.key === column.key) {
@@ -331,6 +333,7 @@ function HeaderCell({ column, sort, resizing, onSort, onResizeStart, onResizeMov
     }
   }
 
+  // CORE
   let cls = 'th';
   if (column.align === 'right') {
     cls += ' num';
@@ -338,9 +341,11 @@ function HeaderCell({ column, sort, resizing, onSort, onResizeStart, onResizeMov
   if (column.key === 'name') {
     cls += ' sticky-col';
   }
+  // NEXT
   if (ariaSort !== 'none') {
     cls += ' is-sorted';
   }
+  // CORE
 
   let resizerCls = 'resizer';
   if (resizing) {
@@ -369,19 +374,23 @@ function HeaderCell({ column, sort, resizing, onSort, onResizeStart, onResizeMov
 }
 
 function CampaignTable({ rows }: { rows: Campaign[] }) {
-  const [widths, setWidths] = useState<Widths>(loadWidths); // lazy init: read storage once
+  // CORE: widths in state (CHANGE: lazy init from storage, read once)
+  const [widths, setWidths] = useState<Widths>(loadWidths);
+  // NEXT
   const [sort, setSort] = useState<Sort>(null);
+  // CORE
   const [resizingKey, setResizingKey] = useState<ColumnKey | null>(null);
   // Drag bookkeeping changes on every pointermove and never renders: a ref.
   const dragRef = useRef<{ key: ColumnKey; startX: number; startWidth: number } | null>(null);
 
-  // Persist once a drag ends, not on every pointermove.
+  // CHANGE: persist once a drag ends, not on every pointermove.
   useEffect(() => {
     if (resizingKey === null) {
       saveWidths(widths);
     }
   }, [widths, resizingKey]);
 
+  // NEXT: asc -> desc -> asc
   function handleSort(key: ColumnKey) {
     setSort((prev) => {
       if (prev && prev.key === key && prev.dir === 'asc') {
@@ -391,8 +400,9 @@ function CampaignTable({ rows }: { rows: Campaign[] }) {
     });
   }
 
+  // CORE: pointer-captured drag
   function handleResizeStart(e: React.PointerEvent<HTMLSpanElement>, key: ColumnKey) {
-    e.preventDefault(); // no text selection while dragging
+    e.preventDefault(); // NEXT: no text selection while dragging
     // Capture: keep getting pointermove even when the pointer leaves the 6px handle.
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { key, startX: e.clientX, startWidth: widths[key] };
@@ -415,6 +425,7 @@ function CampaignTable({ rows }: { rows: Campaign[] }) {
     setResizingKey(null);
   }
 
+  // NEXT: double-click resets
   function handleResetWidth(key: ColumnKey) {
     const col = COLUMNS.find((c) => { return c.key === key; });
     if (col) {
@@ -424,7 +435,7 @@ function CampaignTable({ rows }: { rows: Campaign[] }) {
     }
   }
 
-  // derived: sorted copy, never sort state in place
+  // NEXT: derived: sorted copy, never sort state in place
   let sorted = rows;
   if (sort) {
     const s = sort;
@@ -437,16 +448,19 @@ function CampaignTable({ rows }: { rows: Campaign[] }) {
     });
   }
 
+  // CORE: fixed layout needs the total width
   let total = 0;
   COLUMNS.forEach((col) => {
     total += widths[col.key];
   });
 
+  // NEXT
   let scrollCls = 'grid-scroll';
   if (resizingKey) {
     scrollCls = 'grid-scroll is-resizing';
   }
 
+  // CORE: colgroup drives the widths
   return (
     <div className={scrollCls}>
       <table className="grid" style={{ width: total }}>
@@ -566,6 +580,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 syst
 .pill-ended { background: #F1F5F9; color: #475569; }
 
 /* ---- Added: sticky header/column, resizing, sorting ---- */
+/* CORE: sticky header + first column */
 /* sticky cells lose their borders with border-collapse: collapse */
 .grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .grid td { background: var(--surface); }
@@ -575,7 +590,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 syst
 .grid thead th.sticky-col { z-index: 3; color: var(--muted); }
 .grid-scroll .sticky-col { box-shadow: 4px 0 6px -4px rgba(22, 32, 46, 0.12); }
 
+/* CORE: the header cell hosts the handle */
 .th { position: relative; }
+/* NEXT: sort button */
 .sort-btn { width: 100%; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 14px 0 12px; border: 0; background: none; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .th.num .sort-btn { justify-content: flex-end; }
 .th-label { overflow: hidden; text-overflow: ellipsis; }
@@ -584,7 +601,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 syst
 .th.is-sorted .sort-arrow { opacity: 1; }
 .sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* CORE: resize handle */
 .resizer { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: col-resize; touch-action: none; }
 .resizer::after { content: ''; position: absolute; top: 9px; bottom: 9px; right: 3px; width: 1px; background: #D5DBE5; }
 .resizer:hover::after, .resizer.is-active::after { top: 0; bottom: 0; width: 2px; right: 2px; background: var(--accent); }
+/* NEXT */
 .grid-scroll.is-resizing { cursor: col-resize; user-select: none; }

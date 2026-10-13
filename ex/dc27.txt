@@ -50,8 +50,9 @@ export const LABEL_NAMES: Record<string, string> = {
   research: 'Research',
 };
 @@@ starter src/App.tsx
-import React from 'react';
-import type { Card } from './api';
+import React, { useEffect, useState } from 'react';
+import { getCards } from './api';
+import type { Card, ColumnId } from './api';
 import { COLUMNS, LABEL_NAMES } from './board';
 
 function CardView({ card }: { card: Card }) {
@@ -88,18 +89,41 @@ function Column({ title, cards }: ColumnProps) {
   );
 }
 
-// TODO: load the cards with getCards(), let cards move left/right,
-// show a count in each column header, and add new cards to To do.
+// TODO: let cards move left/right with ← / →, show a count in each
+// column header, and add new cards to To do.
 function Board() {
-  const cards: Card[] = [];
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCards().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setCards(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // derived: which cards are in a column is never stored separately
+  function cardsIn(column: ColumnId) {
+    return cards.filter((c) => {
+      return c.column === column;
+    });
+  }
+
+  if (loading) {
+    return <p className="board-loading">Loading board…</p>;
+  }
 
   return (
     <div className="board">
       {COLUMNS.map((col) => {
-        const inColumn = cards.filter((c) => {
-          return c.column === col.id;
-        });
-        return <Column key={col.id} title={col.title} cards={inColumn} />;
+        return <Column key={col.id} title={col.title} cards={cardsIn(col.id)} />;
       })}
     </div>
   );
@@ -155,14 +179,17 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .label-design { color: var(--design); background: #FCE7F3; }
 .label-eng { color: var(--eng); background: #DBEAFE; }
 .label-research { color: var(--research); background: #FEF3C7; }
+.board-loading { margin: 0; padding: 48px 0; text-align: center; color: var(--muted); font-size: 14px; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getCards } from './api';
 import type { Card, ColumnId } from './api';
 import { COLUMNS, LABEL_NAMES } from './board';
 
+// CHANGE: the limit
 const WIP_LIMIT = 3;
 
+// CORE: ← / → buttons on each card
 type CardViewProps = {
   card: Card;
   canLeft: boolean;
@@ -183,6 +210,7 @@ function CardView({ card, canLeft, canRight, onMove }: CardViewProps) {
   );
 }
 
+// NEXT: add form (a form, so Enter works)
 function AddCardForm({ onAdd }: { onAdd: (title: string) => void }) {
   const [title, setTitle] = useState('');
 
@@ -210,10 +238,13 @@ function AddCardForm({ onAdd }: { onAdd: (title: string) => void }) {
 
 type ColumnProps = {
   title: string;
+  // CORE: column position + move handler
   index: number;
   cards: Card[];
-  limit: number | null;
   onMove: (id: string, step: number) => void;
+  // STRETCH: Doing's limit
+  limit: number | null;
+  // NEXT: the add form goes inside To do
   children?: React.ReactNode;
 };
 
@@ -223,11 +254,14 @@ function Column({ title, index, cards, limit, onMove, children }: ColumnProps) {
     empty = <p className="column-empty">No cards</p>;
   }
 
+  // CORE: first column can't go left, last can't go right
   const canLeft = index > 0;
   const canRight = index < COLUMNS.length - 1;
 
+  // CORE: count pill
   let countText = String(cards.length);
   let countCls = 'count';
+  // STRETCH: "2 / 3", red when full
   if (limit !== null) {
     countText = cards.length + ' / ' + limit;
     if (cards.length >= limit) {
@@ -235,6 +269,7 @@ function Column({ title, index, cards, limit, onMove, children }: ColumnProps) {
     }
   }
 
+  // CORE: render the count + pass move props
   return (
     <section className="column">
       <header className="column-head">
@@ -255,6 +290,7 @@ function Column({ title, index, cards, limit, onMove, children }: ColumnProps) {
 function Board() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  // CHANGE: the banner text
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
@@ -278,6 +314,7 @@ function Board() {
     });
   }
 
+  // CORE: move by id, immutably
   function moveCard(id: string, step: number) {
     const card = cards.find((c) => {
       return c.id === id;
@@ -292,12 +329,13 @@ function Board() {
     if (!target) {
       return;
     }
-    // WIP limit: check against the current cards before moving.
+    // CHANGE: WIP limit: check against the current cards before moving.
     if (target.id === 'doing' && cardsIn('doing').length >= WIP_LIMIT) {
       setNotice('Doing is at its WIP limit of ' + WIP_LIMIT + '. Finish something first.');
       return;
     }
     setNotice('');
+    // CORE: map + spread
     setCards((prev) => {
       return prev.map((c) => {
         if (c.id !== id) {
@@ -308,6 +346,7 @@ function Board() {
     });
   }
 
+  // NEXT: new cards go to the bottom of To do
   function addCard(title: string) {
     const card: Card = { id: 'new-' + Date.now(), title, column: 'todo', label: 'design' };
     setCards((prev) => {
@@ -319,24 +358,29 @@ function Board() {
     return <p className="board-loading">Loading board…</p>;
   }
 
+  // CHANGE: banner above the board
   let noticeEl = null;
   if (notice !== '') {
     noticeEl = <p className="wip-notice" role="alert">{notice}</p>;
   }
 
+  // CORE: render (CHANGE: the banner above the board)
   return (
     <div>
       {noticeEl}
       <div className="board">
         {COLUMNS.map((col, index) => {
+          // STRETCH: only Doing has a limit
           let limit: number | null = null;
           if (col.id === 'doing') {
             limit = WIP_LIMIT;
           }
+          // NEXT: the form lives under To do
           let form = null;
           if (col.id === 'todo') {
             form = <AddCardForm onAdd={addCard} />;
           }
+          // CORE: pass index + onMove
           return (
             <Column key={col.id} title={col.title} index={index} cards={cardsIn(col.id)} limit={limit} onMove={moveCard}>
               {form}
@@ -398,17 +442,22 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .label-design { color: var(--design); background: #FCE7F3; }
 .label-eng { color: var(--eng); background: #DBEAFE; }
 .label-research { color: var(--research); background: #FEF3C7; }
+.board-loading { margin: 0; padding: 48px 0; text-align: center; color: var(--muted); font-size: 14px; }
 
 /* ---- Added: moves, counts, add form, WIP limit ---- */
-.board-loading { margin: 0; padding: 48px 0; text-align: center; color: var(--muted); font-size: 14px; }
+/* CORE: count pill */
 .count { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; }
+/* STRETCH: full */
 .count.is-full { background: #FEE2E2; color: #B91C1C; }
+/* CORE: move buttons */
 .card-actions { display: flex; justify-content: flex-end; gap: 4px; }
 .move-btn { width: 28px; height: 24px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--muted); font-size: 13px; cursor: pointer; }
 .move-btn:hover:not(:disabled) { color: var(--primary); border-color: var(--primary); }
 .move-btn:disabled { opacity: 0.35; cursor: default; }
+/* NEXT: add form */
 .add-form { display: flex; gap: 6px; }
 .add-input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; color: var(--text); }
 .add-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
 .add-btn { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+/* CHANGE: banner */
 .wip-notice { margin: 16px 22px 0; padding: 10px 14px; border-radius: 10px; background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; font-size: 14px; }

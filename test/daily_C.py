@@ -326,7 +326,15 @@ async def t28(page):
     focused = await h.locator('.reply-input').evaluate('e => e.getRootNode().activeElement === e')
     check('dc28 placeholder + focus', ph == 'Reply to Ivy Chen…' and focused, (ph, focused))
     check('dc28 blank disabled', await h.locator('.post-btn').is_disabled())
+    # change: 280-character limit with a live counter
+    check('dc28 counter 280 left', (await h.locator('.char-count').inner_text()) == '280 left')
+    await h.locator('.reply-input').fill('x' * 285)
+    await page.wait_for_timeout(50)
+    over = h.locator('.char-count')
+    check('dc28 counter over limit', (await over.inner_text()) == '-5 left' and 'is-over' in (await over.get_attribute('class')) and await h.locator('.post-btn').is_disabled(),
+          await over.inner_text())
     await h.locator('.reply-input').fill('Up to a day ahead, keep it covered.')
+    check('dc28 counter counts down', (await h.locator('.char-count').inner_text()) == '245 left', await h.locator('.char-count').inner_text())
     await h.locator('.post-btn').click()
     await page.wait_for_timeout(80)
     check('dc28 pending', await h.locator('.post-btn').inner_text() == 'Posting…' and await h.locator('.reply-input').is_disabled())

@@ -51,6 +51,7 @@ const MODULES = [
   { id: 'speed', group: 'Practice', title: 'Speed runs' },
   { id: 'mocks', group: 'Practice', title: 'Mock interviews' },
   { id: 'daily', group: 'Practice', title: 'Daily challenges' },
+  { id: 'primitives', group: 'Practice', title: 'Primitives reference' },
   { id: 'talk', group: 'Interview', title: 'Talking while you code' },
   { id: 'explain', group: 'Interview', title: 'Explain-out-loud questions' },
   { id: 'debug', group: 'Interview', title: 'Debugging fast' },

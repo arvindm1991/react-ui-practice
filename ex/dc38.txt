@@ -113,11 +113,49 @@ export function formatBytes(n: number): string {
   }
   return (n / 1024).toFixed(1) + ' KB';
 }
+@@@ shared src/components/TreeRow.tsx
+import React from 'react';
+import type { FileNode } from '../api';
+import { fileIcon } from '../utils/files';
+
+type TreeRowProps = {
+  node: FileNode;
+  depth: number;          // 0 for the roots; each level indents 14px
+  isOpen: boolean;        // folders: rotates the chevron
+  isSelected: boolean;    // tinted row + purple left edge
+  onClick: () => void;
+  extra?: React.ReactNode; // anything shown at the right end of the row
+};
+
+// One row of the explorer (just the row, not its children).
+export function TreeRow({ node, depth, isOpen, isSelected, onClick, extra }: TreeRowProps) {
+  let cls = 'tree-row';
+  if (isSelected) {
+    cls = 'tree-row is-selected';
+  }
+  let icon = <span className="file-icon">{fileIcon(node.name)}</span>;
+  if (node.type === 'folder') {
+    let chevCls = 'folder-icon';
+    if (isOpen) {
+      chevCls = 'folder-icon is-open';
+    }
+    icon = <span className={chevCls}>▸</span>;
+  }
+  return (
+    <button type="button" className={cls} style={{ paddingLeft: 10 + depth * 14 }} onClick={() => { onClick(); }}>
+      {icon}
+      <span className="tree-name">{node.name}</span>
+      {extra}
+    </button>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
-import { getTree } from './api';
-import type { FileNode } from './api';
-import { fileIcon } from './utils/files';
+import { getFile, getTree } from './api';
+import type { FileContent, FileNode } from './api';
+import { formatBytes } from './utils/files';
+import { CodeView } from './components/CodeView';
+import { TreeRow } from './components/TreeRow';
 
 function TitleBar() {
   return (
@@ -155,16 +193,9 @@ function Explorer() {
     body = (
       <ul className="tree">
         {tree.map((node) => {
-          let icon = <span className="file-icon">{fileIcon(node.name)}</span>;
-          if (node.type === 'folder') {
-            icon = <span className="folder-icon">▸</span>;
-          }
           return (
             <li key={node.id}>
-              <button type="button" className="tree-row">
-                {icon}
-                <span className="tree-name">{node.name}</span>
-              </button>
+              <TreeRow node={node} depth={0} isOpen={false} isSelected={false} onClick={() => {}} />
             </li>
           );
         })}
@@ -182,16 +213,62 @@ function Explorer() {
   );
 }
 
-function Preview() {
+type PreviewProps = {
+  fileId: string | null;
+};
+
+// Loads and shows one file. Already done: pass it a fileId (null = empty state).
+function Preview({ fileId }: PreviewProps) {
+  const [file, setFile] = useState<FileContent | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Refetch when the file changes; the cancelled flag drops late responses for older clicks.
+  useEffect(() => {
+    if (!fileId) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getFile(fileId).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setFile(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fileId]);
+
+  if (!fileId) {
+    return (
+      <section className="preview">
+        <div className="preview-head">
+          <span className="crumbs">codebox-web</span>
+        </div>
+        <div className="preview-empty">
+          <p className="empty-mark">{'</>'}</p>
+          <p>Select a file to preview it</p>
+        </div>
+      </section>
+    );
+  }
+
+  let body = <p className="preview-loading">Loading…</p>;
+  let size = null;
+  if (!loading && file) {
+    body = <CodeView code={file.content} />;
+    size = <span className="file-size">{formatBytes(file.size)}</span>;
+  }
+
   return (
     <section className="preview">
       <div className="preview-head">
         <span className="crumbs">codebox-web</span>
+        {size}
       </div>
-      <div className="preview-empty">
-        <p className="empty-mark">{'</>'}</p>
-        <p>Select a file to preview it</p>
-      </div>
+      {body}
     </section>
   );
 }
@@ -202,7 +279,7 @@ export default function App() {
       <TitleBar />
       <div className="workspace">
         <Explorer />
-        <Preview />
+        <Preview fileId={null} />
       </div>
     </div>
   );
@@ -245,6 +322,9 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
 .folder-icon { width: 14px; color: var(--muted); font-size: 11px; text-align: center; }
 .file-icon { min-width: 26px; padding: 1px 3px; border-radius: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; text-align: center; color: #93C5FD; background: rgba(147, 197, 253, 0.12); }
+.folder-icon { transition: transform 0.12s ease; }
+.folder-icon.is-open { transform: rotate(90deg); }
+.tree-row.is-selected { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }
 
 .preview { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
 .preview-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
@@ -252,6 +332,8 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .preview-empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--muted); }
 .preview-empty p { margin: 4px 0; }
 .empty-mark { font-family: var(--mono); font-size: 34px; color: var(--border); }
+.preview-loading { margin: 0; padding: 16px; color: var(--muted); font-family: var(--mono); }
+.file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 .code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow: auto; flex: 1; }
 .code-line { display: flex; }
@@ -261,13 +343,14 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 import React, { useEffect, useState } from 'react';
 import { getFile, getTree } from './api';
 import type { FileContent, FileNode } from './api';
-import { fileIcon, formatBytes } from './utils/files';
+import { formatBytes } from './utils/files';
 import { CodeView } from './components/CodeView';
+import { TreeRow } from './components/TreeRow';
 
-// What the preview needs: which file, and the names from the root down to it.
+// CORE: what gets selected: which file (NEXT: and the names from the root down to it, for the breadcrumb).
 type Selection = { id: string; path: string[] };
 
-// Change: files anywhere below this folder (recursive).
+// CHANGE: files anywhere below this folder (recursive).
 function countFiles(node: FileNode): number {
   if (node.type === 'file') {
     return 1;
@@ -289,6 +372,7 @@ function TitleBar() {
   );
 }
 
+// CORE: one row, and (if it's an open folder) itself again for each child.
 type TreeNodeProps = {
   node: FileNode;
   depth: number;
@@ -299,7 +383,6 @@ type TreeNodeProps = {
   onSelect: (selection: Selection) => void;
 };
 
-// Renders one row, and (if it's an open folder) itself again for each child.
 function TreeNode({ node, depth, parentPath, expanded, selectedId, onToggle, onSelect }: TreeNodeProps) {
   const path = [...parentPath, node.name];
   const isFolder = node.type === 'folder';
@@ -313,22 +396,13 @@ function TreeNode({ node, depth, parentPath, expanded, selectedId, onToggle, onS
     }
   }
 
-  let cls = 'tree-row';
-  if (node.id === selectedId) {
-    cls = 'tree-row is-selected';
-  }
-
-  let icon = <span className="file-icon">{fileIcon(node.name)}</span>;
+  // CHANGE: file count pill for folders
   let count = null;
   if (isFolder) {
-    let chevCls = 'folder-icon';
-    if (isOpen) {
-      chevCls = 'folder-icon is-open';
-    }
-    icon = <span className={chevCls}>▸</span>;
     count = <span className="file-count">{countFiles(node)}</span>;
   }
 
+  // CORE: recursion
   let children = null;
   if (isFolder && isOpen) {
     children = (
@@ -351,23 +425,22 @@ function TreeNode({ node, depth, parentPath, expanded, selectedId, onToggle, onS
     );
   }
 
+  // STRETCH: ARIA
   let ariaExpanded: boolean | undefined = undefined;
   if (isFolder) {
     ariaExpanded = isOpen;
   }
 
+  // CORE: TreeRow does the indent (depth * 14px) and the selected style
   return (
     <li role="treeitem" aria-expanded={ariaExpanded}>
-      <button type="button" className={cls} style={{ paddingLeft: 10 + depth * 14 }} onClick={() => { handleClick(); }}>
-        {icon}
-        <span className="tree-name">{node.name}</span>
-        {count}
-      </button>
+      <TreeRow node={node} depth={depth} isOpen={isOpen} isSelected={node.id === selectedId} onClick={handleClick} extra={count} />
       {children}
     </li>
   );
 }
 
+// CORE: the explorer reports clicks up; App owns the selection
 type ExplorerProps = {
   selectedId: string | null;
   onSelect: (selection: Selection) => void;
@@ -376,7 +449,7 @@ type ExplorerProps = {
 function Explorer({ selectedId, onSelect }: ExplorerProps) {
   const [tree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
-  // One set for the whole tree (not state per folder) so "Collapse all" can clear it.
+  // CORE: one Set for the whole tree (not state per folder), so NEXT "Collapse all" can clear it.
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['src']));
 
   useEffect(() => {
@@ -393,6 +466,7 @@ function Explorer({ selectedId, onSelect }: ExplorerProps) {
     };
   }, []);
 
+  // CORE: toggle a folder
   function handleToggle(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev); // copy: never mutate state
@@ -405,10 +479,12 @@ function Explorer({ selectedId, onSelect }: ExplorerProps) {
     });
   }
 
+  // NEXT: collapse all
   function handleCollapseAll() {
     setExpanded(new Set());
   }
 
+  // CORE: the roots
   let body;
   if (loading) {
     body = <p className="side-msg">Loading files…</p>;
@@ -433,6 +509,7 @@ function Explorer({ selectedId, onSelect }: ExplorerProps) {
     );
   }
 
+  // NEXT: Collapse all button
   return (
     <aside className="explorer">
       <div className="explorer-head">
@@ -444,22 +521,25 @@ function Explorer({ selectedId, onSelect }: ExplorerProps) {
   );
 }
 
-function Preview({ selection }: { selection: Selection | null }) {
+type PreviewProps = {
+  fileId: string | null;
+  // NEXT: breadcrumb path
+  path: string[];
+};
+
+// Loads and shows one file. Already done: pass it a fileId (null = empty state).
+function Preview({ fileId, path }: PreviewProps) {
   const [file, setFile] = useState<FileContent | null>(null);
   const [loading, setLoading] = useState(false);
-  let selectedId: string | null = null;
-  if (selection) {
-    selectedId = selection.id;
-  }
 
-  // Refetch when the selected file changes; drop late responses for older clicks.
+  // Refetch when the file changes; the cancelled flag drops late responses for older clicks.
   useEffect(() => {
-    if (!selectedId) {
+    if (!fileId) {
       return;
     }
     let cancelled = false;
     setLoading(true);
-    getFile(selectedId).then((data) => {
+    getFile(fileId).then((data) => {
       if (cancelled) {
         return;
       }
@@ -469,9 +549,9 @@ function Preview({ selection }: { selection: Selection | null }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [fileId]);
 
-  if (!selection) {
+  if (!fileId) {
     return (
       <section className="preview">
         <div className="preview-head">
@@ -485,7 +565,8 @@ function Preview({ selection }: { selection: Selection | null }) {
     );
   }
 
-  const crumbs = ['codebox-web', ...selection.path];
+  // NEXT: breadcrumb, last part bold
+  const crumbs = ['codebox-web', ...path];
   let body = <p className="preview-loading">Loading…</p>;
   let size = null;
   if (!loading && file) {
@@ -522,20 +603,24 @@ function Preview({ selection }: { selection: Selection | null }) {
 }
 
 export default function App() {
-  // Lifted here: the explorer highlights it, the preview loads it.
+  // CORE: lifted here, the explorer highlights it, the preview loads it
   const [selection, setSelection] = useState<Selection | null>(null);
 
   let selectedId: string | null = null;
+  // NEXT: the path for the breadcrumb
+  let path: string[] = [];
   if (selection) {
     selectedId = selection.id;
+    path = selection.path;
   }
 
+  // CORE: wire both panes
   return (
     <div className="app">
       <TitleBar />
       <div className="workspace">
         <Explorer selectedId={selectedId} onSelect={setSelection} />
-        <Preview selection={selection} />
+        <Preview fileId={selectedId} path={path} />
       </div>
     </div>
   );
@@ -578,6 +663,9 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
 .folder-icon { width: 14px; color: var(--muted); font-size: 11px; text-align: center; }
 .file-icon { min-width: 26px; padding: 1px 3px; border-radius: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; text-align: center; color: #93C5FD; background: rgba(147, 197, 253, 0.12); }
+.folder-icon { transition: transform 0.12s ease; }
+.folder-icon.is-open { transform: rotate(90deg); }
+.tree-row.is-selected { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }
 
 .preview { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
 .preview-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
@@ -585,6 +673,8 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .preview-empty { flex: 1; display: grid; place-content: center; text-align: center; color: var(--muted); }
 .preview-empty p { margin: 4px 0; }
 .empty-mark { font-family: var(--mono); font-size: 34px; color: var(--border); }
+.preview-loading { margin: 0; padding: 16px; color: var(--muted); font-family: var(--mono); }
+.file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 .code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow: auto; flex: 1; }
 .code-line { display: flex; }
@@ -592,17 +682,15 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .line-text { white-space: pre; color: var(--text); }
 
 /* ---- Added: tree, preview, breadcrumb ---- */
-.folder-icon { transition: transform 0.12s ease; }
-.folder-icon.is-open { transform: rotate(90deg); }
-.tree-row.is-selected { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }
+/* CHANGE */
 .file-count { margin-left: auto; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; color: var(--muted); background: rgba(255, 255, 255, 0.06); }
+/* NEXT: Collapse all */
 .head-btn { border: 0; background: none; padding: 2px 6px; border-radius: 4px; font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); cursor: pointer; }
 .head-btn:hover:not(:disabled) { color: var(--text); background: var(--hover); }
 .head-btn:disabled { opacity: 0.4; cursor: default; }
 
+/* NEXT: breadcrumb */
 .crumbs { display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
 .crumb-wrap { display: inline-flex; align-items: center; }
 .crumb-sep { margin: 0 6px; color: #4B5466; }
 .crumb.is-current { color: var(--text); font-weight: 600; }
-.file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.preview-loading { margin: 0; padding: 16px; color: var(--muted); font-family: var(--mono); }

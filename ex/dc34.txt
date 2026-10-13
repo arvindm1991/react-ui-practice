@@ -71,6 +71,42 @@ export function formatAgo(minutes: number): string {
   }
   return Math.floor(minutes / 1440) + 'd ago';
 }
+@@@ shared src/components/NameInput.tsx
+import React from 'react';
+
+type NameInputProps = {
+  value: string;
+  error?: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+};
+
+// Inline rename field from the design system. It focuses itself and selects its text when it mounts.
+// Pass error to get a red border and the message under it.
+export function NameInput({ value, error, disabled, onChange, onKeyDown }: NameInputProps) {
+  let cls = 'name-input';
+  let message = null;
+  if (error) {
+    cls = 'name-input has-error';
+    message = <span className="name-error">{error}</span>;
+  }
+  return (
+    <span className="name-edit">
+      <input
+        className={cls}
+        aria-label="Project name"
+        value={value}
+        disabled={disabled}
+        autoFocus
+        onFocus={(e) => { e.target.select(); }}
+        onChange={(e) => { onChange(e.target.value); }}
+        onKeyDown={onKeyDown}
+      />
+      {message}
+    </span>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProjects } from './api';
@@ -212,12 +248,21 @@ body { margin: 0; font-family: Geist, Inter, system-ui, -apple-system, 'Segoe UI
 .status-ready .status-dot { background: var(--ok); }
 .status-building .status-dot { background: var(--warn); }
 .status-error .status-dot { background: var(--danger); }
+
+/* NameInput (components/NameInput.tsx) */
+.name-edit { display: flex; flex-direction: column; gap: 4px; }
+.name-input { height: 32px; width: 100%; max-width: 320px; padding: 0 10px; border: 1px solid #999; border-radius: 6px; font: inherit; font-weight: 600; color: var(--text); background: var(--surface); }
+.name-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.15); }
+.name-input:disabled { color: var(--muted); background: #F5F5F5; }
+.name-input.has-error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(238, 0, 0, 0.1); }
+.name-error { font-size: 12px; color: var(--danger); }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProjects, renameProject } from './api';
 import type { Project } from './api';
 import { StatusDot } from './components/StatusDot';
 import { formatAgo } from './utils/format';
+import { NameInput } from './components/NameInput';
 
 function Sidebar() {
   return (
@@ -236,74 +281,108 @@ function Sidebar() {
   );
 }
 
+// CORE: the row is presentational; the list owns the editing state
+// CORE: the list decides WHICH row is editing; the row owns its draft.
 type RowProps = {
   project: Project;
   isEditing: boolean;
-  draft: string;
-  error: string;
-  saving: boolean;
-  onStartEdit: (project: Project) => void;
-  onDraftChange: (value: string) => void;
-  onSave: () => void;
-  onCancel: () => void;
+  onStartEdit: () => void;
+  onStopEdit: () => void;
+  onRenamed: (updated: Project) => void;
+  // STRETCH: another row is saving
+  locked: boolean;
+  onBusyChange: (busy: boolean) => void;
 };
 
-// The row owns no state: the list decides which row is being edited.
-function ProjectRow({ project, isEditing, draft, error, saving, onStartEdit, onDraftChange, onSave, onCancel }: RowProps) {
+function ProjectRow({ project, isEditing, onStartEdit, onStopEdit, onRenamed, locked, onBusyChange }: RowProps) {
+  // CORE: the draft is separate from the saved name, so Cancel can throw it away
+  const [draft, setDraft] = useState('');
+  // NEXT: saving / CHANGE: error message
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // CORE: start editing from the current name
+  function handleStartEdit() {
+    setDraft(project.name);
+    onStartEdit();
+    // CHANGE: forget an old error
+    setError('');
+  }
+
+  // NEXT: typing clears the error (Core can pass setDraft straight to NameInput)
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    setError('');
+  }
+
+  // CORE: save through the API, then hand the updated project to the list
+  function handleSave() {
+    const name = draft.trim();
+    // NEXT: empty is rejected, unchanged just closes
+    if (name === '') {
+      setError("Name can't be empty");
+      return;
+    }
+    if (name === project.name) {
+      onStopEdit();
+      return;
+    }
+    // NEXT: saving flag (STRETCH: tell the list)
+    setSaving(true);
+    onBusyChange(true);
+    // CORE
+    renameProject(project.id, name)
+      .then((updated) => {
+        setSaving(false);
+        onBusyChange(false);
+        onRenamed(updated);
+      })
+      // CHANGE: the API rejected (e.g. duplicate name): stay in edit mode and show why
+      .catch((err: Error) => {
+        setSaving(false);
+        onBusyChange(false);
+        setError(err.message);
+      });
+  }
+
+  // CORE: Enter saves, Escape cancels
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
-      onSave();
+      handleSave();
     }
     if (e.key === 'Escape') {
-      onCancel();
+      onStopEdit();
     }
   }
 
+  // CORE: name or input, Edit or Cancel/Save
   let nameEl = (
-    <span className="project-name" onDoubleClick={() => { onStartEdit(project); }}>{project.name}</span>
+    <span className="project-name" onDoubleClick={() => { handleStartEdit(); }}>{project.name}</span>
   );
-  let actions = <button type="button" className="btn-small" disabled={saving} onClick={() => { onStartEdit(project); }}>Edit</button>;
+  let actions = <button type="button" className="btn-small" disabled={locked} onClick={() => { handleStartEdit(); }}>Edit</button>;
   if (isEditing) {
-    let inputCls = 'name-input';
-    if (error) {
-      inputCls = 'name-input has-error';
-    }
-    let message = null;
-    if (error) {
-      message = <span className="name-error">{error}</span>;
-    }
+    // NEXT: saving label
     let saveLabel = 'Save';
     if (saving) {
       saveLabel = 'Saving…';
     }
-    nameEl = (
-      <span className="name-edit">
-        <input
-          className={inputCls}
-          aria-label="Project name"
-          value={draft}
-          disabled={saving}
-          autoFocus
-          onFocus={(e) => { e.target.select(); }}
-          onChange={(e) => { onDraftChange(e.target.value); }}
-          onKeyDown={handleKeyDown}
-        />
-        {message}
-      </span>
-    );
+    // CORE: NameInput already autofocuses and selects (NEXT/CHANGE: error, saving)
+    nameEl = <NameInput value={draft} error={error} disabled={saving} onChange={handleDraftChange} onKeyDown={handleKeyDown} />;
     actions = (
       <>
-        <button type="button" className="btn-small" disabled={saving} onClick={() => { onCancel(); }}>Cancel</button>
-        <button type="button" className="btn-small btn-dark" disabled={saving} onClick={() => { onSave(); }}>{saveLabel}</button>
+        <button type="button" className="btn-small" disabled={saving} onClick={() => { onStopEdit(); }}>Cancel</button>
+        <button type="button" className="btn-small btn-dark" disabled={saving} onClick={() => { handleSave(); }}>{saveLabel}</button>
       </>
     );
   }
 
+  // NEXT: tinted row while editing
   let rowCls = 'project-row';
   if (isEditing) {
     rowCls = 'project-row is-editing';
   }
 
+  // CORE
   return (
     <li className={rowCls}>
       <div className="project-main">
@@ -322,11 +401,10 @@ function ProjectRow({ project, isEditing, draft, error, saving, onStartEdit, onD
 function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  // Change: one editingId for the whole list means only one row can be open at a time.
+  // CORE: one editingId for the whole list, so only one row can ever be open (STRETCH comes for free)
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
+  // STRETCH: a save is in flight somewhere
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -342,68 +420,24 @@ function ProjectList() {
     };
   }, []);
 
-  function handleStartEdit(project: Project) {
-    if (saving) {
-      return;
-    }
-    // Opening another row simply replaces the old draft (the old row cancels).
-    setEditingId(project.id);
-    setDraft(project.name);
-    setError('');
-  }
-
-  function handleCancel() {
-    setEditingId(null);
-    setError('');
-  }
-
-  function handleDraftChange(value: string) {
-    setDraft(value);
-    setError('');
-  }
-
-  function handleSave() {
-    const id = editingId;
-    const name = draft.trim();
-    const current = projects.find((p) => {
-      return p.id === id;
-    });
-    if (!id || !current) {
-      return;
-    }
-    if (name === '') {
-      setError("Name can't be empty");
-      return;
-    }
-    if (name === current.name) {
-      handleCancel();
-      return;
-    }
-    setSaving(true);
-    renameProject(id, name)
-      .then((updated) => {
-        setProjects((prev) => {
-          return prev.map((p) => {
-            if (p.id === updated.id) {
-              return updated;
-            }
-            return p;
-          });
-        });
-        setSaving(false);
-        setEditingId(null);
-      })
-      .catch((err: Error) => {
-        // Server said no (e.g. duplicate name): stay in edit mode and show why.
-        setSaving(false);
-        setError(err.message);
+  // CORE: replace the renamed project and close the editor
+  function handleRenamed(updated: Project) {
+    setProjects((prev) => {
+      return prev.map((p) => {
+        if (p.id === updated.id) {
+          return updated;
+        }
+        return p;
       });
+    });
+    setEditingId(null);
   }
 
   if (loading) {
     return <p className="empty">Loading projects…</p>;
   }
 
+  // CORE: pass the editing state down
   return (
     <ul className="project-list">
       {projects.map((p) => {
@@ -412,13 +446,11 @@ function ProjectList() {
             key={p.id}
             project={p}
             isEditing={p.id === editingId}
-            draft={draft}
-            error={error}
-            saving={saving}
-            onStartEdit={handleStartEdit}
-            onDraftChange={handleDraftChange}
-            onSave={handleSave}
-            onCancel={handleCancel}
+            onStartEdit={() => { setEditingId(p.id); }}
+            onStopEdit={() => { setEditingId(null); }}
+            onRenamed={handleRenamed}
+            locked={busy}
+            onBusyChange={setBusy}
           />
         );
       })}
@@ -496,13 +528,17 @@ body { margin: 0; font-family: Geist, Inter, system-ui, -apple-system, 'Segoe UI
 .status-building .status-dot { background: var(--warn); }
 .status-error .status-dot { background: var(--danger); }
 
-/* ---- Added: inline rename ---- */
-.project-row.is-editing { background: #FCFCFC; }
+/* NameInput (components/NameInput.tsx) */
 .name-edit { display: flex; flex-direction: column; gap: 4px; }
 .name-input { height: 32px; width: 100%; max-width: 320px; padding: 0 10px; border: 1px solid #999; border-radius: 6px; font: inherit; font-weight: 600; color: var(--text); background: var(--surface); }
 .name-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.15); }
 .name-input:disabled { color: var(--muted); background: #F5F5F5; }
 .name-input.has-error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(238, 0, 0, 0.1); }
 .name-error { font-size: 12px; color: var(--danger); }
+
+/* ---- Added: inline rename ---- */
+/* NEXT */
+.project-row.is-editing { background: #FCFCFC; }
+/* CORE */
 .btn-dark { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn-dark:hover:not(:disabled) { border-color: var(--primary); background: #333; }

@@ -174,8 +174,10 @@ import { getPhotos } from './api';
 import type { Photo } from './api';
 import { wrapIndex } from './utils/wrap';
 
+// CHANGE
 const SWIPE_THRESHOLD = 60; // px
 
+// CORE: onOpen (NEXT: buttonRef, so focus can come back)
 type ThumbnailProps = {
   photo: Photo;
   onOpen: () => void;
@@ -201,6 +203,7 @@ function Header({ count }: { count: number }) {
   );
 }
 
+// CORE: the dialog
 type LightboxProps = {
   photos: Photo[];
   index: number;
@@ -211,20 +214,24 @@ type LightboxProps = {
 function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // CHANGE: where the swipe started (a ref: never rendered)
   const dragStartRef = useRef<number | null>(null);
+  // STRETCH: live offset while dragging
   const [dragX, setDragX] = useState(0);
+
+  // CORE
 
   const photo = photos[index];
   const total = photos.length;
 
-  // Move focus into the dialog when it opens.
+  // CORE: move focus into the dialog when it opens.
   useEffect(() => {
     if (closeRef.current) {
       closeRef.current.focus();
     }
   }, []);
 
-  // Preload neighbours so ←/→ feel instant.
+  // NEXT: preload neighbours so ←/→ feel instant.
   useEffect(() => {
     [wrapIndex(index + 1, total), wrapIndex(index - 1, total)].forEach((i) => {
       const img = new Image();
@@ -232,6 +239,7 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
     });
   }, [index, photos, total]);
 
+  // CORE: wrapping prev/next, keys, focus trap
   function next() {
     onChange(wrapIndex(index + 1, total));
   }
@@ -262,7 +270,7 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
     }
   }
 
-  // ---- change: drag to swipe ----
+  // CHANGE: drag to swipe
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) {
       return;
@@ -271,6 +279,7 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
     dragStartRef.current = e.clientX;
   }
 
+  // STRETCH: the image follows the pointer
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (dragStartRef.current === null) {
       return;
@@ -278,13 +287,14 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
     setDragX(e.clientX - dragStartRef.current);
   }
 
+  // CHANGE: decide on release
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     if (dragStartRef.current === null) {
       return;
     }
     const dx = e.clientX - dragStartRef.current;
     dragStartRef.current = null;
-    setDragX(0);
+    setDragX(0); // STRETCH: snap back
     if (dx <= -SWIPE_THRESHOLD) {
       next();
     } else if (dx >= SWIPE_THRESHOLD) {
@@ -292,11 +302,13 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
     }
   }
 
+  // STRETCH: no transition while dragging
   let imgCls = 'lightbox-img';
   if (dragX !== 0) {
     imgCls = 'lightbox-img is-dragging';
   }
 
+  // CORE: dialog markup (CHANGE: pointer handlers on the stage, draggable={false})
   return (
     <div
       className="lightbox"
@@ -340,7 +352,9 @@ function Lightbox({ photos, index, onChange, onClose }: LightboxProps) {
 export default function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  // CORE: null = closed
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // NEXT
   // One DOM node per thumbnail, so focus can go back to the right one.
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -358,10 +372,11 @@ export default function App() {
     };
   }, []);
 
-  // Return focus to the thumbnail of the photo you were looking at.
+  // CORE: close
   function handleClose() {
     const idx = openIndex;
     setOpenIndex(null);
+    // NEXT: return focus to the thumbnail of the photo you were looking at
     if (idx !== null) {
       const el = thumbRefs.current[idx];
       if (el) {
@@ -377,6 +392,7 @@ export default function App() {
     grid = (
       <div className="grid">
         {photos.map((p, i) => {
+          // CORE
           return (
             <Thumbnail
               key={p.id}
@@ -390,6 +406,7 @@ export default function App() {
     );
   }
 
+  // CORE: mounted only while open
   let lightbox = null;
   if (openIndex !== null) {
     lightbox = <Lightbox photos={photos} index={openIndex} onChange={setOpenIndex} onClose={handleClose} />;
@@ -433,6 +450,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 syst
 .thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Added: lightbox ---- */
+/* CORE: overlay, stage, buttons, caption */
 .lightbox { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: rgba(8, 8, 7, 0.96); animation: fade-in 0.18s ease; }
 .lightbox:focus { outline: none; }
 @keyframes fade-in { from { opacity: 0; } }
@@ -441,10 +459,14 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 syst
 .lightbox-count { font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .lightbox-stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 0 72px; touch-action: pan-y; user-select: none; cursor: grab; }
+/* CHANGE: grab cursor */
 .lightbox-stage:active { cursor: grabbing; }
+/* CORE */
 .lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 2px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); transition: transform 0.25s ease; animation: fade-in 0.25s ease; }
+/* STRETCH */
 .lightbox-img.is-dragging { transition: none; }
 
+/* CORE */
 .lb-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid rgba(237, 233, 225, 0.18); border-radius: 50%; background: rgba(23, 23, 21, 0.6); color: var(--text); font-size: 18px; cursor: pointer; }
 .lb-btn:hover { background: rgba(237, 233, 225, 0.12); }
 .lb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

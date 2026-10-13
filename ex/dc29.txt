@@ -194,14 +194,18 @@ import type { Listing, Photo } from './api';
 import PhotoSlide from './components/PhotoSlide';
 import { formatPrice } from './utils/format';
 
+// NEXT: autoplay interval
 const AUTOPLAY_MS = 4000;
 
 function Gallery({ photos }: { photos: Photo[] }) {
+  // CORE: which photo is showing
   const [index, setIndex] = useState(0);
+  // NEXT: paused while hovered
   const [paused, setPaused] = useState(false);
+  // CORE: derived
   const count = photos.length;
 
-  // Autoplay. `index` is a dependency on purpose: any manual move restarts
+  // NEXT: autoplay. `index` is a dependency on purpose: any manual move restarts
   // the 4s countdown, so the slide never jumps right after a click.
   useEffect(() => {
     if (paused || count < 2) {
@@ -217,6 +221,7 @@ function Gallery({ photos }: { photos: Photo[] }) {
     };
   }, [paused, count, index]);
 
+  // CORE: next / prev, wrapping
   function goNext() {
     setIndex((i) => {
       return (i + 1) % count;
@@ -230,6 +235,7 @@ function Gallery({ photos }: { photos: Photo[] }) {
     });
   }
 
+  // CHANGE: arrow keys while the carousel has focus
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'ArrowRight') {
       e.preventDefault();
@@ -241,9 +247,11 @@ function Gallery({ photos }: { photos: Photo[] }) {
     }
   }
 
+  // CORE: derived
   const photo = photos[index];
   const position = index + 1; // derived: humans count from 1
 
+  // CORE: render arrows, counter, dots (NEXT: hover handlers, CHANGE: tabIndex/role/label/onKeyDown)
   return (
     <div
       className="gallery"
@@ -374,7 +382,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Circu
 .fine { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
 
 /* ---- Added: carousel controls ---- */
+/* CHANGE: visible focus ring */
 .gallery:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+/* CORE: arrows, counter, dots */
 .nav-btn {
   position: absolute;
   top: 50%;

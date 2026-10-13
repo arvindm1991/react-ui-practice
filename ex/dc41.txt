@@ -287,8 +287,10 @@ import { uid } from './utils/id';
 import IconButton from './components/IconButton';
 
 const COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green'];
+// CHANGE: cap the history at 20
 const MAX_HISTORY = 20;
 
+// CORE: history state shape + pure commit / undo / redo helpers
 // One state object, so past/present/future always change together.
 type History = {
   past: Note[][];
@@ -298,10 +300,12 @@ type History = {
 
 // Pure helpers: given the old history, return the new one.
 function commitHistory(h: History, next: Note[]): History {
+  // CHANGE: .slice(-MAX_HISTORY) on every push to past (here and in handleEditEnd)
   // keep only the newest MAX_HISTORY snapshots
   return { past: [...h.past, h.present].slice(-MAX_HISTORY), present: next, future: [] };
 }
 
+// CORE
 function undoHistory(h: History): History {
   if (h.past.length === 0) {
     return h;
@@ -338,11 +342,14 @@ function Header({ title }: { title: string }) {
 type ToolbarProps = {
   color: NoteColor;
   count: number;
+  // CORE: toolbar receives undo / redo state + callbacks
   canUndo: boolean;
   canRedo: boolean;
+  // CHANGE: meter value
   undoSteps: number;
   onColorChange: (color: NoteColor) => void;
   onAdd: () => void;
+  // CORE
   onUndo: () => void;
   onRedo: () => void;
 };
@@ -362,6 +369,7 @@ function Toolbar({ color, count, canUndo, canRedo, undoSteps, onColorChange, onA
         })}
       </div>
       <IconButton label="Add note" icon="+" text="Add note" onClick={onAdd} />
+      {/* CORE: Undo / Redo buttons (reuse IconButton); CHANGE: the meter span */}
       <div className="history-group">
         <IconButton label="Undo (Ctrl+Z)" icon="↶" text="Undo" disabled={!canUndo} onClick={onUndo} />
         <IconButton label="Redo (Ctrl+Shift+Z)" icon="↷" text="Redo" disabled={!canRedo} onClick={onRedo} />
@@ -377,6 +385,7 @@ type NoteCardProps = {
   note: Note;
   onChange: (id: string, text: string) => void;
   onDelete: (id: string) => void;
+  // NEXT: one undo step per text edit (focus / blur)
   onEditStart: () => void;
   onEditEnd: () => void;
 };
@@ -400,9 +409,11 @@ function NoteCard({ note, onChange, onDelete, onEditStart, onEditEnd }: NoteCard
 
 export default function App() {
   const [title, setTitle] = useState('');
+  // CORE: notes now live in history.present
   const [history, setHistory] = useState<History>({ past: [], present: [], future: [] });
   const [loading, setLoading] = useState(true);
   const [color, setColor] = useState<NoteColor>('yellow');
+  // NEXT: edit snapshot
   // Snapshot taken when a note gets focus, committed on blur (one undo = one whole edit).
   const editStart = useRef<Note[] | null>(null);
 
@@ -413,6 +424,7 @@ export default function App() {
         return;
       }
       setTitle(board.title);
+      // CORE: load replaces history (not undoable)
       // Loading is not an undoable step.
       setHistory({ past: [], present: board.notes, future: [] });
       setLoading(false);
@@ -422,6 +434,7 @@ export default function App() {
     };
   }, []);
 
+  // NEXT: keyboard shortcuts, listener added once + cleaned up
   // Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z. The pure helpers don't close over state, so [] deps is safe.
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -446,6 +459,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: add / delete commit a snapshot
   function handleAdd() {
     setHistory((h) => {
       return commitHistory(h, [...h.present, { id: uid(), text: '', color: color }]);
@@ -461,6 +475,7 @@ export default function App() {
     });
   }
 
+  // CORE: typing still has to update present
   // Typing replaces `present` without adding history entries.
   function handleChange(id: string, text: string) {
     setHistory((h) => {
@@ -474,6 +489,7 @@ export default function App() {
     });
   }
 
+  // NEXT: commit the whole edit on blur
   function handleEditStart() {
     editStart.current = history.present;
   }
@@ -492,6 +508,7 @@ export default function App() {
     });
   }
 
+  // CORE: undo / redo handlers
   function handleUndo() {
     setHistory(undoHistory);
   }
@@ -500,6 +517,7 @@ export default function App() {
     setHistory(redoHistory);
   }
 
+  // CORE: render from history.present; can-undo / can-redo derived from lengths
   // derived
   const notes = history.present;
 
@@ -607,5 +625,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 .note:hover .note-delete, .note-delete:focus-visible { opacity: 1; }
 
 /* ---- Added: undo / redo ---- */
+/* CORE */
 .history-group { display: flex; align-items: center; gap: 6px; padding-left: 10px; border-left: 1px solid var(--line); }
+/* CHANGE */
 .history-meter { min-width: 44px; padding: 3px 8px; border-radius: 999px; background: #F3F1EA; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: center; }

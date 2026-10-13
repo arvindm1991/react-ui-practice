@@ -52,6 +52,114 @@ export default function Message({ message }: { message: ChatMessage }) {
     </li>
   );
 }
+@@@ shared src/components/EmojiPicker.tsx
+import React, { useEffect, useState } from 'react';
+import { getEmojiCategories } from '../api';
+import type { EmojiCategory } from '../api';
+
+// The popover CONTENT (already built by the design-system team):
+// loads the categories when it mounts, shows "Loading emoji…", then a tab per
+// category and an 8-column grid. It does NOT know about the textarea or when
+// to open/close: whoever renders it decides that.
+
+type EmojiPickerProps = {
+  recent?: string[];         // optional: shown as a "Recently used" row when not empty
+  onPick: (emoji: string) => void; // called with the emoji that was clicked
+};
+
+export default function EmojiPicker({ recent, onPick }: EmojiPickerProps) {
+  const [categories, setCategories] = useState<EmojiCategory[]>([]);
+  const [activeId, setActiveId] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Loads every time it mounts (= every time the popover opens).
+  useEffect(() => {
+    let cancelled = false;
+    getEmojiCategories().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setCategories(data);
+      setActiveId(data[0].id);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function renderGrid(emojis: string[]) {
+    return (
+      <div className="emoji-grid">
+        {emojis.map((emoji) => {
+          return (
+            <button key={emoji} type="button" className="emoji-btn" onClick={() => { onPick(emoji); }}>
+              {emoji}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const active = categories.find((c) => {
+    return c.id === activeId;
+  });
+
+  let recentRow = null;
+  if (recent && recent.length > 0) {
+    recentRow = (
+      <div className="emoji-section recent-row">
+        <p className="emoji-heading">Recently used</p>
+        {renderGrid(recent)}
+      </div>
+    );
+  }
+
+  let body;
+  if (loading) {
+    body = <p className="emoji-loading">Loading emoji…</p>;
+  } else {
+    let grid = null;
+    if (active) {
+      grid = (
+        <div className="emoji-section">
+          <p className="emoji-heading">{active.name}</p>
+          {renderGrid(active.emojis)}
+        </div>
+      );
+    }
+    const tabs = (
+      <div className="emoji-tabs" role="tablist">
+        {categories.map((c) => {
+          const selected = c.id === activeId;
+          let cls = 'emoji-tab';
+          if (selected) {
+            cls = 'emoji-tab is-active';
+          }
+          return (
+            <button key={c.id} type="button" role="tab" aria-selected={selected} aria-label={c.name} className={cls} onClick={() => { setActiveId(c.id); }}>
+              {c.icon}
+            </button>
+          );
+        })}
+      </div>
+    );
+    body = (
+      <div>
+        {tabs}
+        {grid}
+      </div>
+    );
+  }
+
+  return (
+    <div className="emoji-popover" role="dialog" aria-label="Emoji picker">
+      {recentRow}
+      {body}
+    </div>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useState } from 'react';
 import Message from './components/Message';
@@ -92,8 +200,9 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
     setText('');
   }
 
-  // TODO: the 🙂 button should open an emoji popover. Picking an emoji
-  // inserts it at the cursor position in the textarea.
+  // TODO: the 🙂 button should open an emoji popover (render the existing
+  // <EmojiPicker /> from components/). Picking an emoji inserts it at the
+  // cursor position in the textarea.
   return (
     <div className="composer">
       <textarea
@@ -177,14 +286,28 @@ body { margin: 0; font-family: 'Lato', system-ui, -apple-system, 'Segoe UI', san
 .tool-btn:hover { background: #EEEEEE; }
 .send-btn { height: 30px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--green); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .send-btn:disabled { background: #DDDDDD; color: #8D8D8D; cursor: default; }
+
+/* Emoji picker internals (already styled: tabs, headings, grid cells, loading).
+   The popover box and its positioning are yours to write. */
+.emoji-loading { margin: 0; padding: 28px 0; text-align: center; color: var(--muted); font-size: 14px; }
+.emoji-tabs { display: flex; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.emoji-tab { width: 36px; height: 32px; border: 0; border-radius: 6px; background: none; font-size: 18px; cursor: pointer; }
+.emoji-tab:hover { background: var(--hover); }
+.emoji-tab.is-active { background: #F1E6F1; box-shadow: inset 0 -2px 0 var(--aubergine-2); }
+.emoji-section { padding-top: 8px; }
+.recent-row { padding-top: 0; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.emoji-heading { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.emoji-btn { height: 32px; border: 0; border-radius: 6px; background: none; font-size: 20px; cursor: pointer; padding: 0; }
+.emoji-btn:hover { background: #F1E6F1; }
 @@@ solution src/App.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import Message from './components/Message';
 import type { ChatMessage } from './components/Message';
-import { getEmojiCategories } from './api';
-import type { EmojiCategory } from './api';
+import EmojiPicker from './components/EmojiPicker';
 
 const CHANNELS = ['general', 'design-crit', 'launch-q4', 'random'];
+// CHANGE: cap for the recent row
 const MAX_RECENT = 8;
 
 const INITIAL: ChatMessage[] = [
@@ -209,113 +332,19 @@ function Sidebar() {
   );
 }
 
-type EmojiPickerProps = {
-  recent: string[];
-  onPick: (emoji: string) => void;
-};
-
-// Only mounted while open, so it loads fresh each time it opens.
-function EmojiPicker({ recent, onPick }: EmojiPickerProps) {
-  const [categories, setCategories] = useState<EmojiCategory[]>([]);
-  const [activeId, setActiveId] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    getEmojiCategories().then((data) => {
-      if (cancelled) {
-        return;
-      }
-      setCategories(data);
-      setActiveId(data[0].id);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  function renderGrid(emojis: string[]) {
-    return (
-      <div className="emoji-grid">
-        {emojis.map((emoji) => {
-          return (
-            <button key={emoji} type="button" className="emoji-btn" onClick={() => { onPick(emoji); }}>
-              {emoji}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // derived
-  const active = categories.find((c) => {
-    return c.id === activeId;
-  });
-
-  let recentRow = null;
-  if (recent.length > 0) {
-    recentRow = (
-      <div className="emoji-section recent-row">
-        <p className="emoji-heading">Recently used</p>
-        {renderGrid(recent)}
-      </div>
-    );
-  }
-
-  let body;
-  if (loading) {
-    body = <p className="emoji-loading">Loading emoji…</p>;
-  } else {
-    let grid = null;
-    if (active) {
-      grid = (
-        <div className="emoji-section">
-          <p className="emoji-heading">{active.name}</p>
-          {renderGrid(active.emojis)}
-        </div>
-      );
-    }
-    body = (
-      <div>
-        <div className="emoji-tabs" role="tablist">
-          {categories.map((c) => {
-            const selected = c.id === activeId;
-            let cls = 'emoji-tab';
-            if (selected) {
-              cls = 'emoji-tab is-active';
-            }
-            return (
-              <button key={c.id} type="button" role="tab" aria-selected={selected} aria-label={c.name} className={cls} onClick={() => { setActiveId(c.id); }}>
-                {c.icon}
-              </button>
-            );
-          })}
-        </div>
-        {grid}
-      </div>
-    );
-  }
-
-  return (
-    <div className="emoji-popover" role="dialog" aria-label="Emoji picker">
-      {recentRow}
-      {body}
-    </div>
-  );
-}
-
 function Composer({ onSend }: { onSend: (text: string) => void }) {
   const [text, setText] = useState('');
+  // CORE: open flag + a ref to the textarea (to read the cursor)
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Lives here (not in the picker) so it survives the picker closing.
+  // CHANGE: lives here (not in the picker) so it survives the picker closing.
   const [recent, setRecent] = useState<string[]>([]);
+  // CORE: textarea ref
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // NEXT: wrapper ref (outside click) + where to put the caret after render
   const wrapRef = useRef<HTMLDivElement>(null);
   const caretRef = useRef<number | null>(null);
 
-  // Outside click + Escape close the popover. Only listen while open.
+  // NEXT: outside click + Escape close the popover. Only listen while open.
   useEffect(() => {
     if (!pickerOpen) {
       return;
@@ -338,7 +367,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
     };
   }, [pickerOpen]);
 
-  // After the text changes from an insert, put the caret right after the emoji.
+  // NEXT: after the text changes from an insert, put the caret right after the emoji.
   useEffect(() => {
     const el = textareaRef.current;
     if (caretRef.current === null || !el) {
@@ -357,12 +386,14 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
     setText('');
   }
 
+  // CORE: 🙂 toggles the popover
   function togglePicker() {
     setPickerOpen((open) => {
       return !open;
     });
   }
 
+  // CORE: insert at the cursor (replacing any selection), then close
   function handlePick(emoji: string) {
     const el = textareaRef.current;
     let start = text.length;
@@ -373,26 +404,32 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
       end = el.selectionEnd;
     }
     setText(text.slice(0, start) + emoji + text.slice(end));
+    // NEXT: remember where the caret goes
     caretRef.current = start + emoji.length;
+    // CHANGE: most recent first, no duplicates, at most 8
     setRecent((prev) => {
       const rest = prev.filter((x) => {
         return x !== emoji;
       });
       return [emoji, ...rest].slice(0, MAX_RECENT);
     });
+    // CORE: close
     setPickerOpen(false);
   }
 
+  // CORE: picker only while open
   let picker = null;
   if (pickerOpen) {
     picker = <EmojiPicker recent={recent} onPick={handlePick} />;
   }
 
+  // NEXT: pressed style while open
   let toolCls = 'tool-btn';
   if (pickerOpen) {
     toolCls = 'tool-btn is-open';
   }
 
+  // CORE: ref on the textarea, anchor wrapper around the button + popover
   return (
     <div className="composer">
       <textarea
@@ -489,9 +526,24 @@ body { margin: 0; font-family: 'Lato', system-ui, -apple-system, 'Segoe UI', san
 .send-btn { height: 30px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--green); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .send-btn:disabled { background: #DDDDDD; color: #8D8D8D; cursor: default; }
 
+/* Emoji picker internals (already styled: tabs, headings, grid cells, loading).
+   The popover box and its positioning are yours to write. */
+.emoji-loading { margin: 0; padding: 28px 0; text-align: center; color: var(--muted); font-size: 14px; }
+.emoji-tabs { display: flex; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.emoji-tab { width: 36px; height: 32px; border: 0; border-radius: 6px; background: none; font-size: 18px; cursor: pointer; }
+.emoji-tab:hover { background: var(--hover); }
+.emoji-tab.is-active { background: #F1E6F1; box-shadow: inset 0 -2px 0 var(--aubergine-2); }
+.emoji-section { padding-top: 8px; }
+.recent-row { padding-top: 0; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.emoji-heading { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.emoji-btn { height: 32px; border: 0; border-radius: 6px; background: none; font-size: 20px; cursor: pointer; padding: 0; }
+.emoji-btn:hover { background: #F1E6F1; }
+
+
 /* ---- Added: emoji popover ---- */
+/* CORE: anchor + popover box above the button */
 .emoji-anchor { position: relative; }
-.tool-btn.is-open { background: #E8E8E8; }
 .emoji-popover {
   position: absolute;
   left: 0;
@@ -504,14 +556,5 @@ body { margin: 0; font-family: 'Lato', system-ui, -apple-system, 'Segoe UI', san
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   z-index: 10;
 }
-.emoji-loading { margin: 0; padding: 28px 0; text-align: center; color: var(--muted); font-size: 14px; }
-.emoji-tabs { display: flex; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.emoji-tab { width: 36px; height: 32px; border: 0; border-radius: 6px; background: none; font-size: 18px; cursor: pointer; }
-.emoji-tab:hover { background: var(--hover); }
-.emoji-tab.is-active { background: #F1E6F1; box-shadow: inset 0 -2px 0 var(--aubergine-2); }
-.emoji-section { padding-top: 8px; }
-.recent-row { padding-top: 0; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
-.emoji-heading { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
-.emoji-btn { height: 32px; border: 0; border-radius: 6px; background: none; font-size: 20px; cursor: pointer; padding: 0; }
-.emoji-btn:hover { background: #F1E6F1; }
+/* NEXT: pressed look while open */
+.tool-btn.is-open { background: #E8E8E8; }

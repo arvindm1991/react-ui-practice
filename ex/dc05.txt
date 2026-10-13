@@ -146,6 +146,26 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 @media (max-width: 600px) {
   .plans { grid-template-columns: 1fr; }
 }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: add is-open to .faq-item (rotates the chevron, highlights it); the answer is a .faq-answer div */
+.chevron { transition: transform 0.2s ease; }
+.faq-item.is-open { border-color: #3B3470; background: var(--surface-2); }
+.faq-item.is-open .faq-question { color: var(--primary); }
+.faq-item.is-open .chevron { transform: rotate(180deg); color: var(--primary); }
+.faq-answer { padding: 0 18px 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.faq-answer p { margin: 0; }
+
+/* CHANGE: header row with the Collapse button */
+.faq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.collapse-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.collapse-btn:hover { text-decoration: underline; }
+
+/* STRETCH: "Was this helpful?" */
+.feedback { display: flex; align-items: center; gap: 8px; margin-top: 14px !important; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.vote-btn { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.vote-btn:hover { border-color: var(--primary); color: var(--primary); }
+.thanks { color: var(--accent); }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { FAQS } from './data/faqs';
@@ -197,6 +217,7 @@ function PlanCards() {
   );
 }
 
+// CORE: the item is dumb: isOpen + onToggle (STRETCH: vote + onVote)
 type FaqItemProps = {
   faq: Faq;
   isOpen: boolean;
@@ -206,13 +227,14 @@ type FaqItemProps = {
 };
 
 function FaqItem({ faq, isOpen, vote, onToggle, onVote }: FaqItemProps) {
+  // CORE: class + answer decided above the return
   let cls = 'faq-item';
   let answer = null;
 
   if (isOpen) {
     cls = 'faq-item is-open';
 
-    // Change: once voted, the buttons are replaced by a thank-you line.
+    // STRETCH: once voted, the buttons are replaced by a thank-you line.
     let feedback = (
       <div className="feedback">
         <span>Was this helpful?</span>
@@ -232,6 +254,7 @@ function FaqItem({ faq, isOpen, vote, onToggle, onVote }: FaqItemProps) {
     );
   }
 
+  // NEXT: aria-expanded on the question button
   return (
     <li className={cls}>
       <button type="button" className="faq-question" aria-expanded={isOpen} onClick={() => { onToggle(faq.id); }}>
@@ -244,11 +267,12 @@ function FaqItem({ faq, isOpen, vote, onToggle, onVote }: FaqItemProps) {
 }
 
 function FaqSection() {
-  // One id (or null), not a boolean per item: that is what makes "one open at a time" automatic.
+  // CORE: one id (or null), not a boolean per item: that is what makes "one open at a time" automatic.
   const [openId, setOpenId] = useState<string | null>(null);
-  // Change: votes by question id. Lives here so it survives closing an item.
+  // STRETCH: votes by question id. Lives here so it survives closing an item.
   const [votes, setVotes] = useState<Record<string, Vote>>({});
 
+  // CORE: clicking the open one closes it
   function handleToggle(id: string) {
     setOpenId((prev) => {
       if (prev === id) {
@@ -258,17 +282,28 @@ function FaqSection() {
     });
   }
 
+  // STRETCH
   function handleVote(id: string, vote: Vote) {
     setVotes((prev) => {
       return { ...prev, [id]: vote };
     });
   }
 
+  // CHANGE: a Collapse button, only while something is open
+  let collapseBtn = null;
+  if (openId !== null) {
+    collapseBtn = <button type="button" className="collapse-btn" onClick={() => { setOpenId(null); }}>Collapse</button>;
+  }
+
   return (
     <section className="faq">
-      <h2>Frequently asked questions</h2>
+      <div className="faq-head">
+        <h2>Frequently asked questions</h2>
+        {collapseBtn}
+      </div>
       <ul className="faq-list">
         {FAQS.map((faq) => {
+          // CORE: derived per item
           const isOpen = faq.id === openId;
           const vote = votes[faq.id];
           return (
@@ -339,7 +374,8 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
   .plans { grid-template-columns: 1fr; }
 }
 
-/* ---- Added: accordion ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: add is-open to .faq-item (rotates the chevron, highlights it); the answer is a .faq-answer div */
 .chevron { transition: transform 0.2s ease; }
 .faq-item.is-open { border-color: #3B3470; background: var(--surface-2); }
 .faq-item.is-open .faq-question { color: var(--primary); }
@@ -347,7 +383,12 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sa
 .faq-answer { padding: 0 18px 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .faq-answer p { margin: 0; }
 
-/* Change: helpful? */
+/* CHANGE: header row with the Collapse button */
+.faq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.collapse-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.collapse-btn:hover { text-decoration: underline; }
+
+/* STRETCH: "Was this helpful?" */
 .feedback { display: flex; align-items: center; gap: 8px; margin-top: 14px !important; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
 .vote-btn { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .vote-btn:hover { border-color: var(--primary); color: var(--primary); }

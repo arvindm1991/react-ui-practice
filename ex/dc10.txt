@@ -155,12 +155,37 @@ body { margin: 0; font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-
 .thanks h1 { margin: 12px 0 6px; font-size: 20px; }
 .thanks p { margin: 0; color: var(--muted); font-size: 14px; }
 .thanks-icon { width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; background: #E7F7EE; color: #17955A; font-size: 26px; font-weight: 800; }
+
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: stars are <button class="star"> (is-on when filled) inside .stars, wrapped in .rating with a <p class="rating-label"> */
+.rating { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.star { padding: 0 2px; border: 0; background: none; font-family: inherit; cursor: pointer; transition: transform 0.1s ease, color 0.1s ease; }
+.star:hover { transform: scale(1.12); }
+.star.is-on { color: var(--star); }
+.star:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 6px; }
+.rating-label { margin: 0; min-height: 20px; font-size: 15px; font-weight: 700; }
+.rating-label.is-empty { font-weight: 400; color: var(--muted); }
+/* NEXT: Clear link-button */
+.clear-btn { border: 0; background: none; padding: 2px 6px; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.clear-btn:hover { color: var(--text); }
+
+/* CHANGE: the rating line on the thank-you card */
+.thanks .thanks-rating { margin: 0 0 8px; color: var(--text); font-weight: 700; font-size: 15px; }
+
+/* STRETCH: problem chips */
+.problems { margin-bottom: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: inherit; font-size: 14px; color: var(--text); cursor: pointer; }
+.chip:hover { border-color: var(--text); }
+.chip.is-on { background: #FDECE9; border-color: var(--primary); color: var(--primary); font-weight: 600; }
 @@@ solution src/App.tsx
 import React, { useState } from 'react';
 import { ORDER, LABELS } from './data/order';
 import type { Order } from './data/order';
 
+// CORE
 const STAR_VALUES = [1, 2, 3, 4, 5];
+// STRETCH
 const PROBLEMS = ['Late', 'Cold food', 'Missing item', 'Wrong order'];
 
 function OrderSummary({ order }: { order: Order }) {
@@ -180,6 +205,7 @@ function OrderSummary({ order }: { order: Order }) {
   );
 }
 
+// CORE: a controlled component: value + onChange
 type StarRatingProps = {
   value: number;
   onChange: (value: number) => void;
@@ -187,14 +213,16 @@ type StarRatingProps = {
 
 // value lives in the form (it's submitted). hover is local: only the stars care.
 function StarRating({ value, onChange }: StarRatingProps) {
+  // NEXT: hover preview is local state
   const [hover, setHover] = useState(0);
 
-  // derived: what to show right now
+  // CORE: what to show right now (NEXT: the hover override)
   let shown = value;
   if (hover > 0) {
     shown = hover;
   }
 
+  // CORE: label word from LABELS
   let label = 'Tap a star to rate';
   let labelCls = 'rating-label is-empty';
   if (shown > 0) {
@@ -202,6 +230,7 @@ function StarRating({ value, onChange }: StarRatingProps) {
     labelCls = 'rating-label';
   }
 
+  // NEXT: Clear (and the aria-labels below)
   let clearBtn = null;
   if (value > 0) {
     clearBtn = <button type="button" className="clear-btn" onClick={() => { onChange(0); }}>Clear</button>;
@@ -241,7 +270,7 @@ type ProblemChipsProps = {
   onToggle: (problem: string) => void;
 };
 
-// Change: multi-select chips for low ratings.
+// STRETCH: multi-select chips for low ratings.
 function ProblemChips({ selected, onToggle }: ProblemChipsProps) {
   return (
     <div className="problems">
@@ -262,16 +291,20 @@ function ProblemChips({ selected, onToggle }: ProblemChipsProps) {
   );
 }
 
-function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: () => void }) {
+// CHANGE: onSubmit now reports the rating up
+function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: (rating: number) => void }) {
   const [comment, setComment] = useState('');
+  // CORE: the rating is submitted, so it lives in the form
   const [rating, setRating] = useState(0);
+  // STRETCH
   const [problems, setProblems] = useState<string[]>([]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    onSubmit();
+    onSubmit(rating);
   }
 
+  // STRETCH
   function handleToggleProblem(problem: string) {
     setProblems((prev) => {
       if (prev.includes(problem)) {
@@ -283,7 +316,7 @@ function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: () => void })
     });
   }
 
-  // derived
+  // CORE: submit gate, derived (STRETCH: chips required for 1-2 stars)
   const isLow = rating > 0 && rating <= 2;
   let canSubmit = rating > 0;
   if (isLow && problems.length === 0) {
@@ -310,11 +343,14 @@ function ReviewForm({ order, onSubmit }: { order: Order; onSubmit: () => void })
   );
 }
 
-function ThankYou() {
+// CHANGE: shows the rating that was submitted
+function ThankYou({ rating }: { rating: number }) {
+  const stars = '★'.repeat(rating);
   return (
     <div className="card thanks">
       <div className="thanks-icon">✓</div>
       <h1>Thanks for the feedback</h1>
+      <p className="thanks-rating">You rated it {stars} {LABELS[rating]}</p>
       <p>It helps {ORDER.restaurant} and couriers like {ORDER.courier} do better.</p>
     </div>
   );
@@ -322,10 +358,17 @@ function ThankYou() {
 
 export default function App() {
   const [submitted, setSubmitted] = useState(false);
+  // CHANGE: the parent keeps the submitted rating
+  const [finalRating, setFinalRating] = useState(0);
 
-  let content = <ReviewForm order={ORDER} onSubmit={() => { setSubmitted(true); }} />;
+  function handleSubmit(rating: number) {
+    setFinalRating(rating);
+    setSubmitted(true);
+  }
+
+  let content = <ReviewForm order={ORDER} onSubmit={handleSubmit} />;
   if (submitted) {
-    content = <ThankYou />;
+    content = <ThankYou rating={finalRating} />;
   }
 
   return (
@@ -382,7 +425,8 @@ body { margin: 0; font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-
 .thanks p { margin: 0; color: var(--muted); font-size: 14px; }
 .thanks-icon { width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; background: #E7F7EE; color: #17955A; font-size: 26px; font-weight: 800; }
 
-/* ---- Added: interactive stars ---- */
+/* ---- Ready for the new feature (already styled: just use these class names) ---- */
+/* CORE: stars are <button class="star"> (is-on when filled) inside .stars, wrapped in .rating with a <p class="rating-label"> */
 .rating { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .star { padding: 0 2px; border: 0; background: none; font-family: inherit; cursor: pointer; transition: transform 0.1s ease, color 0.1s ease; }
 .star:hover { transform: scale(1.12); }
@@ -390,10 +434,14 @@ body { margin: 0; font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-
 .star:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 6px; }
 .rating-label { margin: 0; min-height: 20px; font-size: 15px; font-weight: 700; }
 .rating-label.is-empty { font-weight: 400; color: var(--muted); }
+/* NEXT: Clear link-button */
 .clear-btn { border: 0; background: none; padding: 2px 6px; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 .clear-btn:hover { color: var(--text); }
 
-/* Change: problem chips */
+/* CHANGE: the rating line on the thank-you card */
+.thanks .thanks-rating { margin: 0 0 8px; color: var(--text); font-weight: 700; font-size: 15px; }
+
+/* STRETCH: problem chips */
 .problems { margin-bottom: 16px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: inherit; font-size: 14px; color: var(--text); cursor: pointer; }

@@ -67,20 +67,97 @@ export function calcTax(cents: number): number {
 export function percentOf(cents: number, percent: number): number {
   return Math.round((cents * percent) / 100);
 }
+@@@ shared src/utils/cart.ts
+import type { Product } from '../api';
+
+// The cart stores ids + quantities only. Names and prices come from products.
+export type CartLine = { productId: string; qty: number };
+export type JoinedLine = { productId: string; qty: number; product: Product };
+
+// joinCart([{ productId: 'p2', qty: 2 }], products)
+//   -> [{ productId: 'p2', qty: 2, product: { name: 'Ceramic dripper', price: 2800, ... } }]
+// Lines whose product isn't found are skipped.
+export function joinCart(cart: CartLine[], products: Product[]): JoinedLine[] {
+  const lines: JoinedLine[] = [];
+  cart.forEach((line) => {
+    const product = products.find((p) => {
+      return p.id === line.productId;
+    });
+    if (product) {
+      lines.push({ ...line, product });
+    }
+  });
+  return lines;
+}
+@@@ shared src/components/Drawer.tsx
+import React from 'react';
+
+type DrawerProps = {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+};
+
+// A right-side panel over a dark backdrop. ✕ or a click on the backdrop
+// (not on the panel) calls onClose. Put any content inside.
+export default function Drawer({ title, onClose, children }: DrawerProps) {
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Only the backdrop itself: clicks inside the panel bubble up here too.
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }
+
+  return (
+    <div className="drawer-backdrop" onClick={handleBackdropClick}>
+      <aside className="drawer" role="dialog" aria-label={title}>
+        <div className="drawer-head">
+          <h2>{title}</h2>
+          <button type="button" className="close-btn" aria-label="Close" onClick={() => { onClose(); }}>✕</button>
+        </div>
+        {children}
+      </aside>
+    </div>
+  );
+}
+@@@ shared src/components/LineItem.tsx
+import React from 'react';
+import type { Product } from '../api';
+import { formatMoney } from '../utils/money';
+
+type LineItemProps = {
+  product: Product;
+  total: number;              // line total in cents
+  children?: React.ReactNode; // optional controls shown under the name
+};
+
+// One row in a cart/order list: image, name, (children), line total.
+export default function LineItem({ product, total, children }: LineItemProps) {
+  return (
+    <li className="line">
+      <span className="line-img" style={{ background: product.tint }}>{product.glyph}</span>
+      <div className="line-main">
+        <span className="line-name">{product.name}</span>
+        {children}
+      </div>
+      <span className="line-total">{formatMoney(total)}</span>
+    </li>
+  );
+}
 @@@ starter src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProducts } from './api';
 import type { Product } from './api';
 import { formatMoney } from './utils/money';
+import CartDrawer from './components/CartDrawer';
 
-function Header() {
-  // TODO: the badge should show how many items are in the cart,
-  // and clicking the button should open the cart drawer.
+function Header({ onOpenCart }: { onOpenCart: () => void }) {
+  // TODO: the badge should show how many items are in the cart.
   return (
     <header className="header">
       <span className="logo">Ember &amp; Oak</span>
       <nav className="nav"><a href="#">Brew</a><a href="#">Beans</a><a href="#">Journal</a></nav>
-      <button type="button" className="cart-btn">
+      <button type="button" className="cart-btn" onClick={() => { onOpenCart(); }}>
         Cart <span className="badge">0</span>
       </button>
     </header>
@@ -88,6 +165,7 @@ function Header() {
 }
 
 function ProductCard({ product }: { product: Product }) {
+  // TODO: "Add to cart" should add one of this product to the cart.
   return (
     <li className="product">
       <div className="product-img" style={{ background: product.tint }}>{product.glyph}</div>
@@ -103,6 +181,7 @@ function ProductCard({ product }: { product: Product }) {
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,15 +210,44 @@ export default function App() {
     );
   }
 
+  let drawer = null;
+  if (drawerOpen) {
+    // TODO: pass the real cart
+    drawer = <CartDrawer cart={[]} products={products} onClose={() => { setDrawerOpen(false); }} />;
+  }
+
   return (
     <div className="app">
-      <Header />
+      <Header onOpenCart={() => { setDrawerOpen(true); }} />
       <section className="banner">
         <h1>Slow coffee, done right.</h1>
         <p>Pour-over gear we actually use. Free shipping over $75.</p>
       </section>
       <main className="shop">{catalog}</main>
+      {drawer}
     </div>
+  );
+}
+@@@ starter src/components/CartDrawer.tsx
+import React from 'react';
+import type { Product } from '../api';
+import type { CartLine } from '../utils/cart';
+import Drawer from './Drawer';
+
+type CartDrawerProps = {
+  cart: CartLine[];
+  products: Product[];
+  onClose: () => void;
+};
+
+// Scaffolded by a teammate: it opens and closes, but never shows the cart.
+// TODO: list the cart lines and a Subtotal. utils/cart.ts and
+// components/LineItem.tsx are worth reading first.
+export default function CartDrawer({ cart, products, onClose }: CartDrawerProps) {
+  return (
+    <Drawer title="Your cart" onClose={onClose}>
+      <p className="cart-empty">Your cart is empty.</p>
+    </Drawer>
   );
 }
 @@@ starter src/styles.css
@@ -179,14 +287,33 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .product-price { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .add-btn { height: 36px; border: 0; border-radius: 8px; background: var(--espresso); color: #F6F1EA; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .add-btn:hover { background: #47322A; }
+
+/* Drawer shell (used by components/Drawer.tsx) */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(43, 29, 22, 0.45); display: flex; justify-content: flex-end; z-index: 20; }
+.drawer { width: 100%; max-width: 400px; height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(43, 29, 22, 0.2); overflow-y: auto; }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.drawer-head h2 { margin: 0; font-family: Georgia, serif; font-size: 20px; }
+.close-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; font-size: 16px; cursor: pointer; color: var(--text); }
+.close-btn:hover { background: var(--bg); }
+.cart-empty { margin: 0; padding: 48px 20px; text-align: center; color: var(--muted); }
+
+/* Line items (used by components/LineItem.tsx) */
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.line { display: flex; gap: 12px; align-items: flex-start; }
+.line-img { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; font-size: 24px; }
+.line-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.line-name { font-weight: 600; font-size: 14px; }
+.line-total { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 @@@ solution src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { getProducts } from './api';
 import type { Product } from './api';
 import { formatMoney } from './utils/money';
 import CartDrawer from './components/CartDrawer';
-import type { CartLine, Coupon } from './components/CartDrawer';
+import type { Coupon } from './components/CartDrawer';
+import type { CartLine } from './utils/cart';
 
+// CORE: the badge shows the item count
 function Header({ count, onOpenCart }: { count: number; onOpenCart: () => void }) {
   return (
     <header className="header">
@@ -199,6 +326,7 @@ function Header({ count, onOpenCart }: { count: number; onOpenCart: () => void }
   );
 }
 
+// CORE: Add to cart reports the product id up
 function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: string) => void }) {
   return (
     <li className="product">
@@ -215,10 +343,10 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: string)
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  // The cart stores ids + quantities only. Names and prices come from products.
-  const [cart, setCart] = useState<CartLine[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // In App (not the drawer) so closing the drawer keeps the coupon.
+  // CORE: the cart lives in App: the header badge and the drawer both need it.
+  const [cart, setCart] = useState<CartLine[]>([]);
+  // STRETCH: in App (not the drawer) so closing the drawer keeps the coupon.
   const [coupon, setCoupon] = useState<Coupon | null>(null);
 
   useEffect(() => {
@@ -235,6 +363,7 @@ export default function App() {
     };
   }, []);
 
+  // CORE: add one (or bump the quantity if it's already in the cart)
   function addToCart(productId: string) {
     setCart((prev) => {
       const existing = prev.find((line) => {
@@ -252,6 +381,7 @@ export default function App() {
     });
   }
 
+  // NEXT: − / + (never below 1)
   function changeQty(productId: string, delta: number) {
     setCart((prev) => {
       return prev.map((line) => {
@@ -263,6 +393,7 @@ export default function App() {
     });
   }
 
+  // NEXT: Remove
   function removeLine(productId: string) {
     setCart((prev) => {
       return prev.filter((line) => {
@@ -271,7 +402,7 @@ export default function App() {
     });
   }
 
-  // derived
+  // CORE: derived item count for the badge
   const itemCount = cart.reduce((sum, line) => {
     return sum + line.qty;
   }, 0);
@@ -291,6 +422,7 @@ export default function App() {
 
   let drawer = null;
   if (drawerOpen) {
+    // CORE: pass the real cart (NEXT: qty/remove handlers, STRETCH: coupon)
     drawer = (
       <CartDrawer
         cart={cart}
@@ -304,6 +436,7 @@ export default function App() {
     );
   }
 
+  // CORE: render with the count
   return (
     <div className="app">
       <Header count={itemCount} onOpenCart={() => { setDrawerOpen(true); }} />
@@ -321,22 +454,30 @@ import React, { useState } from 'react';
 import { validateCoupon } from '../api';
 import type { Product } from '../api';
 import { formatMoney, calcTax, percentOf } from '../utils/money';
+import { joinCart } from '../utils/cart';
+import type { CartLine } from '../utils/cart';
+import Drawer from './Drawer';
+import LineItem from './LineItem';
 
-export type CartLine = { productId: string; qty: number };
+// STRETCH: an applied coupon
 export type Coupon = { code: string; percentOff: number };
 
+// CHANGE: free shipping threshold, in cents
 const FREE_SHIPPING_CENTS = 7500;
 
 type CartDrawerProps = {
   cart: CartLine[];
   products: Product[];
-  coupon: Coupon | null;
-  onCouponChange: (coupon: Coupon | null) => void;
+  onClose: () => void;
+  // NEXT: quantity + remove
   onChangeQty: (productId: string, delta: number) => void;
   onRemove: (productId: string) => void;
-  onClose: () => void;
+  // STRETCH: coupon lives in App
+  coupon: Coupon | null;
+  onCouponChange: (coupon: Coupon | null) => void;
 };
 
+// STRETCH: coupon form: owns its input, a checking flag and the error
 function CouponForm({ onApply }: { onApply: (coupon: Coupon) => void }) {
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
@@ -385,6 +526,7 @@ function CouponForm({ onApply }: { onApply: (coupon: Coupon) => void }) {
   );
 }
 
+// CHANGE: all derived from the subtotal, no new state
 function ShippingProgress({ subtotal }: { subtotal: number }) {
   const remaining = FREE_SHIPPING_CENTS - subtotal;
   const percent = Math.min(100, Math.round((subtotal / FREE_SHIPPING_CENTS) * 100));
@@ -407,39 +549,28 @@ function ShippingProgress({ subtotal }: { subtotal: number }) {
 }
 
 export default function CartDrawer({ cart, products, coupon, onCouponChange, onChangeQty, onRemove, onClose }: CartDrawerProps) {
-  // Join cart lines with product data. Skip lines whose product is unknown.
-  const lines: { productId: string; qty: number; product: Product }[] = [];
-  cart.forEach((line) => {
-    const product = products.find((p) => {
-      return p.id === line.productId;
-    });
-    if (!product) {
-      return;
-    }
-    lines.push({ ...line, product });
-  });
+  // CORE: reuse the helper: lines with their product attached
+  const lines = joinCart(cart, products);
 
-  // derived totals, all in cents
+  // CORE: derived subtotal, in cents
   const subtotal = lines.reduce((sum, line) => {
     return sum + line.product.price * line.qty;
   }, 0);
+  // STRETCH: discount
   let discount = 0;
   if (coupon) {
     discount = percentOf(subtotal, coupon.percentOff);
   }
+  // NEXT: tax on the (discounted) subtotal, and the total
   const tax = calcTax(subtotal - discount);
   const total = subtotal - discount + tax;
 
-  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
+  // NEXT: empty message
   let body;
   if (lines.length === 0) {
     body = <p className="cart-empty">Your cart is empty.</p>;
   } else {
+    // STRETCH: coupon form, or the applied coupon + a Discount row
     let couponArea = <CouponForm onApply={onCouponChange} />;
     let discountRow = null;
     if (coupon) {
@@ -454,27 +585,27 @@ export default function CartDrawer({ cart, products, coupon, onCouponChange, onC
       );
     }
 
+    // CORE: the list + Subtotal row (NEXT: tax, total, checkout; STRETCH: coupon; CHANGE: progress)
     body = (
       <div className="cart-body">
         <ShippingProgress subtotal={subtotal} />
         <ul className="lines">
           {lines.map((line) => {
+            // NEXT: − qty + and Remove, passed as LineItem's children
             const atMin = line.qty <= 1;
-            const lineTotal = line.product.price * line.qty;
+            const controls = (
+              <div className="qty">
+                <button type="button" className="qty-btn" aria-label="Decrease quantity" disabled={atMin} onClick={() => { onChangeQty(line.productId, -1); }}>−</button>
+                <span className="qty-value">{line.qty}</span>
+                <button type="button" className="qty-btn" aria-label="Increase quantity" onClick={() => { onChangeQty(line.productId, 1); }}>+</button>
+                <button type="button" className="text-btn" onClick={() => { onRemove(line.productId); }}>Remove</button>
+              </div>
+            );
+            // CORE: one LineItem per line
             return (
-              <li key={line.productId} className="line">
-                <span className="line-img" style={{ background: line.product.tint }}>{line.product.glyph}</span>
-                <div className="line-main">
-                  <span className="line-name">{line.product.name}</span>
-                  <div className="qty">
-                    <button type="button" className="qty-btn" aria-label="Decrease quantity" disabled={atMin} onClick={() => { onChangeQty(line.productId, -1); }}>−</button>
-                    <span className="qty-value">{line.qty}</span>
-                    <button type="button" className="qty-btn" aria-label="Increase quantity" onClick={() => { onChangeQty(line.productId, 1); }}>+</button>
-                    <button type="button" className="text-btn" onClick={() => { onRemove(line.productId); }}>Remove</button>
-                  </div>
-                </div>
-                <span className="line-total">{formatMoney(lineTotal)}</span>
-              </li>
+              <LineItem key={line.productId} product={line.product} total={line.product.price * line.qty}>
+                {controls}
+              </LineItem>
             );
           })}
         </ul>
@@ -490,16 +621,11 @@ export default function CartDrawer({ cart, products, coupon, onCouponChange, onC
     );
   }
 
+  // CORE: the shell is the existing Drawer
   return (
-    <div className="drawer-backdrop" onClick={handleBackdropClick}>
-      <aside className="drawer" role="dialog" aria-label="Your cart">
-        <div className="drawer-head">
-          <h2>Your cart</h2>
-          <button type="button" className="close-btn" aria-label="Close cart" onClick={() => { onClose(); }}>✕</button>
-        </div>
-        {body}
-      </aside>
-    </div>
+    <Drawer title="Your cart" onClose={onClose}>
+      {body}
+    </Drawer>
   );
 }
 @@@ solution src/styles.css
@@ -540,7 +666,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .add-btn { height: 36px; border: 0; border-radius: 8px; background: var(--espresso); color: #F6F1EA; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .add-btn:hover { background: #47322A; }
 
-/* ---- Added: cart drawer ---- */
+/* Drawer shell (used by components/Drawer.tsx) */
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(43, 29, 22, 0.45); display: flex; justify-content: flex-end; z-index: 20; }
 .drawer { width: 100%; max-width: 400px; height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(43, 29, 22, 0.2); overflow-y: auto; }
 .drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--border); }
@@ -548,27 +674,30 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .close-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; font-size: 16px; cursor: pointer; color: var(--text); }
 .close-btn:hover { background: var(--bg); }
 .cart-empty { margin: 0; padding: 48px 20px; text-align: center; color: var(--muted); }
-.cart-body { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 
-.ship { padding: 12px 14px; border-radius: 12px; background: #FBF3E8; }
-.ship.is-unlocked { background: #EAF4EC; }
-.ship-text { margin: 0 0 8px; font-size: 13px; }
-.ship-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
-.ship-fill { height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.3s ease; }
-.ship.is-unlocked .ship-fill { background: var(--green); }
-
+/* Line items (used by components/LineItem.tsx) */
 .lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .line { display: flex; gap: 12px; align-items: flex-start; }
 .line-img { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; font-size: 24px; }
 .line-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .line-name { font-weight: 600; font-size: 14px; }
 .line-total { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---- Added: cart drawer ---- */
+/* CORE: lines + subtotal */
+.cart-body { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.summary { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sum-row { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
+/* NEXT: quantity controls, total, checkout */
 .qty { display: flex; align-items: center; gap: 6px; }
 .qty-btn { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 7px; background: #fff; font-size: 15px; line-height: 1; cursor: pointer; color: var(--text); }
 .qty-btn:disabled { opacity: 0.4; cursor: default; }
 .qty-value { min-width: 18px; text-align: center; font-size: 14px; font-weight: 600; }
 .text-btn { margin-left: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
-
+.sum-row.total { font-size: 17px; font-weight: 700; padding-top: 6px; }
+.checkout { height: 46px; border: 0; border-radius: 10px; background: var(--amber); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.checkout:hover { background: var(--amber-dark); }
+/* STRETCH: coupon */
 .coupon-row { display: flex; gap: 8px; }
 .coupon-input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; text-transform: uppercase; background: #fff; color: var(--text); }
 .coupon-input:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
@@ -576,10 +705,11 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .coupon-btn:disabled { opacity: 0.6; cursor: progress; }
 .coupon-error { margin: 6px 0 0; font-size: 13px; color: #B42318; }
 .coupon-applied { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; background: #EAF4EC; color: var(--green); font-size: 14px; }
-
-.summary { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-.sum-row { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
 .sum-row.discount { color: var(--green); }
-.sum-row.total { font-size: 17px; font-weight: 700; padding-top: 6px; }
-.checkout { height: 46px; border: 0; border-radius: 10px; background: var(--amber); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-.checkout:hover { background: var(--amber-dark); }
+/* CHANGE: free-shipping progress */
+.ship { padding: 12px 14px; border-radius: 12px; background: #FBF3E8; }
+.ship.is-unlocked { background: #EAF4EC; }
+.ship-text { margin: 0 0 8px; font-size: 13px; }
+.ship-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.ship-fill { height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.3s ease; }
+.ship.is-unlocked .ship-fill { background: var(--green); }

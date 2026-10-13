@@ -236,6 +236,7 @@ import { bookSeats, getSeatMap } from './api';
 import type { Seat, SeatMap } from './api';
 import { formatPrice } from './utils/money';
 
+// CHANGE: max 4 seats
 const MAX_SEATS = 4;
 
 function ShowHeader({ show, when }: { show: string; when: string }) {
@@ -254,12 +255,14 @@ function Legend() {
       <li><span className="dot tier-premium" /> Premium · $95</li>
       <li><span className="dot tier-standard" /> Standard · $65</li>
       <li><span className="dot tier-balcony" /> Balcony · $40</li>
+      {/* CORE: legend entry for selected seats */}
       <li><span className="dot is-selected" /> Selected</li>
       <li><span className="dot is-taken" /> Taken</li>
     </ul>
   );
 }
 
+// CORE: the grid gets the selection + a toggle callback
 type SeatGridProps = {
   map: SeatMap;
   selected: string[];
@@ -267,6 +270,7 @@ type SeatGridProps = {
 };
 
 function SeatGrid({ map, selected, onToggle }: SeatGridProps) {
+  // STRETCH: keyboard navigation (roving tabindex + arrow keys)
   // Roving tabindex: only one seat is in the Tab order; arrow keys move it.
   const [focusId, setFocusId] = useState(map.seats[0].id);
   const seatRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -313,6 +317,7 @@ function SeatGrid({ map, selected, onToggle }: SeatGridProps) {
           <div key={row} className="seat-row">
             <span className="row-label">{row}</span>
             {seats.map((s) => {
+              // CORE: selected class + aria-pressed
               const isSelected = selected.includes(s.id);
               let cls = 'seat tier-' + s.tier.toLowerCase();
               if (s.taken) {
@@ -320,6 +325,7 @@ function SeatGrid({ map, selected, onToggle }: SeatGridProps) {
               } else if (isSelected) {
                 cls = cls + ' is-selected';
               }
+              // STRETCH: aria-label + roving tabIndex
               let label = 'Row ' + s.row + ', seat ' + s.number + ', ' + s.tier + ' ' + formatPrice(s.price);
               if (s.taken) {
                 label = label + ', taken';
@@ -355,6 +361,7 @@ function SeatGrid({ map, selected, onToggle }: SeatGridProps) {
   );
 }
 
+// CORE: summary of the picked seats
 type SummaryProps = {
   seats: Seat[];
   booking: boolean;
@@ -387,6 +394,7 @@ function Summary({ seats, booking, onRemove, onBook }: SummaryProps) {
     );
   }
 
+  // NEXT: "Book 2 seats · $160" / "Booking…"
   let bookLabel = 'Book seats';
   if (seats.length > 0) {
     let noun = 'seats';
@@ -401,6 +409,7 @@ function Summary({ seats, booking, onRemove, onBook }: SummaryProps) {
 
   return (
     <aside className="summary">
+      {/* CHANGE: the 2 / 4 counter */}
       <h2>Your seats <span className="picked-count">{seats.length} / {MAX_SEATS}</span></h2>
       {list}
       <div className="summary-total"><span>Total</span><b>{formatPrice(total)}</b></div>
@@ -411,8 +420,11 @@ function Summary({ seats, booking, onRemove, onBook }: SummaryProps) {
 
 export default function App() {
   const [map, setMap] = useState<SeatMap | null>(null);
+  // NEXT: refetch after booking
   const [reloadKey, setReloadKey] = useState(0); // bump to refetch the map
+  // CORE: selected seat ids, in pick order
   const [selected, setSelected] = useState<string[]>([]);
+  // NEXT: booking status + messages (CHANGE: notice)
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -425,6 +437,7 @@ export default function App() {
         return;
       }
       setMap(data);
+      // NEXT: failure path keeps only seats still free
       // Drop any selected seat that is now taken.
       setSelected((prev) => {
         return prev.filter((id) => {
@@ -440,6 +453,7 @@ export default function App() {
     };
   }, [reloadKey]);
 
+  // CORE: toggle (taken seats refused)
   function handleToggle(seat: Seat) {
     if (seat.taken || booking) {
       return;
@@ -454,15 +468,18 @@ export default function App() {
       });
       return;
     }
+    // CHANGE: refuse a 5th seat
     if (selected.length >= MAX_SEATS) {
       setNotice('You can select up to ' + MAX_SEATS + ' seats.');
       return;
     }
+    // CORE: add the seat
     setSelected((prev) => {
       return [...prev, seat.id];
     });
   }
 
+  // NEXT: book, success banner; failure banner + refetch
   function handleBook() {
     const ids = selected;
     setBooking(true);
@@ -488,6 +505,7 @@ export default function App() {
     return <div className="app"><p className="loading">Loading seat map…</p></div>;
   }
 
+  // CORE
   // derived: the full seat objects, in the order they were picked
   const selectedSeats: Seat[] = [];
   selected.forEach((id) => {
@@ -499,6 +517,7 @@ export default function App() {
     }
   });
 
+  // NEXT: banners (CHANGE: the notice)
   let banner = null;
   if (error) {
     banner = <div className="banner is-error" role="alert">{error}</div>;
@@ -508,6 +527,7 @@ export default function App() {
     banner = <div className="banner is-notice" role="status">{notice}</div>;
   }
 
+  // CORE: pass the selection down (NEXT: {banner}, booking props)
   return (
     <div className="app">
       <ShowHeader show={map.show} when={map.when} />
@@ -578,11 +598,15 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .book-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---- Added: selection, summary, booking, keyboard ---- */
+/* CORE: selected seat + picked list */
 .seat:hover:not(.is-taken) { filter: brightness(1.15); }
 .seat.is-selected, .dot.is-selected { background: var(--gold); color: #2A1408; box-shadow: 0 0 0 2px rgba(230, 184, 92, 0.35); }
+/* STRETCH */
 .seat:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* CHANGE */
 .summary h2 { display: flex; justify-content: space-between; align-items: baseline; }
 .picked-count { font-family: system-ui, sans-serif; font-size: 12px; font-weight: 600; color: var(--muted); }
+/* CORE */
 .picked { list-style: none; margin: 0 0 12px; padding: 0; }
 .picked-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14px; border-bottom: 1px dashed var(--line); }
 .picked-row:last-child { border-bottom: 0; }
@@ -591,6 +615,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 .picked-price { font-variant-numeric: tabular-nums; }
 .picked-remove { width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--panel-2); color: var(--muted); cursor: pointer; }
 .picked-remove:hover { color: var(--text); }
+/* NEXT (is-notice: CHANGE) */
 .banner { margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 500; }
 .banner.is-error { background: rgba(201, 69, 94, 0.18); border: 1px solid var(--premium); color: #FFC9D3; }
 .banner.is-success { background: rgba(77, 170, 120, 0.16); border: 1px solid #4DAA78; color: #BDF0D2; }

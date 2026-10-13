@@ -117,161 +117,19 @@ export function isToday(iso: string): boolean {
   const d = new Date(iso);
   return d.getFullYear() === NOW.getFullYear() && d.getMonth() === NOW.getMonth() && d.getDate() === NOW.getDate();
 }
-@@@ starter src/App.tsx
+@@@ shared src/components/NotificationItem.tsx
 import React from 'react';
-import { Avatar } from './components/Avatar';
-import { BellIcon, SearchIcon } from './components/Icons';
-
-type Card = { id: string; title: string; tag: string; assignee: string };
-type Column = { id: string; title: string; cards: Card[] };
-
-const COLUMNS: Column[] = [
-  { id: 'todo', title: 'To do', cards: [
-    { id: 'c1', title: 'Pricing page copy', tag: 'Marketing', assignee: 'Arvind Murali' },
-    { id: 'c2', title: 'Billing migration', tag: 'Platform', assignee: 'Tom Becker' },
-  ] },
-  { id: 'doing', title: 'In progress', cards: [
-    { id: 'c3', title: 'Launch checklist', tag: 'Launch', assignee: 'Marcus Lee' },
-    { id: 'c4', title: 'Brand refresh', tag: 'Design', assignee: 'Dana Okafor' },
-  ] },
-  { id: 'done', title: 'Done', cards: [
-    { id: 'c5', title: 'Onboarding emails', tag: 'Marketing', assignee: 'Dana Okafor' },
-    { id: 'c6', title: 'Fix SSO redirect loop', tag: 'Platform', assignee: 'Marcus Lee' },
-  ] },
-];
-
-function BellButton() {
-  // TODO: unread badge + notifications dropdown
-  return (
-    <button type="button" className="icon-btn bell-btn" aria-label="Notifications">
-      <BellIcon />
-    </button>
-  );
-}
-
-function AppHeader() {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="brand-mark">T</span>
-        Tasklane
-      </div>
-      <nav className="nav">
-        <button type="button" className="nav-link is-active">Board</button>
-        <button type="button" className="nav-link">Timeline</button>
-        <button type="button" className="nav-link">Reports</button>
-      </nav>
-      <div className="topbar-right">
-        <label className="search">
-          <SearchIcon />
-          <input placeholder="Search tasks" />
-        </label>
-        <BellButton />
-        <Avatar name="Arvind Murali" size={32} />
-      </div>
-    </header>
-  );
-}
-
-function TaskCard({ card }: { card: Card }) {
-  return (
-    <article className="task-card">
-      <span className="tag">{card.tag}</span>
-      <p className="task-title">{card.title}</p>
-      <div className="task-foot">
-        <Avatar name={card.assignee} size={22} />
-        <span>{card.assignee.split(' ')[0]}</span>
-      </div>
-    </article>
-  );
-}
-
-function BoardColumn({ column }: { column: Column }) {
-  return (
-    <section className="column">
-      <h2 className="column-title">
-        {column.title}
-        <span className="count">{column.cards.length}</span>
-      </h2>
-      {column.cards.map((card) => {
-        return <TaskCard key={card.id} card={card} />;
-      })}
-    </section>
-  );
-}
-
-export default function App() {
-  return (
-    <div className="app">
-      <AppHeader />
-      <main className="page">
-        <h1 className="page-title">Website relaunch</h1>
-        <div className="board">
-          {COLUMNS.map((col) => {
-            return <BoardColumn key={col.id} column={col} />;
-          })}
-        </div>
-      </main>
-    </div>
-  );
-}
-@@@ starter src/styles.css
-:root {
-  --bg: #F6F7FB;
-  --surface: #FFFFFF;
-  --border: #E6E8F0;
-  --text: #1B1F3B;
-  --muted: #6B7090;
-  --primary: #5B5BD6;
-  --primary-soft: #EEEEFC;
-  --danger: #E5484D;
-  --radius: 10px;
-}
-
-* { box-sizing: border-box; }
-body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
-
-.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
-.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 14px; }
-.nav { display: flex; gap: 4px; }
-.nav-link { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--muted); cursor: pointer; }
-.nav-link:hover { background: var(--bg); }
-.nav-link.is-active { color: var(--primary); background: var(--primary-soft); font-weight: 600; }
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.search { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
-.search input { border: 0; outline: 0; font: inherit; width: 140px; background: none; }
-
-.icon-btn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
-.icon-btn:hover { background: var(--bg); color: var(--text); }
-.bell-btn { position: relative; }
-
-.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 600; }
-
-.page { padding: 24px 20px; }
-.page-title { margin: 0 0 16px; font-size: 20px; }
-.board { display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 16px; }
-.column { background: #EEF0F6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.column-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-.count { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
-.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(27, 31, 59, 0.04); }
-.tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 4px; padding: 2px 6px; }
-.task-title { margin: 8px 0 10px; font-weight: 600; }
-.task-foot { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-@@@ solution src/components/NotificationsMenu.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { getNotifications, markRead, markAllRead } from '../api';
 import type { Notification } from '../api';
 import { Avatar } from './Avatar';
-import { BellIcon } from './Icons';
-import { isToday, timeAgo } from '../utils/time';
+import { timeAgo } from '../utils/time';
 
+// One row in the notifications list (Avatar, text, timeAgo). Unread rows get a tint and a dot.
 type ItemProps = {
   item: Notification;
   onClick: (id: string) => void;
 };
 
-function NotificationItem({ item, onClick }: ItemProps) {
+export function NotificationItem({ item, onClick }: ItemProps) {
   let cls = 'notif-item';
   let dot = null;
   if (!item.read) {
@@ -291,157 +149,7 @@ function NotificationItem({ item, onClick }: ItemProps) {
     </li>
   );
 }
-
-type GroupProps = {
-  title: string;
-  items: Notification[];
-  onItemClick: (id: string) => void;
-};
-
-// Change: one heading + list per group. An empty group renders nothing.
-function NotificationGroup({ title, items, onItemClick }: GroupProps) {
-  if (items.length === 0) {
-    return null;
-  }
-  return (
-    <section className="notif-group">
-      <h3 className="notif-group-title">{title}</h3>
-      <ul className="notif-list">
-        {items.map((item) => {
-          return <NotificationItem key={item.id} item={item} onClick={onItemClick} />;
-        })}
-      </ul>
-    </section>
-  );
-}
-
-export function NotificationsMenu() {
-  const [items, setItems] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  // Load on mount, not on open: the badge needs the count before the menu is ever opened.
-  useEffect(() => {
-    let cancelled = false;
-    getNotifications().then((data) => {
-      if (cancelled) {
-        return;
-      }
-      setItems(data);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Outside click + Escape. Only listen while the menu is open.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function handleMouseDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
-
-  function handleToggle() {
-    setOpen((prev) => {
-      return !prev;
-    });
-  }
-
-  // Optimistic: update the UI now, tell the server in the background.
-  function handleItemClick(id: string) {
-    setItems((prev) => {
-      return prev.map((n) => {
-        if (n.id === id) {
-          return { ...n, read: true };
-        }
-        return n;
-      });
-    });
-    markRead(id);
-  }
-
-  function handleMarkAll() {
-    setItems((prev) => {
-      return prev.map((n) => {
-        return { ...n, read: true };
-      });
-    });
-    markAllRead();
-  }
-
-  // derived: never stored in state
-  const unreadCount = items.filter((n) => {
-    return !n.read;
-  }).length;
-  const todayItems = items.filter((n) => {
-    return isToday(n.createdAt);
-  });
-  const earlierItems = items.filter((n) => {
-    return !isToday(n.createdAt);
-  });
-
-  let badge = null;
-  if (unreadCount > 0) {
-    badge = <span className="bell-badge">{unreadCount}</span>;
-  }
-
-  let dropdown = null;
-  if (open) {
-    let body;
-    if (loading) {
-      body = <p className="notif-empty">Loading notifications…</p>;
-    } else if (items.length === 0) {
-      body = <p className="notif-empty">You're all caught up.</p>;
-    } else {
-      body = (
-        <div className="notif-scroll">
-          <NotificationGroup title="Today" items={todayItems} onItemClick={handleItemClick} />
-          <NotificationGroup title="Earlier" items={earlierItems} onItemClick={handleItemClick} />
-        </div>
-      );
-    }
-    dropdown = (
-      <div className="notif-menu" role="dialog" aria-label="Notifications">
-        <div className="notif-head">
-          <h2>Notifications</h2>
-          <button type="button" className="link-btn" disabled={unreadCount === 0} onClick={() => { handleMarkAll(); }}>
-            Mark all as read
-          </button>
-        </div>
-        {body}
-      </div>
-    );
-  }
-
-  return (
-    <div className="notif-wrap" ref={wrapRef}>
-      <button type="button" className="icon-btn bell-btn" aria-label="Notifications" aria-expanded={open} onClick={() => { handleToggle(); }}>
-        <BellIcon />
-        {badge}
-      </button>
-      {dropdown}
-    </div>
-  );
-}
-@@@ solution src/App.tsx
+@@@ starter src/App.tsx
 import React from 'react';
 import { Avatar } from './components/Avatar';
 import { SearchIcon } from './components/Icons';
@@ -531,6 +239,243 @@ export default function App() {
     </div>
   );
 }
+@@@ starter src/components/NotificationsMenu.tsx
+import React from 'react';
+import { BellIcon } from './Icons';
+
+// The bell in the header. TODO: unread badge + notifications dropdown.
+export function NotificationsMenu() {
+  return (
+    <div className="notif-wrap">
+      <button type="button" className="icon-btn bell-btn" aria-label="Notifications">
+        <BellIcon />
+      </button>
+    </div>
+  );
+}
+@@@ starter src/styles.css
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --border: #E6E8F0;
+  --text: #1B1F3B;
+  --muted: #6B7090;
+  --primary: #5B5BD6;
+  --primary-soft: #EEEEFC;
+  --danger: #E5484D;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 14px; }
+.nav { display: flex; gap: 4px; }
+.nav-link { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--muted); cursor: pointer; }
+.nav-link:hover { background: var(--bg); }
+.nav-link.is-active { color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.search { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+.search input { border: 0; outline: 0; font: inherit; width: 140px; background: none; }
+
+.icon-btn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { background: var(--bg); color: var(--text); }
+.bell-btn { position: relative; }
+
+.avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 600; }
+
+.page { padding: 24px 20px; }
+.page-title { margin: 0 0 16px; font-size: 20px; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 16px; }
+.column { background: #EEF0F6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.column-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.count { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: 0 1px 2px rgba(27, 31, 59, 0.04); }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 4px; padding: 2px 6px; }
+.task-title { margin: 8px 0 10px; font-weight: 600; }
+.task-foot { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+
+/* NotificationItem row (components/NotificationItem.tsx): already styled */
+.notif-item { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border: 0; background: none; font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.notif-item:hover { background: var(--bg); }
+.notif-item.is-unread { background: #F7F7FE; }
+.notif-item.is-unread:hover { background: var(--primary-soft); }
+.notif-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.notif-text { font-size: 13px; line-height: 1.4; }
+.notif-time { font-size: 12px; color: var(--muted); }
+.unread-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+@@@ solution src/components/NotificationsMenu.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { getNotifications, markRead, markAllRead } from '../api';
+import type { Notification } from '../api';
+import { BellIcon } from './Icons';
+import { NotificationItem } from './NotificationItem';
+import { isToday } from '../utils/time';
+
+// STRETCH: Today / Earlier groups. One heading + list per group; an empty group renders nothing.
+// (Core is simply one <ul className="notif-list"> mapping items to <NotificationItem>.)
+type GroupProps = {
+  title: string;
+  items: Notification[];
+  onItemClick: (id: string) => void;
+};
+
+function NotificationGroup({ title, items, onItemClick }: GroupProps) {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <section className="notif-group">
+      <h3 className="notif-group-title">{title}</h3>
+      <ul className="notif-list">
+        {items.map((item) => {
+          return <NotificationItem key={item.id} item={item} onClick={onItemClick} />;
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export function NotificationsMenu() {
+  // CORE: items, loading, open
+  const [items, setItems] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  // STRETCH: ref for click-outside
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // CORE: load on mount, not on open: the badge needs the count before the menu is ever opened.
+  useEffect(() => {
+    let cancelled = false;
+    getNotifications().then((data) => {
+      if (cancelled) {
+        return;
+      }
+      setItems(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // NEXT: outside click + Escape. Only listen while the menu is open.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function handleMouseDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  // CORE: toggle
+  function handleToggle() {
+    setOpen((prev) => {
+      return !prev;
+    });
+  }
+
+  // NEXT: optimistic mark-read. Update the UI now, tell the server in the background.
+  function handleItemClick(id: string) {
+    setItems((prev) => {
+      return prev.map((n) => {
+        if (n.id === id) {
+          return { ...n, read: true };
+        }
+        return n;
+      });
+    });
+    markRead(id);
+  }
+
+  // CHANGE: mark all as read
+  function handleMarkAll() {
+    setItems((prev) => {
+      return prev.map((n) => {
+        return { ...n, read: true };
+      });
+    });
+    markAllRead();
+  }
+
+  // CORE: derived, never stored in state
+  const unreadCount = items.filter((n) => {
+    return !n.read;
+  }).length;
+  // STRETCH: the two groups
+  const todayItems = items.filter((n) => {
+    return isToday(n.createdAt);
+  });
+  const earlierItems = items.filter((n) => {
+    return !isToday(n.createdAt);
+  });
+
+  // CHANGE: header button (disabled when nothing is unread)
+  const markAllBtn = (
+    <button type="button" className="link-btn" disabled={unreadCount === 0} onClick={() => { handleMarkAll(); }}>
+      Mark all as read
+    </button>
+  );
+
+  // CORE: badge + dropdown decisions
+  let badge = null;
+  if (unreadCount > 0) {
+    badge = <span className="bell-badge">{unreadCount}</span>;
+  }
+
+  let dropdown = null;
+  if (open) {
+    let body;
+    if (loading) {
+      body = <p className="notif-empty">Loading notifications…</p>;
+    } else if (items.length === 0) {
+      body = <p className="notif-empty">You're all caught up.</p>;
+    } else {
+      body = (
+        <div className="notif-scroll">
+          <NotificationGroup title="Today" items={todayItems} onItemClick={handleItemClick} />
+          <NotificationGroup title="Earlier" items={earlierItems} onItemClick={handleItemClick} />
+        </div>
+      );
+    }
+    dropdown = (
+      <div className="notif-menu" role="dialog" aria-label="Notifications">
+        <div className="notif-head">
+          <h2>Notifications</h2>
+          {markAllBtn}
+        </div>
+        {body}
+      </div>
+    );
+  }
+
+  // CORE: render
+  return (
+    <div className="notif-wrap" ref={wrapRef}>
+      <button type="button" className="icon-btn bell-btn" aria-label="Notifications" aria-expanded={open} onClick={() => { handleToggle(); }}>
+        <BellIcon />
+        {badge}
+      </button>
+      {dropdown}
+    </div>
+  );
+}
 @@@ solution src/styles.css
 :root {
   --bg: #F6F7FB;
@@ -575,20 +520,7 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .task-title { margin: 8px 0 10px; font-weight: 600; }
 .task-foot { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 
-/* ---- Added: notifications dropdown ---- */
-.notif-wrap { position: relative; }
-.bell-badge { position: absolute; top: 3px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; border: 2px solid var(--surface); box-sizing: content-box; }
-
-.notif-menu { position: absolute; top: 44px; right: -44px; width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(27, 31, 59, 0.14); overflow: hidden; z-index: 20; }
-.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.notif-head h2 { margin: 0; font-size: 15px; }
-.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
-.link-btn:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
-.notif-scroll { max-height: 420px; overflow-y: auto; }
-.notif-empty { margin: 0; padding: 28px 16px; text-align: center; color: var(--muted); }
-
-.notif-group-title { margin: 0; padding: 10px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.notif-list { list-style: none; margin: 0; padding: 0 0 6px; }
+/* NotificationItem row (components/NotificationItem.tsx): already styled */
 .notif-item { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border: 0; background: none; font: inherit; text-align: left; color: var(--text); cursor: pointer; }
 .notif-item:hover { background: var(--bg); }
 .notif-item.is-unread { background: #F7F7FE; }
@@ -597,3 +529,22 @@ body { margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans
 .notif-text { font-size: 13px; line-height: 1.4; }
 .notif-time { font-size: 12px; color: var(--muted); }
 .unread-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+
+/* ---- Added: notifications dropdown ---- */
+/* CORE: wrapper, badge, menu */
+.notif-wrap { position: relative; }
+.bell-badge { position: absolute; top: 3px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; border: 2px solid var(--surface); box-sizing: content-box; }
+
+.notif-menu { position: absolute; top: 44px; right: -44px; width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(27, 31, 59, 0.14); overflow: hidden; z-index: 20; }
+.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.notif-head h2 { margin: 0; font-size: 15px; }
+.notif-scroll { max-height: 420px; overflow-y: auto; }
+.notif-empty { margin: 0; padding: 28px 16px; text-align: center; color: var(--muted); }
+.notif-list { list-style: none; margin: 0; padding: 0 0 6px; }
+
+/* CHANGE: mark all button */
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.link-btn:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
+
+/* STRETCH: group headings */
+.notif-group-title { margin: 0; padding: 10px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
